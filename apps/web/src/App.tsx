@@ -91,8 +91,6 @@ function Table({
   // Develop, once its card is chosen, is played by tapping industries on the mat.
   const developing = draft.kind === 'develop' && draft.card !== null;
   const developable = useMemo(() => new Set(developIndustries(view.cards, legal, draft)), [view.cards, legal, draft]);
-  const removing: Partial<Record<brass.Industry, number>> = {};
-  for (const ind of draft.industries) removing[ind] = (removing[ind] ?? 0) + 1;
   // Building with a town card: jump the map to that town.
   const focusCard = draft.kind === 'build' && draft.card ? view.cards[draft.card] : undefined;
   const buildFocus = focusCard?.kind === 'location' ? { location: focusCard.location, key: draft.card! } : null;
@@ -182,9 +180,10 @@ function Table({
                 <PlayerMat
                   player={p!}
                   era={state.era}
-                  removing={removing}
+                  picks={draft.industries}
                   selectable={developable}
                   onRow={(ind) => setDraft((d) => tapMatRow(d, ind, developable))}
+                  onUnpick={(i) => setDraft((d) => ({ ...d, industries: d.industries.filter((_, j) => j !== i) }))}
                 />
               ) : (
                 <PlayerMat player={p!} era={state.era} />

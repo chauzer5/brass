@@ -91,24 +91,29 @@ function eraNote(tile: brass.TileLevel, era: brass.Era): string | null {
 export function PlayerMat({
   player,
   era,
-  removing,
+  picks,
   selectable,
   onRow,
+  onUnpick,
 }: {
   player: brass.PlayerView;
   era: brass.Era;
-  /** While developing: tiles marked for removal per industry, taken from the lowest levels up. */
-  removing?: Partial<Record<brass.Industry, number>> | undefined;
+  /** While developing: the industries picked for removal, in order. Each takes that industry's lowest tile. */
+  picks?: readonly brass.Industry[] | undefined;
   /** While developing: industries that can take another removal; their rows light up. */
   selectable?: ReadonlySet<brass.Industry> | undefined;
   onRow?: ((industry: brass.Industry) => void) | undefined;
+  /** Undo the pick at this index of `picks`. */
+  onUnpick?: ((index: number) => void) | undefined;
 }) {
   const choosing = selectable !== undefined;
   return (
     <div className={`player-mat ${choosing ? 'choosing' : ''}`}>
       {brass.INDUSTRIES.map((industry) => {
         const levels = brass.INDUSTRY_TILES[industry];
-        const { remaining, removed } = afterRemoving(player.mat[industry], removing?.[industry] ?? 0);
+        // Picks of this industry, numbered in the order they were made.
+        const order = (picks ?? []).flatMap((ind, i) => (ind === industry ? [i] : []));
+        const { remaining, removed } = afterRemoving(player.mat[industry], order.length);
         const nextIndex = remaining.findIndex((n) => n > 0);
         const next = nextIndex < 0 ? null : nextIndex + 1;
         const tile = next ? levels[next - 1]! : null;
@@ -170,6 +175,23 @@ export function PlayerMat({
                 <span className="muted">All built</span>
               )}
             </span>
+            {choosing && (
+              <span className="mat-picks">
+                {order.map((i) => (
+                  <button
+                    key={i}
+                    className="mat-pick"
+                    aria-label={`Undo pick ${i + 1}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onUnpick?.(i);
+                    }}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
+              </span>
+            )}
           </div>
         );
       })}

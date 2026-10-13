@@ -83,7 +83,7 @@ export function StepPanel({ view, player, legal, draft, setDraft, validate, onPl
       {draft.kind === 'network' && draft.card && (
         <NetworkSteps view={view} legal={legal} draft={draft} setDraft={setDraft} />
       )}
-      {draft.kind === 'develop' && draft.card && <DevelopSteps me={me} draft={draft} setDraft={setDraft} />}
+      {draft.kind === 'develop' && draft.card && <DevelopSteps draft={draft} />}
       {draft.kind === 'sell' && draft.card && <SellSteps view={view} legal={legal} draft={draft} setDraft={setDraft} />}
 
       {action && (
@@ -121,45 +121,15 @@ export function tapMatRow(d: Draft, industry: brass.Industry, addable: ReadonlyS
   return i < 0 ? d : { ...d, industries: d.industries.filter((_, j) => j !== i) };
 }
 
-/** Develop picks tiles on the player mat; this lists the picks so they can be undone. */
-function DevelopSteps({ me, draft, setDraft }: { me: brass.PlayerView; draft: Draft; setDraft: Dispatch<SetStateAction<Draft>> }) {
-  // Name each pick by the level it removes: a second pick of an industry takes the tile after the first.
-  const seen: Partial<Record<brass.Industry, number>> = {};
-  const picks = draft.industries.map((ind) => {
-    const skip = (seen[ind] = (seen[ind] ?? 0) + 1) - 1;
-    let level = 0;
-    for (let left = skip; level < me.mat[ind].length; level++) {
-      left -= me.mat[ind][level]!;
-      if (left < 0) break;
-    }
-    return { ind, label: `${INDUSTRY_NAME[ind]} ${roman(level + 1)}` };
-  });
+/** Develop is played on the player mat, which numbers the picks; this only says what to do. */
+function DevelopSteps({ draft }: { draft: Draft }) {
+  const n = draft.industries.length;
   return (
-    <>
-      <p className="hint">
-        {draft.industries.length < 2
-          ? `Tap ${draft.industries.length ? 'another industry' : 'an industry'} on your board to remove its lowest tile (${draft.industries.length}/2).`
-          : 'Two tiles chosen. Tap a marked industry to put one back.'}
-      </p>
-      {picks.length > 0 && (
-        <div className="chips">
-          {picks.map(({ ind, label }, i) => (
-            <button
-              key={i}
-              className="chip selected with-icon"
-              aria-label={`Keep ${label}`}
-              onClick={() => setDraft((d) => ({ ...d, industries: d.industries.filter((_, j) => j !== i) }))}
-            >
-              <IndustryIcon industry={ind} size={16} />
-              {label} ✕
-            </button>
-          ))}
-          <span className="muted develop-cost">
-            {picks.length} iron
-          </span>
-        </div>
-      )}
-    </>
+    <p className="hint">
+      {n === 0
+        ? 'Tap an industry on your board to remove its lowest tile (up to 2).'
+        : `${n} tile${n > 1 ? 's' : ''} chosen · ${n} iron. Tap a number to undo.`}
+    </p>
   );
 }
 

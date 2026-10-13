@@ -1205,9 +1205,29 @@ button {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--danger) 35%, transparent);
 }
 
-.develop-cost {
-  align-self: center;
-  font-size: 12px;
+.player-mat.choosing .mat-row {
+  grid-template-columns: 26px 140px 1fr auto;
+}
+
+.mat-picks {
+  display: flex;
+  gap: 4px;
+}
+
+.mat-pick {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--danger);
+  color: var(--surface);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
 }
 
 .mat-icon {
