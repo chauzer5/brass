@@ -1,5 +1,5 @@
 import { brass } from '@brass/engine';
-import type { KeyboardEvent } from 'react';
+import { useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { INDUSTRY_NAME, roman } from '../game/labels.ts';
 import { IndustryIcon } from './icons.tsx';
 
@@ -84,9 +84,78 @@ function eraNote(tile: brass.TileLevel, era: brass.Era): string | null {
   return null;
 }
 
+/** Holding a level box this long shows that level's tile in place of the next one. */
+const HOLD_MS = 250;
+/** A finger that moves further than this (px) before the hold kicks in is a scroll, not a hold. */
+const HOLD_SLOP = 10;
+
+type Inspect = { industry: brass.Industry; level: number };
+
+/** The level box under a point on screen, if any. */
+function levelAt(x: number, y: number): Inspect | null {
+  const el = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-level]');
+  return el ? { industry: el.dataset.industry as brass.Industry, level: Number(el.dataset.level) } : null;
+}
+
+/**
+ * Hold a level box to see that level's tile; slide to look along the row or
+ * across rows, like fanning through the hand. The release isn't a tap.
+ */
+function useInspect() {
+  const [inspect, setInspect] = useState<Inspect | null>(null);
+  const hold = useRef<{ x: number; y: number; timer: number } | null>(null);
+  const swallowClick = useRef(false);
+  const end = () => {
+    if (hold.current) clearTimeout(hold.current.timer);
+    hold.current = null;
+    setInspect(null);
+  };
+  const handlers = {
+    onPointerDown: (e: PointerEvent<HTMLDivElement>) => {
+      swallowClick.current = false;
+      const start = levelAt(e.clientX, e.clientY);
+      if (!start || e.button !== 0) return;
+      const target = e.currentTarget;
+      const { pointerId } = e;
+      const timer = window.setTimeout(() => {
+        target.setPointerCapture(pointerId);
+        swallowClick.current = true;
+        setInspect(start);
+        navigator.vibrate?.(8);
+      }, HOLD_MS);
+      hold.current = { x: e.clientX, y: e.clientY, timer };
+    },
+    onPointerMove: (e: PointerEvent<HTMLDivElement>) => {
+      const h = hold.current;
+      if (!h) return;
+      if (!inspect) {
+        if (Math.hypot(e.clientX - h.x, e.clientY - h.y) > HOLD_SLOP) end();
+        return;
+      }
+      const at = levelAt(e.clientX, e.clientY);
+      if (at && (at.industry !== inspect.industry || at.level !== inspect.level)) {
+        setInspect(at);
+        navigator.vibrate?.(4);
+      }
+    },
+    onPointerUp: end,
+    onPointerCancel: end,
+    onContextMenu: (e: { preventDefault: () => void }) => e.preventDefault(),
+    onClickCapture: (e: { stopPropagation: () => void }) => {
+      // The release that ends a hold shouldn't also pick a row.
+      if (swallowClick.current) {
+        swallowClick.current = false;
+        e.stopPropagation();
+      }
+    },
+  };
+  return { inspect, handlers };
+}
+
 /**
  * A player's mat: for each industry, the tiles left at each level (the next
- * one to build is outlined) and the stats of that next tile.
+ * one to build is outlined) and the stats of that next tile. Holding a
+ * level shows that level's stats instead.
  */
 export function PlayerMat({
   player,
@@ -107,8 +176,9 @@ export function PlayerMat({
   onUnpick?: ((index: number) => void) | undefined;
 }) {
   const choosing = selectable !== undefined;
+  const { inspect, handlers } = useInspect();
   return (
-    <div className={`player-mat ${choosing ? 'choosing' : ''}`}>
+    <div className={`player-mat ${choosing ? 'choosing' : ''}`} {...handlers}>
       {brass.INDUSTRIES.map((industry) => {
         const levels = brass.INDUSTRY_TILES[industry];
         // Picks of this industry, numbered in the order they were made.
@@ -116,6 +186,8 @@ export function PlayerMat({
         const { remaining, removed } = afterRemoving(player.mat[industry], order.length);
         const nextIndex = remaining.findIndex((n) => n > 0);
         const next = nextIndex < 0 ? null : nextIndex + 1;
+        const held = inspect?.industry === industry ? inspect.level : null;
+        const heldTile = held ? levels[held - 1]! : null;
         const tile = next ? levels[next - 1]! : null;
         const note = tile && eraNote(tile, era);
         const lit = selectable?.has(industry) ?? false;
@@ -148,7 +220,11 @@ export function PlayerMat({
                 return (
                   <span
                     key={def.level}
+                    data-industry={industry}
+                    data-level={def.level}
                     className={`mat-level ${left === 0 ? 'gone' : ''} ${going ? 'removing' : ''} ${def.level === next ? 'next' : ''} ${
+                      def.level === held ? 'held' : ''
+                    } ${
                       def.canalOnly ? 'canal-only' : def.railOnly ? 'rail-only' : ''
                     }`}
                     title={`${INDUSTRY_NAME[industry]} ${roman(def.level)}: ${left} of ${def.count} left`}
@@ -165,7 +241,28 @@ export function PlayerMat({
                 );
               })}
             </span>
-            <span className="mat-next">
+            <span className={`mat-next ${heldTile ? 'held' : ''}`}>
+              {heldTile && (
+                // Drawn over the next tile's stats, so the row keeps its height while sliding.
+                <span className="mat-held-card">
+                  <span className="mat-held-label">
+                    {INDUSTRY_NAME[industry]} {roman(heldTile.level)} · {player.mat[industry][heldTile.level - 1] ?? 0} of{' '}
+                    {heldTile.count} left
+                  </span>
+                  <TileStats tile={heldTile} />
+                  {[
+                    heldTile.canalOnly && 'Canal Era only',
+                    heldTile.railOnly && 'Rail Era only',
+                    heldTile.cannotDevelop && "Can't be developed",
+                  ]
+                    .filter(Boolean)
+                    .map((n) => (
+                      <span key={n as string} className="mat-note">
+                        {n}
+                      </span>
+                    ))}
+                </span>
+              )}
               {tile ? (
                 <>
                   <TileStats tile={tile} />
@@ -199,6 +296,7 @@ export function PlayerMat({
         <span>
           <Glyph kind="link" /> {player.linksInSupply} link tiles left
         </span>
+        <span>Hold a level to see its tile</span>
         <span className="mat-legend">
           <span className="legend-swatch canal-only" /> Canal only
           <span className="legend-swatch rail-only" /> Rail only

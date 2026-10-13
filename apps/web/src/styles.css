@@ -1257,6 +1257,62 @@ button {
   line-height: 1;
 }
 
+/* Holding a level box: it lifts like a card from the hand. */
+.mat-level {
+  transition: transform 0.12s ease;
+}
+
+.mat-track {
+  touch-action: none;
+}
+
+.mat-level.held {
+  z-index: 1;
+  opacity: 1;
+  transform: translateY(-3px) scale(1.25);
+  background: var(--surface);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+}
+
+.mat-next {
+  position: relative;
+}
+
+.mat-held-card {
+  position: absolute;
+  z-index: 2;
+  left: -6px;
+  right: -6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 1.5px solid var(--accent);
+  background: var(--surface);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+.mat-held-card .tile-stats {
+  display: flex;
+  flex-direction: column;
+}
+
+.mat-held-card .tile-cost {
+  font-weight: 700;
+}
+
+.mat-held-card .tile-reward {
+  color: var(--muted);
+}
+
+.mat-held-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
 .mat-level.canal-only { border-bottom-color: var(--canal); }
 .mat-level.rail-only { border-bottom-color: var(--rail); }
 
