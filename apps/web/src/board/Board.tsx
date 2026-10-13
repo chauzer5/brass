@@ -102,7 +102,14 @@ export function Board({ state, highlights = NO_HIGHLIGHTS, onSlot, onLink }: Boa
   return (
     <TransformWrapper minScale={1} maxScale={6} doubleClick={{ mode: 'zoomIn' }} centerOnInit>
       <TransformComponent wrapperClass="board-viewport" contentClass="board-content">
-        <svg className="board-svg" viewBox={`0 0 ${BOARD_SIZE} ${BOARD_SIZE}`} role="img" aria-label="Game board">
+        <svg
+          className="board-svg"
+          viewBox={`0 0 ${BOARD_SIZE} ${BOARD_SIZE}`}
+          // Pin the map to the top: the hand covers the bottom of the screen.
+          preserveAspectRatio="xMidYMin meet"
+          role="img"
+          aria-label="Game board"
+        >
           <rect width={BOARD_SIZE} height={BOARD_SIZE} className="board-bg" />
           <image href="/board-bg.webp" width={BOARD_SIZE} height={BOARD_SIZE} preserveAspectRatio="xMidYMid slice" />
           {/* Softens the art so links, spaces and labels stay readable on top of it. */}

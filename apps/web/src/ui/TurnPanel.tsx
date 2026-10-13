@@ -1,32 +1,20 @@
 import { brass } from '@brass/engine';
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 import {
-  ACTION_KINDS,
   EMPTY_DRAFT,
-  availableKinds,
   buildIndustries,
   buildSlots,
   compose,
   developIndustries,
   networkLinks,
   sellOptions,
-  usableCards,
-  type ActionKind,
   type Draft,
 } from '../game/draft.ts';
 import { INDUSTRY_NAME, cardName, linkName, merchantName, roman, slotName } from '../game/labels.ts';
+import { ACTION_LABEL } from './ActionRail.tsx';
+import { ActionIcon } from './icons.tsx';
 
-const ACTION_LABEL: Record<ActionKind, { name: string; hint: string }> = {
-  build: { name: 'Build', hint: 'Place an industry' },
-  network: { name: 'Network', hint: 'Place a canal or rail link' },
-  develop: { name: 'Develop', hint: 'Remove tiles from your mat' },
-  sell: { name: 'Sell', hint: 'Flip cotton, goods or pottery' },
-  loan: { name: 'Loan', hint: '£30, −3 income levels' },
-  scout: { name: 'Scout', hint: 'Discard 3 for 2 Wild cards' },
-  pass: { name: 'Pass', hint: 'Discard a card' },
-};
-
-interface TurnPanelProps {
+interface StepPanelProps {
   view: brass.BrassView;
   player: number;
   legal: readonly brass.BrassAction[];
@@ -34,13 +22,14 @@ interface TurnPanelProps {
   setDraft: Dispatch<SetStateAction<Draft>>;
   validate: (action: brass.BrassAction) => string | null;
   onPlay: (action: brass.BrassAction) => void;
-  canUndo: boolean;
-  onUndo: () => void;
 }
 
-export function TurnPanel({ view, player, legal, draft, setDraft, validate, onPlay, canUndo, onUndo }: TurnPanelProps) {
+/**
+ * The choices left for the action being put together, and Confirm. Actions
+ * are picked from the rail and cards from the hand; this panel holds the rest.
+ */
+export function StepPanel({ view, player, legal, draft, setDraft, validate, onPlay }: StepPanelProps) {
   const me = view.players[player]!;
-  const hand = me.hand ?? [];
   const cards = view.cards;
 
   if (view.phase.kind === 'shortfall') {
@@ -64,69 +53,29 @@ export function TurnPanel({ view, player, legal, draft, setDraft, validate, onPl
     );
   }
 
-  const action = compose(draft);
-  const error = action ? validate(action) : null;
-  const kinds = availableKinds(legal);
-
   if (!draft.kind) {
-    return (
-      <div className="panel">
-        <Hand cards={cards} hand={hand} />
-        <div className="action-grid">
-          {ACTION_KINDS.map((k) => (
-            <button
-              key={k}
-              className="action-button"
-              disabled={!kinds.has(k)}
-              onClick={() => setDraft({ ...EMPTY_DRAFT, kind: k })}
-            >
-              <span className="action-name">{ACTION_LABEL[k].name}</span>
-              <span className="action-hint">{ACTION_LABEL[k].hint}</span>
-            </button>
-          ))}
-        </div>
-        {canUndo && (
-          <button className="link-button" onClick={onUndo}>
-            Undo last action
-          </button>
-        )}
-      </div>
-    );
+    return <p className="hint">Choose an action from the side of the board.</p>;
   }
 
-  const usable = usableCards(cards, hand, legal, draft.kind);
-  const pickCard = (id: brass.CardId) =>
-    setDraft((d) =>
-      d.kind === 'scout'
-        ? {
-            ...d,
-            scoutCards: d.scoutCards.includes(id)
-              ? d.scoutCards.filter((c) => c !== id)
-              : d.scoutCards.length < 3
-                ? [...d.scoutCards, id]
-                : d.scoutCards,
-          }
-        : { ...EMPTY_DRAFT, kind: d.kind, card: id },
-    );
+  const action = compose(draft);
+  const error = action ? validate(action) : null;
+  const cardHint =
+    draft.kind === 'scout'
+      ? `Choose 3 cards to discard (${draft.scoutCards.length}/3)`
+      : draft.card
+        ? `Card: ${cardName(cards[draft.card])}`
+        : 'Choose a card from your hand';
 
   return (
     <div className="panel">
       <div className="panel-header">
-        <button className="back" onClick={() => setDraft(EMPTY_DRAFT)} aria-label="Back to actions">
-          ‹
-        </button>
+        <ActionIcon kind={draft.kind} size={20} />
         <h2>{ACTION_LABEL[draft.kind].name}</h2>
+        <span className="panel-card-hint">{cardHint}</span>
+        <button className="close" onClick={() => setDraft(EMPTY_DRAFT)} aria-label="Cancel action">
+          ✕
+        </button>
       </div>
-
-      <Step title={draft.kind === 'scout' ? 'Choose 3 cards to discard' : 'Choose a card'}>
-        <Hand
-          cards={cards}
-          hand={hand}
-          usable={usable}
-          selected={new Set(draft.kind === 'scout' ? draft.scoutCards : draft.card ? [draft.card] : [])}
-          onPick={pickCard}
-        />
-      </Step>
 
       {draft.kind === 'build' && draft.card && <BuildSteps view={view} me={me} legal={legal} draft={draft} setDraft={setDraft} />}
       {draft.kind === 'network' && draft.card && (
@@ -155,14 +104,27 @@ export function TurnPanel({ view, player, legal, draft, setDraft, validate, onPl
       )}
       {draft.kind === 'sell' && draft.card && <SellSteps view={view} legal={legal} draft={draft} setDraft={setDraft} />}
 
-      <div className="confirm-row">
-        {action && error && <p className="error">{error}</p>}
-        <button className="confirm" disabled={!action || !!error} onClick={() => action && onPlay(action)}>
-          Confirm
-        </button>
-      </div>
+      {action && (
+        <div className="confirm-row">
+          {error && <p className="error">{error}</p>}
+          <button className="confirm" disabled={!!error} onClick={() => onPlay(action)}>
+            Confirm {ACTION_LABEL[draft.kind].name}
+          </button>
+        </div>
+      )}
     </div>
   );
+}
+
+/** Applies a tap on a hand card to the draft. */
+export function pickCard(draft: Draft, id: brass.CardId): Draft {
+  if (draft.kind === 'scout') {
+    const chosen = draft.scoutCards;
+    if (chosen.includes(id)) return { ...draft, scoutCards: chosen.filter((c) => c !== id) };
+    return chosen.length < 3 ? { ...draft, scoutCards: [...chosen, id] } : draft;
+  }
+  if (draft.card === id) return { ...EMPTY_DRAFT, kind: draft.kind };
+  return { ...EMPTY_DRAFT, kind: draft.kind, card: id };
 }
 
 function lowest(me: brass.PlayerView, industry: brass.Industry): string {
@@ -176,40 +138,6 @@ function Step({ title, children }: { title: string; children: ReactNode }) {
       <h3>{title}</h3>
       {children}
     </section>
-  );
-}
-
-function Hand({
-  cards,
-  hand,
-  usable,
-  selected,
-  onPick,
-}: {
-  cards: Record<brass.CardId, brass.Card>;
-  hand: readonly brass.CardId[];
-  usable?: Set<brass.CardId>;
-  selected?: Set<brass.CardId>;
-  onPick?: (id: brass.CardId) => void;
-}) {
-  if (hand.length === 0) return <p className="muted">No cards in hand.</p>;
-  return (
-    <div className="hand">
-      {hand.map((id) => {
-        const card = cards[id];
-        const disabled = usable ? !usable.has(id) : true;
-        return (
-          <button
-            key={id}
-            className={`card card-${card?.kind ?? 'unknown'} ${selected?.has(id) ? 'selected' : ''}`}
-            disabled={!onPick || disabled}
-            onClick={() => onPick?.(id)}
-          >
-            {cardName(card)}
-          </button>
-        );
-      })}
-    </div>
   );
 }
 

@@ -1,11 +1,12 @@
 import { brass } from '@brass/engine';
 import { useEffect, useMemo, useState } from 'react';
 import { Board } from './board/Board.tsx';
-import { EMPTY_DRAFT, highlights, type Draft } from './game/draft.ts';
+import { EMPTY_DRAFT, availableKinds, highlights, usableCards, type Draft } from './game/draft.ts';
 import { canUndo, useGame, type Game } from './game/useGame.ts';
-import { BottomSheet } from './layout/BottomSheet.tsx';
+import { ActionRail } from './ui/ActionRail.tsx';
+import { HandTray } from './ui/HandTray.tsx';
 import { GameOver, Handoff, NewGame, PlayerStrip } from './ui/Screens.tsx';
-import { TurnPanel, tapSlot } from './ui/TurnPanel.tsx';
+import { StepPanel, pickCard, tapSlot } from './ui/TurnPanel.tsx';
 
 export function App() {
   const { game, start, play, undoLast, quit } = useGame();
@@ -56,6 +57,7 @@ function Table({
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [revealedFor, setRevealedFor] = useState<number | null>(names.length === 1 ? player : null);
   const [message, setMessage] = useState<string | null>(null);
+  const [tucked, setTucked] = useState(false);
 
   // A new player (or a new phase) starts with a fresh draft.
   useEffect(() => setDraft(EMPTY_DRAFT), [player, state.phase.kind, match.log.length]);
@@ -78,6 +80,10 @@ function Table({
   const actionsThisTurn = brass.actionsThisTurn(state);
   const coalPrice = state.coalMarket > 0 ? brass.COAL_MARKET.prices[brass.COAL_MARKET.prices.length - state.coalMarket] : brass.COAL_MARKET.emptyPrice;
   const ironPrice = state.ironMarket > 0 ? brass.IRON_MARKET.prices[brass.IRON_MARKET.prices.length - state.ironMarket] : brass.IRON_MARKET.emptyPrice;
+  const hand = p?.hand ?? [];
+  const usable = draft.kind ? usableCards(view.cards, hand, legal, draft.kind) : null;
+  const selectedCards = new Set(draft.kind === 'scout' ? draft.scoutCards : draft.card ? [draft.card] : []);
+  const showControls = player !== null && !hidden;
 
   return (
     <div className="app">
@@ -86,7 +92,13 @@ function Table({
           Brass ☰
         </button>
         <span className="topbar-status">
-          {state.era === 'canal' ? 'Canal' : 'Rail'} Era · Round {state.round}
+          {state.era === 'canal' ? 'Canal' : 'Rail'} · Round {state.round}
+          {state.phase.kind === 'actions' && player !== null && (
+            <>
+              {' '}
+              · Action {state.actionsTaken + 1}/{actionsThisTurn}
+            </>
+          )}
         </span>
       </header>
       <PlayerStrip view={view} names={names} active={player} />
@@ -100,43 +112,47 @@ function Table({
           }}
           onLink={(id) => setDraft((d) => ({ ...d, links: [...d.links, id] }))}
         />
-      </main>
-      <BottomSheet
-        title={
-          p && player !== null ? (
-            <>
-              {names[player]} · £{p.money}
-              {state.phase.kind === 'actions' && (
-                <span className="muted">
-                  {' '}
-                  · action {state.actionsTaken + 1} of {actionsThisTurn}
-                </span>
-              )}
-            </>
-          ) : (
-            'Game over'
-          )
-        }
-      >
-        {message && <p className="error">{message}</p>}
-        {player !== null && !hidden && (
-          <TurnPanel
-            view={view}
-            player={player}
-            legal={legal}
-            draft={draft}
-            setDraft={setDraft}
-            validate={(a) => brass.brassGame.validate(state, player, a)}
-            onPlay={submit}
+        {showControls && state.phase.kind === 'actions' && (
+          <ActionRail
+            available={availableKinds(legal)}
+            selected={draft.kind}
+            onSelect={(kind) => {
+              setDraft(kind ? { ...EMPTY_DRAFT, kind } : EMPTY_DRAFT);
+              setMessage(null);
+              if (kind) setTucked(false);
+            }}
             canUndo={canUndo(match)}
             onUndo={undoLast}
           />
         )}
-        <p className="market-row muted">
-          Coal market {state.coalMarket} (next £{coalPrice}) · Iron market {state.ironMarket} (next £{ironPrice}) · Deck{' '}
-          {view.deckSize}
-        </p>
-      </BottomSheet>
+        {showControls && (
+          <HandTray
+            cards={view.cards}
+            hand={hand}
+            usable={usable}
+            selected={selectedCards}
+            onPick={(id) => setDraft((d) => pickCard(d, id))}
+            tucked={tucked}
+            onToggle={() => setTucked((t) => !t)}
+            header={
+              <>
+                Deck {view.deckSize} · Coal £{coalPrice} · Iron £{ironPrice}
+              </>
+            }
+          >
+            {message && <p className="error">{message}</p>}
+            <StepPanel
+              view={view}
+              player={player}
+              legal={legal}
+              draft={draft}
+              setDraft={setDraft}
+              validate={(a) => brass.brassGame.validate(state, player, a)}
+              onPlay={submit}
+            />
+          </HandTray>
+        )}
+      </main>
       {hidden && player !== null && <Handoff name={names[player]!} onReady={() => setRevealedFor(player)} />}
       {outcome && <GameOver outcome={outcome} names={names} onNewGame={onNewGame} />}
     </div>
