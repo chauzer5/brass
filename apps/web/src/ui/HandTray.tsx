@@ -8,8 +8,10 @@ const CARD_GAP = 6;
 /** Narrowest strip of a card left showing when the hand overlaps; below this the hand wraps to 2 rows. */
 const MIN_PEEK = 50;
 /** Vertical distance between the two rows of cards. */
-const ROW_STEP = 104;
-const ONE_ROW_HEIGHT = 116;
+const ROW_STEP = 100;
+/** Room above the first row for a chosen card to lift into. */
+const CARD_TOP = 11;
+const ONE_ROW_HEIGHT = 110;
 /** How far the bar must be dragged (px) to count as a drag rather than a tap. */
 const DRAG_THRESHOLD = 12;
 
@@ -215,7 +217,7 @@ export function HandTray({
             <button
               key={id}
               className={`hand-card ${isSelected ? 'selected' : ''} ${usable && disabled ? 'unusable' : ''} ${rowEnd ? 'row-end' : ''}`}
-              style={{ left: offset + col * step, top: 16 + row * ROW_STEP, zIndex: isSelected ? 50 : i }}
+              style={{ left: offset + col * step, top: CARD_TOP + row * ROW_STEP, zIndex: isSelected ? 50 : i }}
               disabled={disabled}
               aria-pressed={isSelected}
               onClick={() => onPick(id)}
