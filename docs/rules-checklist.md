@@ -11,14 +11,14 @@ Data lives in `packages/engine/src/brass/data/`. Values the rulebook's pictures 
 - [~] Industry tiles per type and level. Most values were read from the mat photo on p.5. Still to confirm against a real mat: the count of each level, Cotton I and Manufacturer II income, Manufacturer III beer, Manufacturer VII link VP and beer, Manufacturer VIII, Iron III–IV, and the coal/iron that Coal IV and Iron II–IV produce
 - [x] Coal and iron markets: spaces, prices, starting fill
 - [x] Income track: positions mapped to income levels
-- [ ] Cards: location and industry cards, with counts by player count. **Not in the rulebook**: needs the physical cards
+- [x] Cards: location and industry cards, with counts by player count (from the Card Distribution player aid; `data/cards.ts`)
 - [~] Merchant tiles: location spaces, beer and bonuses are done. **Still needed**: the contents of the 9 tiles and their player counts (not in the rulebook)
-- [ ] Wild location and wild industry cards
+- [x] Wild location and wild industry cards (4 of each)
 
 ## Setup
 
 - [x] Starting money, income and VP
-- [x] Cards removed by player count, and hand size (needs the real card list to be complete)
+- [x] Cards removed by player count, and hand size
 - [x] Merchant tile placement and merchant beer (needs the real tiles)
 - [x] Market starting state
 - [x] Turn order in the first round

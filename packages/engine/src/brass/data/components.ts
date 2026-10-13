@@ -25,8 +25,9 @@ export interface Components {
 }
 
 /**
- * Location card player counts follow their banner colour (rulebook p.4):
- * blue and teal cards are removed with 2 players, teal with 3.
+ * Fewest players for each banner colour's Location cards (rulebook p.4):
+ * blue and teal cards are removed with 2 players, teal with 3. Individual
+ * cards can need more (one Uttoxeter card is 4-player only); see `cards.ts`.
  */
 export const LOCATION_CARD_MIN_PLAYERS: Readonly<Record<BannerColor, PlayerCount>> = {
   blue: 3,

@@ -1,7 +1,6 @@
 import { createRng } from '../../src/index.ts';
 import {
-  LOCATION_CARD_MIN_PLAYERS,
-  TOWNS,
+  BIRMINGHAM_CARDS,
   setup,
   type BrassState,
   type CardId,
@@ -12,20 +11,12 @@ import {
 } from '../../src/brass/index.ts';
 
 /**
- * STAND-IN components for tests only. The real card list and Merchant tiles
- * aren't in the rulebook yet; these just have the right shape and the right
- * number of Merchant tiles per player count (5 / 7 / 9).
+ * The real Birmingham cards, with STAND-IN Merchant tiles: the real tiles
+ * haven't been transcribed yet, so these just have the right number of
+ * tiles per player count (5 / 7 / 9).
  */
 export const TEST_COMPONENTS: Components = {
-  cards: [
-    ...TOWNS.flatMap((t): CardSpec[] => [
-      { kind: 'location', location: t.id, minPlayers: LOCATION_CARD_MIN_PLAYERS[t.color] },
-      { kind: 'location', location: t.id, minPlayers: LOCATION_CARD_MIN_PLAYERS[t.color] },
-    ]),
-    ...(['cotton', 'manufacturer', 'pottery', 'coal', 'iron', 'brewery'] as const).flatMap((ind): CardSpec[] =>
-      [2, 3, 4].map((n) => ({ kind: 'industry', industries: [ind], minPlayers: n as PlayerCount })),
-    ),
-  ],
+  cards: BIRMINGHAM_CARDS,
   merchantTiles: [
     { industries: ['cotton'], minPlayers: 2 },
     { industries: ['manufacturer'], minPlayers: 2 },
