@@ -372,8 +372,11 @@ function MerchantMarker({ loc, spaces }: { loc: brass.MerchantDef; spaces: brass
  * Markets fill from the most expensive space, so cubes are bought cheapest
  * first; the next cube to be bought is ringed.
  */
-/** The turn order panel, in the empty lower-left corner of the map (like the Character tiles track on the real board). */
-const ORDER = { left: 22, top: 664, width: 212, headerH: 50, rowH: 54 };
+/**
+ * The turn order panel, in the empty lower-left corner of the map (like the
+ * Character tiles track on the real board). Sized to match the markets.
+ */
+const ORDER = { left: 22, bottom: 968, width: 142, headerH: 28, rowH: 30 };
 
 /**
  * Money spent this round by each player, in next round's turn order: least
@@ -388,36 +391,34 @@ function TurnOrder({
 }) {
   const next = [...state.turnOrder].sort((a, b) => state.players[a]!.spent - state.players[b]!.spent);
   const acting = state.phase.kind === 'actions' ? state.turnOrder[state.turnIndex] : undefined;
-  const height = ORDER.headerH + next.length * ORDER.rowH + 8;
+  const height = ORDER.headerH + next.length * ORDER.rowH + 6;
+  const top = ORDER.bottom - height;
   const nameOf = (id: number) => {
     const name = names[id] ?? `Player ${id + 1}`;
-    return name.length > 11 ? `${name.slice(0, 10)}…` : name;
+    return name.length > 10 ? `${name.slice(0, 9)}…` : name;
   };
   return (
     <g className="turn-order">
       <title>Money spent this round. Least spent plays first next round; ties keep their order.</title>
-      <rect x={ORDER.left} y={ORDER.top} width={ORDER.width} height={height} rx={10} className="market-panel" />
-      <text x={ORDER.left + 14} y={ORDER.top + 22} className="turn-order-title">
-        Next round order
-      </text>
-      <text x={ORDER.left + 14} y={ORDER.top + 39} className="turn-order-sub">
-        Spent this round · least goes first
+      <rect x={ORDER.left} y={top} width={ORDER.width} height={height} rx={10} className="market-panel" />
+      <text x={ORDER.left + 10} y={top + 16} className="turn-order-title">
+        Next round · spent
       </text>
       {next.map((id, i) => {
-        const y = ORDER.top + ORDER.headerH + i * ORDER.rowH;
+        const y = top + ORDER.headerH + i * ORDER.rowH;
         const cy = y + ORDER.rowH / 2;
         return (
           <g key={id} className={`turn-order-row owner-${id} ${id === acting ? 'acting' : ''}`}>
-            <rect x={ORDER.left + 6} y={y + 3} width={ORDER.width - 12} height={ORDER.rowH - 6} rx={8} className="turn-order-bg" />
-            <circle cx={ORDER.left + 26} cy={cy} r={12} className="market-price" />
-            <text x={ORDER.left + 26} y={cy} className="turn-order-rank">
+            <rect x={ORDER.left + 4} y={y + 2} width={ORDER.width - 8} height={ORDER.rowH - 4} rx={6} className="turn-order-bg" />
+            <circle cx={ORDER.left + 16} cy={cy} r={10} className="market-price" />
+            <text x={ORDER.left + 16} y={cy} className="market-price-label">
               {i + 1}
             </text>
-            <circle cx={ORDER.left + 52} cy={cy} r={8} className="turn-order-dot" />
-            <text x={ORDER.left + 66} y={cy} className="turn-order-name">
+            <circle cx={ORDER.left + 34} cy={cy} r={5} className="turn-order-dot" />
+            <text x={ORDER.left + 43} y={cy} className="turn-order-name">
               {nameOf(id)}
             </text>
-            <text x={ORDER.left + ORDER.width - 16} y={cy} className="turn-order-spent">
+            <text x={ORDER.left + ORDER.width - 10} y={cy} className="turn-order-spent">
               £{state.players[id]!.spent}
             </text>
           </g>
