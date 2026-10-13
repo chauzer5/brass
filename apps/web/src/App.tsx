@@ -1,13 +1,13 @@
 import { brass } from '@brass/engine';
 import { useEffect, useMemo, useState } from 'react';
 import { Board } from './board/Board.tsx';
-import { EMPTY_DRAFT, availableKinds, highlights, usableCards, type Draft } from './game/draft.ts';
+import { EMPTY_DRAFT, availableKinds, developIndustries, highlights, usableCards, type Draft } from './game/draft.ts';
 import { canUndo, useGame, type Game } from './game/useGame.ts';
 import { ActionRail } from './ui/ActionRail.tsx';
 import { HandTray, type TrayTab } from './ui/HandTray.tsx';
 import { PlayerMat } from './ui/PlayerMat.tsx';
 import { GameOver, Handoff, MatSheet, NewGame, PlayerStrip } from './ui/Screens.tsx';
-import { StepPanel, pickCard, tapSlot } from './ui/TurnPanel.tsx';
+import { StepPanel, pickCard, tapMatRow, tapSlot } from './ui/TurnPanel.tsx';
 
 export function App() {
   const { game, start, play, undoLast, quit } = useGame();
@@ -88,6 +88,11 @@ function Table({
   const usable = draft.kind ? usableCards(view.cards, hand, legal, draft.kind) : null;
   const selectedCards = new Set(draft.kind === 'scout' ? draft.scoutCards : draft.card ? [draft.card] : []);
   const showControls = player !== null && !hidden;
+  // Develop, once its card is chosen, is played by tapping industries on the mat.
+  const developing = draft.kind === 'develop' && draft.card !== null;
+  const developable = useMemo(() => new Set(developIndustries(view.cards, legal, draft)), [view.cards, legal, draft]);
+  const removing: Partial<Record<brass.Industry, number>> = {};
+  for (const ind of draft.industries) removing[ind] = (removing[ind] ?? 0) + 1;
   // Building with a town card: jump the map to that town.
   const focusCard = draft.kind === 'build' && draft.card ? view.cards[draft.card] : undefined;
   const buildFocus = focusCard?.kind === 'location' ? { location: focusCard.location, key: draft.card! } : null;
@@ -160,13 +165,32 @@ function Table({
             hand={hand}
             usable={usable}
             selected={selectedCards}
-            onPick={(id) => setDraft((d) => (d.kind ? pickCard(d, id) : d))}
+            onPick={(id) => {
+              if (!draft.kind) return;
+              const next = pickCard(draft, id);
+              setDraft(next);
+              // Develop is played on the mat: once the card is chosen, show it.
+              if (next.kind === 'develop' && next.card) setTrayTab('mat');
+            }}
             onDoubleTap={peekAt}
             tucked={tucked}
             onTuckedChange={setTucked}
             tab={trayTab}
             onTabChange={setTrayTab}
-            mat={<PlayerMat player={p!} era={state.era} />}
+            mat={
+              developing ? (
+                <PlayerMat
+                  player={p!}
+                  era={state.era}
+                  removing={removing}
+                  selectable={developable}
+                  onRow={(ind) => setDraft((d) => tapMatRow(d, ind, developable))}
+                />
+              ) : (
+                <PlayerMat player={p!} era={state.era} />
+              )
+            }
+            panelOnMat={developing}
             header={
               <>
                 Deck {view.deckSize} · Coal £{coalPrice} · Iron £{ironPrice}

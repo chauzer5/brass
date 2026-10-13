@@ -83,27 +83,7 @@ export function StepPanel({ view, player, legal, draft, setDraft, validate, onPl
       {draft.kind === 'network' && draft.card && (
         <NetworkSteps view={view} legal={legal} draft={draft} setDraft={setDraft} />
       )}
-      {draft.kind === 'develop' && draft.card && (
-        <Step title="Choose 1 or 2 tiles to remove from your mat">
-          <div className="chips">
-            {draft.industries.map((ind, i) => (
-              <button
-                key={i}
-                className="chip selected"
-                onClick={() => setDraft((d) => ({ ...d, industries: d.industries.filter((_, j) => j !== i) }))}
-              >
-                {INDUSTRY_NAME[ind]} ✕
-              </button>
-            ))}
-            {draft.industries.length < 2 &&
-              developIndustries(cards, legal, draft).map((ind) => (
-                <button key={ind} className="chip" onClick={() => setDraft((d) => ({ ...d, industries: [...d.industries, ind] }))}>
-                  + {INDUSTRY_NAME[ind]} {lowest(me, ind)}
-                </button>
-              ))}
-          </div>
-        </Step>
-      )}
+      {draft.kind === 'develop' && draft.card && <DevelopSteps me={me} draft={draft} setDraft={setDraft} />}
       {draft.kind === 'sell' && draft.card && <SellSteps view={view} legal={legal} draft={draft} setDraft={setDraft} />}
 
       {action && (
@@ -132,6 +112,55 @@ export function pickCard(draft: Draft, id: brass.CardId): Draft {
 function lowest(me: brass.PlayerView, industry: brass.Industry): string {
   const i = me.mat[industry].findIndex((n) => n > 0);
   return i < 0 ? '' : roman(i + 1);
+}
+
+/** Tapping an industry on the mat while developing: mark its next tile, or unmark if it can't take more. */
+export function tapMatRow(d: Draft, industry: brass.Industry, addable: ReadonlySet<brass.Industry>): Draft {
+  if (addable.has(industry)) return { ...d, industries: [...d.industries, industry] };
+  const i = d.industries.lastIndexOf(industry);
+  return i < 0 ? d : { ...d, industries: d.industries.filter((_, j) => j !== i) };
+}
+
+/** Develop picks tiles on the player mat; this lists the picks so they can be undone. */
+function DevelopSteps({ me, draft, setDraft }: { me: brass.PlayerView; draft: Draft; setDraft: Dispatch<SetStateAction<Draft>> }) {
+  // Name each pick by the level it removes: a second pick of an industry takes the tile after the first.
+  const seen: Partial<Record<brass.Industry, number>> = {};
+  const picks = draft.industries.map((ind) => {
+    const skip = (seen[ind] = (seen[ind] ?? 0) + 1) - 1;
+    let level = 0;
+    for (let left = skip; level < me.mat[ind].length; level++) {
+      left -= me.mat[ind][level]!;
+      if (left < 0) break;
+    }
+    return { ind, label: `${INDUSTRY_NAME[ind]} ${roman(level + 1)}` };
+  });
+  return (
+    <>
+      <p className="hint">
+        {draft.industries.length < 2
+          ? `Tap ${draft.industries.length ? 'another industry' : 'an industry'} on your board to remove its lowest tile (${draft.industries.length}/2).`
+          : 'Two tiles chosen. Tap a marked industry to put one back.'}
+      </p>
+      {picks.length > 0 && (
+        <div className="chips">
+          {picks.map(({ ind, label }, i) => (
+            <button
+              key={i}
+              className="chip selected with-icon"
+              aria-label={`Keep ${label}`}
+              onClick={() => setDraft((d) => ({ ...d, industries: d.industries.filter((_, j) => j !== i) }))}
+            >
+              <IndustryIcon industry={ind} size={16} />
+              {label} ✕
+            </button>
+          ))}
+          <span className="muted develop-cost">
+            {picks.length} iron
+          </span>
+        </div>
+      )}
+    </>
+  );
 }
 
 function Step({ title, children }: { title: string; children: ReactNode }) {

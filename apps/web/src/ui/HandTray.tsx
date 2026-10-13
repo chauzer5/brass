@@ -129,6 +129,7 @@ export function HandTray({
   tab,
   onTabChange,
   mat,
+  panelOnMat = false,
   children,
 }: {
   cards: Record<brass.CardId, brass.Card>;
@@ -145,6 +146,8 @@ export function HandTray({
   tab: TrayTab;
   onTabChange: (tab: TrayTab) => void;
   mat: ReactNode;
+  /** Also show the step panel above the mat (for actions played on the mat, like Develop). */
+  panelOnMat?: boolean;
   children?: ReactNode;
 }) {
   const rowRef = useRef<HTMLDivElement>(null);
@@ -280,8 +283,8 @@ export function HandTray({
         </span>
         <span className="tray-info">{header}</span>
       </div>
+      {(tab === 'hand' || panelOnMat) && children && <div className="tray-panel">{children}</div>}
       {tab === 'mat' && <div className="tray-mat">{mat}</div>}
-      {tab === 'hand' && children && <div className="tray-panel">{children}</div>}
       <div
         hidden={tab !== 'hand'}
         className={`hand-row ${step < TIGHT_PEEK ? 'tight' : ''}`}

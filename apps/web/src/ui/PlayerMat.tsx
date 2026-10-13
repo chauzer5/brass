@@ -1,4 +1,5 @@
 import { brass } from '@brass/engine';
+import type { KeyboardEvent } from 'react';
 import { INDUSTRY_NAME, roman } from '../game/labels.ts';
 import { IndustryIcon } from './icons.tsx';
 
@@ -60,10 +61,21 @@ export function TileStats({ tile }: { tile: brass.TileLevel }) {
   );
 }
 
-const nextLevel = (p: brass.PlayerView, industry: brass.Industry) => {
-  const i = p.mat[industry].findIndex((n) => n > 0);
-  return i < 0 ? null : i + 1;
-};
+/**
+ * Tiles left per level once `take` tiles are removed from the lowest levels
+ * up (as Develop removes them), and how many go from each level.
+ */
+function afterRemoving(left: readonly number[], take: number) {
+  const remaining = [...left];
+  const removed = left.map(() => 0);
+  for (let i = 0; i < remaining.length && take > 0; i++) {
+    const n = Math.min(remaining[i]!, take);
+    remaining[i]! -= n;
+    removed[i]! += n;
+    take -= n;
+  }
+  return { remaining, removed };
+}
 
 /** A note when the next tile can't be built in this era. */
 function eraNote(tile: brass.TileLevel, era: brass.Era): string | null {
@@ -76,26 +88,62 @@ function eraNote(tile: brass.TileLevel, era: brass.Era): string | null {
  * A player's mat: for each industry, the tiles left at each level (the next
  * one to build is outlined) and the stats of that next tile.
  */
-export function PlayerMat({ player, era }: { player: brass.PlayerView; era: brass.Era }) {
+export function PlayerMat({
+  player,
+  era,
+  removing,
+  selectable,
+  onRow,
+}: {
+  player: brass.PlayerView;
+  era: brass.Era;
+  /** While developing: tiles marked for removal per industry, taken from the lowest levels up. */
+  removing?: Partial<Record<brass.Industry, number>> | undefined;
+  /** While developing: industries that can take another removal; their rows light up. */
+  selectable?: ReadonlySet<brass.Industry> | undefined;
+  onRow?: ((industry: brass.Industry) => void) | undefined;
+}) {
+  const choosing = selectable !== undefined;
   return (
-    <div className="player-mat">
+    <div className={`player-mat ${choosing ? 'choosing' : ''}`}>
       {brass.INDUSTRIES.map((industry) => {
         const levels = brass.INDUSTRY_TILES[industry];
-        const next = nextLevel(player, industry);
+        const { remaining, removed } = afterRemoving(player.mat[industry], removing?.[industry] ?? 0);
+        const nextIndex = remaining.findIndex((n) => n > 0);
+        const next = nextIndex < 0 ? null : nextIndex + 1;
         const tile = next ? levels[next - 1]! : null;
         const note = tile && eraNote(tile, era);
+        const lit = selectable?.has(industry) ?? false;
+        const marked = removed.some((n) => n > 0);
+        const tappable = onRow && (lit || marked);
         return (
-          <div key={industry} className="mat-row">
+          <div
+            key={industry}
+            className={`mat-row ${lit ? 'lit' : ''} ${marked ? 'marked' : ''} ${choosing && !lit && !marked ? 'inactive' : ''}`}
+            {...(tappable && {
+              role: 'button',
+              tabIndex: 0,
+              'aria-label': lit ? `Develop ${INDUSTRY_NAME[industry]}` : `Keep ${INDUSTRY_NAME[industry]}`,
+              onClick: () => onRow(industry),
+              onKeyDown: (e: KeyboardEvent<HTMLDivElement>) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onRow(industry);
+                }
+              },
+            })}
+          >
             <span className="mat-icon" title={INDUSTRY_NAME[industry]}>
               <IndustryIcon industry={industry} size={22} />
             </span>
             <span className="mat-track">
               {levels.map((def) => {
                 const left = player.mat[industry][def.level - 1] ?? 0;
+                const going = removed[def.level - 1] ?? 0;
                 return (
                   <span
                     key={def.level}
-                    className={`mat-level ${left === 0 ? 'gone' : ''} ${def.level === next ? 'next' : ''} ${
+                    className={`mat-level ${left === 0 ? 'gone' : ''} ${going ? 'removing' : ''} ${def.level === next ? 'next' : ''} ${
                       def.canalOnly ? 'canal-only' : def.railOnly ? 'rail-only' : ''
                     }`}
                     title={`${INDUSTRY_NAME[industry]} ${roman(def.level)}: ${left} of ${def.count} left`}
@@ -103,7 +151,8 @@ export function PlayerMat({ player, era }: { player: brass.PlayerView; era: bras
                     {roman(def.level)}
                     <span className="mat-pips">
                       {Array.from({ length: def.count }, (_, i) => (
-                        <span key={i} className={i < left ? 'pip' : 'pip used'} />
+                        // The lowest of a level's remaining tiles go first.
+                        <span key={i} className={i >= left ? 'pip used' : i >= left - going ? 'pip going' : 'pip'} />
                       ))}
                     </span>
                     {def.cannotDevelop && <span className="mat-bulb" title="Can't be developed" />}
