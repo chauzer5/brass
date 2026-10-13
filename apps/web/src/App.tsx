@@ -84,6 +84,9 @@ function Table({
   const usable = draft.kind ? usableCards(view.cards, hand, legal, draft.kind) : null;
   const selectedCards = new Set(draft.kind === 'scout' ? draft.scoutCards : draft.card ? [draft.card] : []);
   const showControls = player !== null && !hidden;
+  // Building with a town card: jump the map to that town.
+  const focusCard = draft.kind === 'build' && draft.card ? view.cards[draft.card] : undefined;
+  const buildFocus = focusCard?.kind === 'location' ? { location: focusCard.location, key: draft.card! } : null;
 
   return (
     <div className="app">
@@ -111,6 +114,7 @@ function Table({
             else setDraft((d) => tapSlot(d, location, slot, view, legal));
           }}
           onLink={(id) => setDraft((d) => ({ ...d, links: [...d.links, id] }))}
+          focus={buildFocus}
         />
         {showControls && state.phase.kind === 'actions' && (
           <ActionRail

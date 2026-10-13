@@ -1,5 +1,6 @@
 import { brass } from '@brass/engine';
-import { TransformComponent, TransformWrapper } from 'react-zoom-pan-pinch';
+import { useEffect, useRef } from 'react';
+import { TransformComponent, TransformWrapper, type ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
 import type { Highlights } from '../game/draft.ts';
 import { INDUSTRY_NAME, roman } from '../game/labels.ts';
 import { IndustryIcon } from '../ui/icons.tsx';
@@ -21,7 +22,17 @@ interface BoardProps {
   highlights?: Highlights | undefined;
   onSlot?: (location: brass.LocationId, slot: number) => void;
   onLink?: (id: string) => void;
+  /**
+   * Pan and zoom to this location. `key` re-triggers the move when the same
+   * location is asked for again (e.g. a different card for the same town).
+   */
+  focus?: { location: brass.LocationId; key: string } | null | undefined;
 }
+
+/** How far to zoom in on a focused location. */
+const FOCUS_SCALE = 2.6;
+/** Width of the action rail floating over the board's right edge. */
+const RAIL_WIDTH = 76;
 
 function linkPath(ends: readonly brass.LocationId[]): string {
   const [a, b, c] = ends.map((id) => brass.LOCATION_BY_ID[id].pos);
@@ -126,11 +137,34 @@ function Slots({
   );
 }
 
-export function Board({ state, highlights = NO_HIGHLIGHTS, onSlot, onLink }: BoardProps) {
+export function Board({ state, highlights = NO_HIGHLIGHTS, onSlot, onLink, focus }: BoardProps) {
   const tiles = state?.tiles ?? {};
   const links = state?.links ?? {};
+  const zoom = useRef<ReactZoomPanPinchRef>(null);
+
+  useEffect(() => {
+    const ref = zoom.current;
+    const svg = ref?.instance.contentComponent?.querySelector('svg');
+    const wrapper = ref?.instance.wrapperComponent;
+    if (!focus || !ref || !svg || !wrapper) return;
+    // Map units -> content pixels at scale 1 (the map is drawn "meet", pinned to the top).
+    const svgW = svg.clientWidth;
+    const svgH = svg.clientHeight;
+    const unit = Math.min(svgW, svgH) / BOARD_SIZE;
+    const pos = brass.LOCATION_BY_ID[focus.location].pos;
+    const px = (svgW - BOARD_SIZE * unit) / 2 + pos.x * unit;
+    const py = pos.y * unit;
+    // Centre it in the part of the board not covered by the rail or the hand.
+    const view = wrapper.getBoundingClientRect();
+    const tray = document.querySelector('.hand-tray')?.getBoundingClientRect();
+    const visibleBottom = tray ? Math.min(view.bottom, tray.top) : view.bottom;
+    const cx = (view.width - RAIL_WIDTH) / 2;
+    const cy = (visibleBottom - view.top) / 2;
+    ref.setTransform(cx - px * FOCUS_SCALE, cy - py * FOCUS_SCALE, FOCUS_SCALE, 350, 'easeOut');
+  }, [focus?.location, focus?.key]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
-    <TransformWrapper minScale={1} maxScale={6} doubleClick={{ mode: 'zoomIn' }}>
+    <TransformWrapper ref={zoom} minScale={1} maxScale={6} doubleClick={{ mode: 'zoomIn' }}>
       <TransformComponent wrapperClass="board-viewport" contentClass="board-content">
         <svg
           className="board-svg"
