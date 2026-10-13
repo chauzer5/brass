@@ -1003,8 +1003,9 @@ button {
 }
 
 .game-card.location {
-  border-top: 10px solid var(--banner);
-  background: color-mix(in srgb, var(--banner) 12%, var(--bg));
+  /* The banner is painted, not a border, so the card's rounded corners clip it cleanly. */
+  padding-top: 15px;
+  background: linear-gradient(var(--banner) 0 10px, color-mix(in srgb, var(--banner) 12%, var(--bg)) 10px);
 }
 
 .banner-bg-blue { --banner: var(--banner-blue); }
@@ -1170,4 +1171,8 @@ button {
 
 .hand-row.tight .game-card {
   padding: 4px;
+}
+
+.hand-row.tight .game-card.location {
+  padding-top: 14px;
 }
