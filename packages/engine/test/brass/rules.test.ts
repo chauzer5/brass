@@ -6,6 +6,7 @@ import {
   currentPlayer,
   incomeLevel,
   perform,
+  ROUNDS_PER_ERA,
   type BrassAction,
   type BrassConfig,
   type BrassState,
@@ -502,26 +503,52 @@ describe('views', () => {
 
 describe('full games', () => {
   /** Plays a whole game, each move picked at random from the legal candidates. */
+  /**
+   * Plays a whole game, each move picked at random from the legal candidates,
+   * recording how many turns each round of each era had.
+   */
   function playOut(playerCount: PlayerCount, seed: number) {
     const config: BrassConfig = { playerCount, components: TEST_COMPONENTS };
     const pick = createRng(seed + 1000);
+    const turns: Record<string, number> = {};
     let match: Match<BrassConfig, BrassState, BrassAction> = createMatch(brassGame, config, seed);
     for (let step = 0; step < 2000 && !brassGame.outcome(match.state); step++) {
-      const player = brassGame.activePlayers(match.state)[0]!;
-      const options = pick.shuffle(candidateActions(match.state, player));
-      const action = options.find((a) => brassGame.validate(match.state, player, a) === null);
-      if (!action) throw new Error(`No legal action at step ${step}: ${JSON.stringify({ phase: match.state.phase, era: match.state.era, round: match.state.round, player, hand: match.state.players[player]!.hand, actionsTaken: match.state.actionsTaken, deck: match.state.deck.length, n: options.length, errs: options.slice(0, 5).map((a) => [a, brassGame.validate(match.state, player, a)]) })}`);
+      const s = match.state;
+      const player = brassGame.activePlayers(s)[0]!;
+      if (s.phase.kind === 'actions' && s.actionsTaken === 0) {
+        const key = `${s.era} ${s.round}`;
+        turns[key] = (turns[key] ?? 0) + 1;
+      }
+      const options = pick.shuffle(candidateActions(s, player));
+      const action = options.find((a) => brassGame.validate(s, player, a) === null);
+      if (!action) throw new Error(`No legal action at step ${step} (${s.era} round ${s.round})`);
       const next = act(brassGame, match, player, action);
       if (!next.ok) throw new Error(next.error);
       match = next.value;
     }
-    return match;
+    return { match, turns };
   }
 
   it.each([2, 3, 4] as const)('plays a %i-player game to the end and replays it exactly', (n) => {
-    const match = playOut(n, n);
+    const { match } = playOut(n, n);
     expect(match.state.phase.kind).toBe('gameOver');
     expect(brassGame.outcome(match.state)!.ranking).toHaveLength(n);
     expect(replay(brassGame, match.config, match.seed, match.log)).toEqual({ ok: true, value: match });
   });
+
+  it.each([2, 3, 4] as const)(
+    'gives every %i-player era the printed number of rounds, with every player taking each turn',
+    (n) => {
+      // Scouting discards 3 and returns 2 Wild cards, so hands never run out early.
+      for (const seed of [11, 12, 13]) {
+        const { turns } = playOut(n, seed);
+        const expected = Object.fromEntries(
+          (['canal', 'rail'] as const).flatMap((era) =>
+            Array.from({ length: ROUNDS_PER_ERA[n] }, (_, i) => [`${era} ${i + 1}`, n]),
+          ),
+        );
+        expect(turns).toEqual(expected);
+      }
+    },
+  );
 });

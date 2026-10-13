@@ -379,9 +379,10 @@ function endTurn(state: BrassState, p: PlayerState, rng: Rng): void {
 }
 
 /**
- * Once the deck is gone, hands shrink until they are empty (rulebook p.6). A
- * player whose hand is already empty (e.g. after Scouting) has no turn; the
- * era ends after the round in which every hand runs out.
+ * Skips players with no cards. With the real deck this never happens: every
+ * action, Scout included (3 discarded, 2 Wilds back), costs one card, and the
+ * deck runs out at the end of a round, so all hands empty in the same round
+ * (rulebook p.6). This only guards against malformed component data.
  */
 function skipEmptyHands(state: BrassState, rng: Rng): void {
   while (state.turnIndex < state.turnOrder.length && player(state, state.turnOrder[state.turnIndex]!).hand.length === 0) {
