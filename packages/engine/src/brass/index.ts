@@ -8,3 +8,4 @@ export * from './actions.ts';
 export * from './game.ts';
 export { RuleError, type BeerSource, type CubeSource } from './resources.ts';
 export * from './data/cards.ts';
+export * from './data/merchants.ts';

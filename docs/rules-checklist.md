@@ -12,14 +12,14 @@ Data lives in `packages/engine/src/brass/data/`. Values the rulebook's pictures 
 - [x] Coal and iron markets: spaces, prices, starting fill
 - [x] Income track: positions mapped to income levels
 - [x] Cards: location and industry cards, with counts by player count (from the Card Distribution player aid; `data/cards.ts`)
-- [~] Merchant tiles: location spaces, beer and bonuses are done. **Still needed**: the contents of the 9 tiles and their player counts (not in the rulebook)
+- [x] Merchant tiles: the 9 tiles with their player counts (`data/merchants.ts`), location spaces, beer and bonuses
 - [x] Wild location and wild industry cards (4 of each)
 
 ## Setup
 
 - [x] Starting money, income and VP
 - [x] Cards removed by player count, and hand size
-- [x] Merchant tile placement and merchant beer (needs the real tiles)
+- [x] Merchant tile placement and merchant beer
 - [x] Market starting state
 - [x] Turn order in the first round
 

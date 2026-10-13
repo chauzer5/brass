@@ -1,6 +1,6 @@
 import { createRng } from '../../src/index.ts';
 import {
-  BIRMINGHAM_CARDS,
+  BIRMINGHAM_COMPONENTS,
   setup,
   type BrassState,
   type CardId,
@@ -10,25 +10,7 @@ import {
   type TownId,
 } from '../../src/brass/index.ts';
 
-/**
- * The real Birmingham cards, with STAND-IN Merchant tiles: the real tiles
- * haven't been transcribed yet, so these just have the right number of
- * tiles per player count (5 / 7 / 9).
- */
-export const TEST_COMPONENTS: Components = {
-  cards: BIRMINGHAM_CARDS,
-  merchantTiles: [
-    { industries: ['cotton'], minPlayers: 2 },
-    { industries: ['manufacturer'], minPlayers: 2 },
-    { industries: ['pottery'], minPlayers: 2 },
-    { industries: ['cotton', 'manufacturer', 'pottery'], minPlayers: 2 },
-    { industries: [], minPlayers: 2 },
-    { industries: ['manufacturer'], minPlayers: 3 },
-    { industries: ['cotton'], minPlayers: 3 },
-    { industries: ['pottery'], minPlayers: 4 },
-    { industries: [], minPlayers: 4 },
-  ],
-};
+export const TEST_COMPONENTS: Components = BIRMINGHAM_COMPONENTS;
 
 export function newGame(playerCount: PlayerCount = 2, seed = 1): BrassState {
   return setup({ playerCount, components: TEST_COMPONENTS }, createRng(seed));

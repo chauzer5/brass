@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { createRng } from '../../src/index.ts';
 import {
   BIRMINGHAM_CARDS,
+  BIRMINGHAM_COMPONENTS,
+  BIRMINGHAM_MERCHANT_TILES,
+  setup,
   HAND_SIZE,
   LOCATION_CARD_MIN_PLAYERS,
   ROUNDS_PER_ERA,
@@ -38,5 +42,21 @@ describe('Birmingham cards (Card Distribution player aid)', () => {
       const color = TOWNS.find((t) => t.id === card.location)!.color;
       expect(card.minPlayers, card.location).toBeGreaterThanOrEqual(LOCATION_CARD_MIN_PLAYERS[color]);
     }
+  });
+});
+
+describe('Birmingham Merchant tiles', () => {
+  it.each([
+    [2, 5],
+    [3, 7],
+    [4, 9],
+  ] as const)('fills exactly the %i-player Merchant spaces (%i tiles)', (n, count) => {
+    expect(BIRMINGHAM_MERCHANT_TILES.filter((t) => t.minPlayers <= n)).toHaveLength(count);
+    expect(() => setup({ playerCount: n, components: BIRMINGHAM_COMPONENTS }, createRng(n))).not.toThrow();
+  });
+
+  it('has one tile that buys all three goods, and three blanks', () => {
+    expect(BIRMINGHAM_MERCHANT_TILES.filter((t) => t.industries.length === 3)).toHaveLength(1);
+    expect(BIRMINGHAM_MERCHANT_TILES.filter((t) => t.industries.length === 0)).toHaveLength(3);
   });
 });
