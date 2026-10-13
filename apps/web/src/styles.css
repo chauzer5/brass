@@ -138,14 +138,25 @@ button {
   position: relative;
 }
 
-.board-viewport,
-.board-content {
+/*
+ * The pannable content is wider than the viewport by the action rail's
+ * width, with the map drawn in the left part. At normal zoom the map starts
+ * where it always did, but can be dragged left until nothing hides under the
+ * rail.
+ */
+.board-viewport {
+  --rail-space: 76px;
   width: 100% !important;
   height: 100% !important;
 }
 
+.board-content {
+  width: calc(100% + var(--rail-space)) !important;
+  height: 100% !important;
+}
+
 .board-svg {
-  width: 100%;
+  width: calc(100% - var(--rail-space));
   height: 100%;
   display: block;
   touch-action: none;

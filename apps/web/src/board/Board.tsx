@@ -100,7 +100,7 @@ export function Board({ state, highlights = NO_HIGHLIGHTS, onSlot, onLink }: Boa
   const tiles = state?.tiles ?? {};
   const links = state?.links ?? {};
   return (
-    <TransformWrapper minScale={1} maxScale={6} doubleClick={{ mode: 'zoomIn' }} centerOnInit>
+    <TransformWrapper minScale={1} maxScale={6} doubleClick={{ mode: 'zoomIn' }}>
       <TransformComponent wrapperClass="board-viewport" contentClass="board-content">
         <svg
           className="board-svg"
