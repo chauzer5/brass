@@ -55,7 +55,7 @@ export function StepPanel({ view, player, legal, draft, setDraft, validate, onPl
   }
 
   if (!draft.kind) {
-    return <p className="hint">Choose an action from the side of the board.</p>;
+    return <p className="hint">Choose an action from the side of the board. Double-tap a town card to find it on the map.</p>;
   }
 
   const action = compose(draft);

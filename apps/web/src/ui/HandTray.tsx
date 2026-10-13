@@ -14,6 +14,8 @@ const CARD_TOP = 11;
 const ONE_ROW_HEIGHT = 110;
 /** How far the bar must be dragged (px) to count as a drag rather than a tap. */
 const DRAG_THRESHOLD = 12;
+/** Two taps on the same card within this many ms count as a double-tap. */
+const DOUBLE_TAP_MS = 350;
 
 /**
  * Card labels with soft hyphens (\u00AD), so long names break neatly inside
@@ -108,6 +110,7 @@ export function HandTray({
   usable,
   selected,
   onPick,
+  onDoubleTap,
   tucked,
   onTuckedChange,
   header,
@@ -118,6 +121,8 @@ export function HandTray({
   usable: Set<brass.CardId> | null;
   selected: Set<brass.CardId>;
   onPick: (id: brass.CardId) => void;
+  /** A second tap on the same card within a moment. */
+  onDoubleTap?: (id: brass.CardId) => void;
   tucked: boolean;
   onTuckedChange: (tucked: boolean) => void;
   header: ReactNode;
@@ -133,6 +138,18 @@ export function HandTray({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  const lastTap = useRef<{ id: brass.CardId; at: number } | null>(null);
+  const tapCard = (id: brass.CardId) => {
+    const now = Date.now();
+    const prev = lastTap.current;
+    lastTap.current = { id, at: now };
+    if (prev && prev.id === id && now - prev.at < DOUBLE_TAP_MS) {
+      lastTap.current = null;
+      onDoubleTap?.(id);
+    }
+    onPick(id);
+  };
 
   // Tap the bar to toggle; drag it down to tuck the hand away or up to show it.
   const [drag, setDrag] = useState<{ startY: number; dy: number } | null>(null);
@@ -206,7 +223,8 @@ export function HandTray({
         <div className="hand-row-inner">
         {hand.map((id, i) => {
           const isSelected = selected.has(id);
-          const disabled = !usable || !usable.has(id);
+          // With no action chosen, cards can still be tapped (double-tap shows a town on the map).
+          const disabled = usable !== null && !usable.has(id);
           const row = Math.floor(i / perRow);
           const col = i % perRow;
           const rowEnd = col === perRow - 1 || i === n - 1;
@@ -220,7 +238,7 @@ export function HandTray({
               style={{ left: offset + col * step, top: CARD_TOP + row * ROW_STEP, zIndex: isSelected ? 50 : i }}
               disabled={disabled}
               aria-pressed={isSelected}
-              onClick={() => onPick(id)}
+              onClick={() => tapCard(id)}
             >
               <GameCard card={cards[id]} />
             </button>

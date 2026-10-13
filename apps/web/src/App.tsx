@@ -87,6 +87,13 @@ function Table({
   // Building with a town card: jump the map to that town.
   const focusCard = draft.kind === 'build' && draft.card ? view.cards[draft.card] : undefined;
   const buildFocus = focusCard?.kind === 'location' ? { location: focusCard.location, key: draft.card! } : null;
+  // Double-tapping a town card with no action chosen also shows that town.
+  const [peek, setPeek] = useState<{ location: brass.LocationId; key: string } | null>(null);
+  const peekAt = (id: brass.CardId) => {
+    const card = view.cards[id];
+    if (draft.kind || card?.kind !== 'location') return;
+    setPeek({ location: card.location, key: `${id}:${Date.now()}` });
+  };
 
   return (
     <div className="app">
@@ -114,7 +121,7 @@ function Table({
             else setDraft((d) => tapSlot(d, location, slot, view, legal));
           }}
           onLink={(id) => setDraft((d) => ({ ...d, links: [...d.links, id] }))}
-          focus={buildFocus}
+          focus={buildFocus ?? peek}
         />
         {showControls && state.phase.kind === 'actions' && (
           <ActionRail
@@ -135,7 +142,8 @@ function Table({
             hand={hand}
             usable={usable}
             selected={selectedCards}
-            onPick={(id) => setDraft((d) => pickCard(d, id))}
+            onPick={(id) => setDraft((d) => (d.kind ? pickCard(d, id) : d))}
+            onDoubleTap={peekAt}
             tucked={tucked}
             onTuckedChange={setTucked}
             header={

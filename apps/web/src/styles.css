@@ -884,6 +884,11 @@ button {
   cursor: default;
 }
 
+/* Cards take double-taps themselves (to show a town), so the browser mustn't zoom on them. */
+.hand-card {
+  touch-action: manipulation;
+}
+
 .hand-card.unusable {
   filter: grayscale(0.8) opacity(0.45);
 }
