@@ -644,6 +644,7 @@ button {
 /* ---- Hand tray ---- */
 
 .hand-tray {
+  transition: transform 0.2s ease;
   position: absolute;
   left: 0;
   right: 0;
@@ -662,11 +663,39 @@ button {
 }
 
 .tray-bar {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 0 12px 0 4px;
+  min-height: 48px;
+  padding: 8px 12px 0 4px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.hand-tray[data-dragging='true'] .tray-bar {
+  cursor: grabbing;
+}
+
+.tray-bar:focus-visible {
+  outline: 2px solid var(--highlight);
+  outline-offset: -2px;
+  border-radius: 16px 16px 0 0;
+}
+
+/* The pill at the top edge that signals the panel can be dragged. */
+.tray-grip {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  width: 36px;
+  height: 4px;
+  margin-left: -18px;
+  border-radius: 2px;
+  background: var(--line);
 }
 
 .tray-tab {
@@ -675,11 +704,8 @@ button {
   gap: 6px;
   min-height: 40px;
   padding: 0 10px;
-  border: 0;
-  background: none;
   font-weight: 700;
   font-size: 14px;
-  cursor: pointer;
 }
 
 .tray-chevron {
@@ -862,4 +888,8 @@ button {
   border: 1px solid var(--line);
   background: var(--bg);
   cursor: pointer;
+}
+
+.hand-tray[data-dragging='true'] {
+  transition: none;
 }

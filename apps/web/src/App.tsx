@@ -133,7 +133,7 @@ function Table({
             selected={selectedCards}
             onPick={(id) => setDraft((d) => pickCard(d, id))}
             tucked={tucked}
-            onToggle={() => setTucked((t) => !t)}
+            onTuckedChange={setTucked}
             header={
               <>
                 Deck {view.deckSize} · Coal £{coalPrice} · Iron £{ironPrice}

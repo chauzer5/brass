@@ -1,5 +1,5 @@
 import { brass } from '@brass/engine';
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react';
 import type { CSSProperties } from 'react';
 import { IndustryIcon } from './icons.tsx';
 
@@ -10,6 +10,8 @@ const MIN_PEEK = 50;
 /** Vertical distance between the two rows of cards. */
 const ROW_STEP = 104;
 const ONE_ROW_HEIGHT = 116;
+/** How far the bar must be dragged (px) to count as a drag rather than a tap. */
+const DRAG_THRESHOLD = 12;
 
 /**
  * Card labels with soft hyphens (\u00AD), so long names break neatly inside
@@ -105,7 +107,7 @@ export function HandTray({
   selected,
   onPick,
   tucked,
-  onToggle,
+  onTuckedChange,
   header,
   children,
 }: {
@@ -115,7 +117,7 @@ export function HandTray({
   selected: Set<brass.CardId>;
   onPick: (id: brass.CardId) => void;
   tucked: boolean;
-  onToggle: () => void;
+  onTuckedChange: (tucked: boolean) => void;
   header: ReactNode;
   children?: ReactNode;
 }) {
@@ -130,6 +132,25 @@ export function HandTray({
     return () => ro.disconnect();
   }, []);
 
+  // Tap the bar to toggle; drag it down to tuck the hand away or up to show it.
+  const [drag, setDrag] = useState<{ startY: number; dy: number } | null>(null);
+  const onBarDown = (e: PointerEvent<HTMLDivElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setDrag({ startY: e.clientY, dy: 0 });
+  };
+  const onBarMove = (e: PointerEvent<HTMLDivElement>) => {
+    if (drag) setDrag({ ...drag, dy: e.clientY - drag.startY });
+  };
+  const onBarUp = () => {
+    if (!drag) return;
+    const { dy } = drag;
+    setDrag(null);
+    if (Math.abs(dy) < DRAG_THRESHOLD) onTuckedChange(!tucked);
+    else onTuckedChange(dy > 0);
+  };
+  // While dragging, the tray follows the finger a little in the allowed direction.
+  const follow = drag ? (tucked ? Math.max(-60, Math.min(0, drag.dy)) : Math.max(0, Math.min(120, drag.dy))) : 0;
+
   const n = hand.length;
   const stepFor = (perRow: number) => (perRow > 1 ? (width - CARD_WIDTH) / (perRow - 1) : CARD_WIDTH);
   const rows = stepFor(n) >= MIN_PEEK ? 1 : 2;
@@ -137,15 +158,37 @@ export function HandTray({
   const step = Math.min(CARD_WIDTH + CARD_GAP, stepFor(perRow));
 
   return (
-    <section className="hand-tray" data-tucked={tucked}>
-      <div className="tray-bar">
-        <button className="tray-tab" onClick={onToggle} aria-expanded={!tucked}>
+    <section
+      className="hand-tray"
+      data-tucked={tucked}
+      data-dragging={drag !== null}
+      style={follow ? { transform: `translateY(${follow}px)` } : undefined}
+    >
+      <div
+        className="tray-bar"
+        role="button"
+        tabIndex={0}
+        aria-expanded={!tucked}
+        aria-label={tucked ? 'Show hand' : 'Hide hand'}
+        onPointerDown={onBarDown}
+        onPointerMove={onBarMove}
+        onPointerUp={onBarUp}
+        onPointerCancel={() => setDrag(null)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onTuckedChange(!tucked);
+          }
+        }}
+      >
+        <span className="tray-grip" aria-hidden />
+        <span className="tray-tab">
           <span className="tray-chevron" aria-hidden>
             {tucked ? '▴' : '▾'}
           </span>
           Hand ({n})
-        </button>
-        <div className="tray-info">{header}</div>
+        </span>
+        <span className="tray-info">{header}</span>
       </div>
       {children && <div className="tray-panel">{children}</div>}
       <div
