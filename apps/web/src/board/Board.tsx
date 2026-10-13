@@ -10,8 +10,8 @@ import { INDUSTRY_SHORT, roman } from '../game/labels.ts';
  */
 export const BOARD_SIZE = 1000;
 
-const SLOT = 30;
-const GAP = 4;
+const SLOT = 36;
+const GAP = 5;
 
 const NO_HIGHLIGHTS: Highlights = { slots: new Set(), links: new Set(), selectedSlots: new Set(), selectedLinks: new Set() };
 
@@ -71,15 +71,15 @@ function Slots({
             <rect width={SLOT} height={SLOT} rx={4} className={cls} />
             {tile ? (
               <>
-                <text x={SLOT / 2} y={SLOT / 2 - 5} className="tile-label">
+                <text x={SLOT / 2} y={SLOT / 2 - 6} className="tile-label">
                   {INDUSTRY_SHORT[tile.industry]}
                 </text>
-                <text x={SLOT / 2} y={SLOT / 2 + 7} className="tile-level">
+                <text x={SLOT / 2} y={SLOT / 2 + 8} className="tile-level">
                   {roman(tile.level)}
                 </text>
                 {tile.cubes > 0 && (
                   <g transform={`translate(${SLOT - 4} 4)`}>
-                    <circle r={6} className={`cube cube-${tile.industry}`} />
+                    <circle r={7} className={`cube cube-${tile.industry}`} />
                     <text className="cube-count">{tile.cubes}</text>
                   </g>
                 )}
@@ -152,7 +152,7 @@ export function Board({ state, highlights = NO_HIGHLIGHTS, onSlot, onLink }: Boa
                     onSlot={onSlot}
                   />
                   {loc.kind === 'town' && (
-                    <text x={loc.pos.x} y={loc.pos.y + SLOT / 2 + 12} className={`location-name banner-${loc.color}`}>
+                    <text x={loc.pos.x} y={loc.pos.y + SLOT / 2 + 13} className={`location-name banner-${loc.color}`}>
                       {loc.name}
                     </text>
                   )}
