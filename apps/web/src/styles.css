@@ -1130,3 +1130,18 @@ button {
 .market-legend {
   color: #f1e6d6;
 }
+
+/* Tightly overlapped hand: slightly smaller text so names fit the visible strip. */
+.hand-row.tight .card-title {
+  font-size: 9.5px;
+  line-height: 1.1;
+}
+
+.hand-row.tight .card-kind {
+  font-size: 6.5px;
+  letter-spacing: 0.04em;
+}
+
+.hand-row.tight .game-card {
+  padding: 4px;
+}

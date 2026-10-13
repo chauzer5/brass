@@ -6,7 +6,9 @@ import { IndustryIcon } from './icons.tsx';
 const CARD_WIDTH = 70;
 const CARD_GAP = 6;
 /** Narrowest strip of a card left showing when the hand overlaps; below this the hand wraps to 2 rows. */
-const MIN_PEEK = 50;
+const MIN_PEEK = 38;
+/** Below this strip width, card text shrinks a little to fit. */
+const TIGHT_PEEK = 50;
 /** Vertical distance between the two rows of cards. */
 const ROW_STEP = 100;
 /** Room above the first row for a chosen card to lift into. */
@@ -21,21 +23,25 @@ const DOUBLE_TAP_MS = 350;
  * Card labels with soft hyphens (\u00AD), so long names break neatly inside
  * the strip of a card that shows when cards overlap.
  */
+const SH = '\u00AD';
 const TOWN_LABEL: Partial<Record<brass.LocationId, string>> = {
-  birmingham: 'Birming\u00ADham',
-  'burton': 'Burton-on-Trent',
-  cannock: 'Can\u00ADnock',
-  coalbrookdale: 'Coal\u00ADbrook\u00ADdale',
-  coventry: 'Coven\u00ADtry',
-  kidderminster: 'Kidder\u00ADminster',
-  nuneaton: 'Nun\u00ADeaton',
-  redditch: 'Red\u00ADditch',
-  stafford: 'Staf\u00ADford',
+  belper: `Bel${SH}per`,
+  birmingham: `Birm${SH}ing${SH}ham`,
+  burton: `Bur${SH}ton-on-Trent`,
+  cannock: `Can${SH}nock`,
+  coalbrookdale: `Coal${SH}brook${SH}dale`,
+  coventry: `Cov${SH}en${SH}try`,
+  dudley: `Dud${SH}ley`,
+  kidderminster: `Kid${SH}der${SH}min${SH}ster`,
+  nuneaton: `Nun${SH}eaton`,
+  redditch: `Red${SH}ditch`,
+  stafford: `Staf${SH}ford`,
   stoke: 'Stoke-on-Trent',
-  tamworth: 'Tam\u00ADworth',
-  uttoxeter: 'Uttox\u00ADeter',
-  wolverhampton: 'Wolver\u00ADhamp\u00ADton',
-  worcester: 'Wor\u00ADcester',
+  tamworth: `Tam${SH}worth`,
+  uttoxeter: `Utt${SH}ox${SH}eter`,
+  walsall: `Wal${SH}sall`,
+  wolverhampton: `Wol${SH}ver${SH}hamp${SH}ton`,
+  worcester: `Wor${SH}ces${SH}ter`,
 };
 
 const INDUSTRY_LABEL: Record<brass.Industry, string> = {
@@ -211,7 +217,7 @@ export function HandTray({
       </div>
       {children && <div className="tray-panel">{children}</div>}
       <div
-        className="hand-row"
+        className={`hand-row ${step < TIGHT_PEEK ? 'tight' : ''}`}
         ref={rowRef}
         style={
           {
