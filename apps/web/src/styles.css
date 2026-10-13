@@ -388,9 +388,10 @@ button {
 
 .stall-name {
   fill: var(--stall-ink);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  opacity: 0.75;
   text-transform: uppercase;
   text-anchor: middle;
   dominant-baseline: central;
@@ -430,7 +431,7 @@ button {
 
 .stall-bonus text {
   fill: #fff;
-  font-size: 8.5px;
+  font-size: 11px;
   font-weight: 700;
   text-anchor: middle;
   dominant-baseline: central;

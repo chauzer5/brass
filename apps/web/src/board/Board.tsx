@@ -219,21 +219,22 @@ const BONUS_LABEL = (bonus: brass.MerchantBeerBonus): string => {
   }
 };
 
-const TOKEN_R = 13;
-const TOKEN_GAP = 30;
+const TOKEN_R = 16;
+/** Horizontal room per merchant tile: its token plus the beer barrel beside it. */
+const SPACE_WIDTH = 58;
 
 /** A merchant tile: a round trade token showing the goods it buys. */
 function TradeToken({ cx, cy, industries }: { cx: number; cy: number; industries: readonly brass.Industry[] | null }) {
   const icons = industries ?? [];
-  const size = icons.length === 1 ? 16 : 11;
+  const size = icons.length === 1 ? 21 : 13;
   // One icon centred; three in a small triangle.
   const spots =
     icons.length === 1
       ? [[0, 0]]
       : [
-          [0, -5],
-          [-5.5, 4],
-          [5.5, 4],
+          [0, -6],
+          [-6.5, 5],
+          [6.5, 5],
         ];
   return (
     <g className={`trade-token ${icons.length === 0 ? 'blank' : ''}`}>
@@ -259,14 +260,14 @@ function TradeToken({ cx, cy, industries }: { cx: number; cy: number; industries
 function MerchantMarker({ loc, spaces }: { loc: brass.MerchantDef; spaces: brass.MerchantSpace[] }) {
   const open = spaces.some((s) => s.tile !== null);
   const n = loc.spaces;
-  const width = Math.max(92, n * (TOKEN_GAP + 18) + 18);
+  const width = Math.max(92, n * SPACE_WIDTH + 16);
   const { x, y } = loc.pos;
   const left = x - width / 2;
   const top = y - 30;
   const awning = 10;
   const scallops = Math.round(width / 12);
   const scallopW = width / scallops;
-  const tokensY = y + 12;
+  const tokensY = y + 10;
   return (
     <g className={`merchant-stall ${open ? '' : 'closed'}`}>
       <title>
@@ -275,7 +276,7 @@ function MerchantMarker({ loc, spaces }: { loc: brass.MerchantDef; spaces: brass
           : `${loc.name} merchant (not used with this many players)`}
       </title>
       {/* Stall body */}
-      <rect x={left} y={top + awning - 2} width={width} height={52} rx={5} className="stall-body" />
+      <rect x={left} y={top + awning - 2} width={width} height={56} rx={5} className="stall-body" />
       {/* Striped awning with a scalloped edge */}
       <g clipPath={`url(#awning-${loc.id})`}>
         <rect x={left - 2} y={top - 2} width={width + 4} height={awning + 8} className="stall-awning" />
@@ -286,26 +287,26 @@ function MerchantMarker({ loc, spaces }: { loc: brass.MerchantDef; spaces: brass
           <circle key={i} cx={left + scallopW * (i + 0.5)} cy={top + awning} r={scallopW / 2} />
         ))}
       </clipPath>
-      <text x={x} y={top + awning + 13} className="stall-name">
+      <text x={x} y={top + awning + 8} className="stall-name">
         {loc.name}
       </text>
       {open ? (
         <>
           {spaces.map((space, i) => {
-            const cx = x - ((n - 1) * (TOKEN_GAP + 18)) / 2 + i * (TOKEN_GAP + 18) - 6;
+            const cx = x - ((n - 1) * SPACE_WIDTH) / 2 + i * SPACE_WIDTH - 8;
             return (
               <g key={i}>
                 <TradeToken cx={cx} cy={tokensY} industries={space.tile?.industries ?? null} />
                 <g className={`stall-beer ${space.beer ? '' : 'empty'}`}>
-                  <IndustryIcon industry="brewery" size={13} x={cx + TOKEN_R + 2} y={tokensY - 6.5} />
+                  <IndustryIcon industry="brewery" size={17} x={cx + TOKEN_R + 2} y={tokensY - 8.5} />
                 </g>
               </g>
             );
           })}
           <g className="stall-bonus">
-            <rect x={x - 34} y={top + 60} width={68} height={15} rx={7.5} />
-            <IndustryIcon industry="brewery" size={10} x={x - 29} y={top + 62.5} />
-            <text x={x + 5} y={top + 68}>
+            <rect x={x - 42} y={top + 66} width={84} height={20} rx={10} />
+            <IndustryIcon industry="brewery" size={13} x={x - 36} y={top + 69.5} />
+            <text x={x + 6} y={top + 76}>
               {BONUS_LABEL(loc.beerBonus)}
             </text>
           </g>
