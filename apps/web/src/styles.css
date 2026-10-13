@@ -140,6 +140,18 @@ body {
   font: 16px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif;
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
+  /* A long press shouldn't select text or pop the iOS callout menu. */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Name fields still need normal text editing. */
+input,
+textarea {
+  user-select: text;
+  -webkit-user-select: text;
+  -webkit-touch-callout: default;
 }
 
 button {
