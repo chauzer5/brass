@@ -69,11 +69,16 @@ function validate(state: BrassState, player: PlayerId, action: BrassAction): str
 }
 
 /** One card per distinct card type in hand, so equivalent actions aren't listed twice. */
+/** Identifies cards that are interchangeable (same kind, location or industries). */
+export function cardSignature(card: Card): string {
+  const { id: _, ...spec } = card;
+  return JSON.stringify(spec);
+}
+
 function distinctCards(state: BrassState, hand: readonly CardId[]): CardId[] {
   const seen = new Map<string, CardId>();
   for (const id of hand) {
-    const { id: _, ...spec } = state.cards[id]!;
-    const sig = JSON.stringify(spec);
+    const sig = cardSignature(state.cards[id]!);
     if (!seen.has(sig)) seen.set(sig, id);
   }
   return [...seen.values()];
