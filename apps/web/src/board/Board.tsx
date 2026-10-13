@@ -1,7 +1,7 @@
 import { brass } from '@brass/engine';
 import { TransformComponent, TransformWrapper } from 'react-zoom-pan-pinch';
 import type { Highlights } from '../game/draft.ts';
-import { INDUSTRY_NAME, INDUSTRY_SHORT, roman } from '../game/labels.ts';
+import { INDUSTRY_NAME, roman } from '../game/labels.ts';
 import { IndustryIcon } from '../ui/icons.tsx';
 
 /**
@@ -140,6 +140,12 @@ export function Board({ state, highlights = NO_HIGHLIGHTS, onSlot, onLink }: Boa
           role="img"
           aria-label="Game board"
         >
+          <defs>
+            <pattern id="awning-stripes" width="12" height="12" patternUnits="userSpaceOnUse">
+              <rect width="6" height="12" fill="var(--stall-stripe)" />
+              <rect x="6" width="6" height="12" fill="var(--token)" />
+            </pattern>
+          </defs>
           <rect width={BOARD_SIZE} height={BOARD_SIZE} className="board-bg" />
           <image href="/board-bg.webp" width={BOARD_SIZE} height={BOARD_SIZE} preserveAspectRatio="xMidYMid slice" />
           {/* Softens the art so links, spaces and labels stay readable on top of it. */}
@@ -200,21 +206,115 @@ export function Board({ state, highlights = NO_HIGHLIGHTS, onSlot, onLink }: Boa
   );
 }
 
-function MerchantMarker({ loc, spaces }: { loc: brass.MerchantDef; spaces: brass.MerchantSpace[] }) {
-  const goods = spaces
-    .map((s) => (s.tile ? (s.tile.industries.length ? s.tile.industries.map((i) => INDUSTRY_SHORT[i]).join('/') : '—') : null))
-    .filter((g) => g !== null);
-  const beer = spaces.filter((s) => s.beer).length;
+const BONUS_LABEL = (bonus: brass.MerchantBeerBonus): string => {
+  switch (bonus.type) {
+    case 'develop':
+      return 'Develop';
+    case 'income':
+      return `+${bonus.spaces} income`;
+    case 'vp':
+      return `+${bonus.amount} VP`;
+    case 'money':
+      return `+£${bonus.amount}`;
+  }
+};
+
+const TOKEN_R = 13;
+const TOKEN_GAP = 30;
+
+/** A merchant tile: a round trade token showing the goods it buys. */
+function TradeToken({ cx, cy, industries }: { cx: number; cy: number; industries: readonly brass.Industry[] | null }) {
+  const icons = industries ?? [];
+  const size = icons.length === 1 ? 16 : 11;
+  // One icon centred; three in a small triangle.
+  const spots =
+    icons.length === 1
+      ? [[0, 0]]
+      : [
+          [0, -5],
+          [-5.5, 4],
+          [5.5, 4],
+        ];
   return (
-    <g>
-      <rect x={loc.pos.x - 52} y={loc.pos.y - 20} width={104} height={40} rx={6} className="merchant" />
-      <text x={loc.pos.x} y={loc.pos.y - 7} className="location-name">
+    <g className={`trade-token ${icons.length === 0 ? 'blank' : ''}`}>
+      <circle cx={cx} cy={cy} r={TOKEN_R} />
+      {icons.map((ind, i) => (
+        <IndustryIcon
+          key={ind}
+          industry={ind}
+          size={size}
+          x={cx + spots[i]![0]! - size / 2}
+          y={cy + spots[i]![1]! - size / 2}
+        />
+      ))}
+    </g>
+  );
+}
+
+/**
+ * A merchant drawn as a market stall: a striped awning over the name, a trade
+ * token per merchant tile (the goods it buys), a barrel beside each token
+ * that still has beer, and the beer bonus on a tag below.
+ */
+function MerchantMarker({ loc, spaces }: { loc: brass.MerchantDef; spaces: brass.MerchantSpace[] }) {
+  const open = spaces.some((s) => s.tile !== null);
+  const n = loc.spaces;
+  const width = Math.max(92, n * (TOKEN_GAP + 18) + 18);
+  const { x, y } = loc.pos;
+  const left = x - width / 2;
+  const top = y - 30;
+  const awning = 10;
+  const scallops = Math.round(width / 12);
+  const scallopW = width / scallops;
+  const tokensY = y + 12;
+  return (
+    <g className={`merchant-stall ${open ? '' : 'closed'}`}>
+      <title>
+        {open
+          ? `${loc.name} merchant. Selling here with its beer gives: ${BONUS_LABEL(loc.beerBonus)}`
+          : `${loc.name} merchant (not used with this many players)`}
+      </title>
+      {/* Stall body */}
+      <rect x={left} y={top + awning - 2} width={width} height={52} rx={5} className="stall-body" />
+      {/* Striped awning with a scalloped edge */}
+      <g clipPath={`url(#awning-${loc.id})`}>
+        <rect x={left - 2} y={top - 2} width={width + 4} height={awning + 8} className="stall-awning" />
+      </g>
+      <clipPath id={`awning-${loc.id}`}>
+        <rect x={left - 2} y={top - 2} width={width + 4} height={awning + 2} rx={4} />
+        {Array.from({ length: scallops }, (_, i) => (
+          <circle key={i} cx={left + scallopW * (i + 0.5)} cy={top + awning} r={scallopW / 2} />
+        ))}
+      </clipPath>
+      <text x={x} y={top + awning + 13} className="stall-name">
         {loc.name}
       </text>
-      <text x={loc.pos.x} y={loc.pos.y + 9} className="merchant-goods">
-        {goods.length ? goods.join(' · ') : 'no merchants'}
-        {beer > 0 ? ` · ${'🍺'.repeat(beer)}` : ''}
-      </text>
+      {open ? (
+        <>
+          {spaces.map((space, i) => {
+            const cx = x - ((n - 1) * (TOKEN_GAP + 18)) / 2 + i * (TOKEN_GAP + 18) - 6;
+            return (
+              <g key={i}>
+                <TradeToken cx={cx} cy={tokensY} industries={space.tile?.industries ?? null} />
+                <g className={`stall-beer ${space.beer ? '' : 'empty'}`}>
+                  <IndustryIcon industry="brewery" size={13} x={cx + TOKEN_R + 2} y={tokensY - 6.5} />
+                </g>
+              </g>
+            );
+          })}
+          <g className="stall-bonus">
+            <rect x={x - 34} y={top + 60} width={68} height={15} rx={7.5} />
+            <IndustryIcon industry="brewery" size={10} x={x - 29} y={top + 62.5} />
+            <text x={x + 5} y={top + 68}>
+              {BONUS_LABEL(loc.beerBonus)}
+            </text>
+          </g>
+        </>
+      ) : (
+        <text x={x} y={tokensY} className="stall-closed">
+          closed
+        </text>
+      )}
     </g>
   );
 }

@@ -21,6 +21,13 @@
   --p2: #c4472e;
   --p3: #2a8c84;
   --highlight: #e0661b;
+  --stall: #f6ead2;
+  --stall-edge: #7a3b1d;
+  --stall-ink: #3a2012;
+  --stall-stripe: #a8402a;
+  --token: #fff6dc;
+  --token-rim: #c9962f;
+  --beer: #8a5a2b;
   color-scheme: light;
 }
 
@@ -48,6 +55,13 @@
     --p2: #ef7a5f;
     --p3: #57c1b8;
     --highlight: #ffa04d;
+    --stall: #3b2a1e;
+    --stall-edge: #c0703f;
+    --stall-ink: #f6e3c7;
+    --stall-stripe: #b5503a;
+    --token: #4a3524;
+    --token-rim: #e0b35a;
+    --beer: #e0a463;
     color-scheme: dark;
   }
 }
@@ -212,11 +226,6 @@ button {
   stroke-width: 1;
 }
 
-.merchant {
-  fill: var(--surface);
-  stroke: var(--accent);
-  stroke-width: 2;
-}
 
 .location-name {
   fill: var(--ink);
@@ -331,9 +340,76 @@ button {
   pointer-events: stroke;
 }
 
-.merchant-goods {
-  fill: var(--muted);
-  font-size: 9px;
+/* ---- Merchants: market stalls ---- */
+
+.stall-body {
+  fill: var(--stall);
+  stroke: var(--stall-edge);
+  stroke-width: 2;
+}
+
+.stall-awning {
+  fill: url(#awning-stripes);
+}
+
+.stall-name {
+  fill: var(--stall-ink);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.trade-token {
+  color: var(--stall-ink);
+}
+
+.trade-token circle {
+  fill: var(--token);
+  stroke: var(--token-rim);
+  stroke-width: 2.5;
+}
+
+.trade-token.blank circle {
+  fill: var(--stall);
+  stroke-dasharray: 3 3;
+  stroke-opacity: 0.6;
+}
+
+.stall-beer {
+  color: var(--beer);
+}
+
+.stall-beer.empty {
+  opacity: 0.25;
+}
+
+.stall-bonus rect {
+  fill: var(--stall-edge);
+}
+
+.stall-bonus {
+  color: #fff;
+}
+
+.stall-bonus text {
+  fill: #fff;
+  font-size: 8.5px;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.merchant-stall.closed {
+  opacity: 0.55;
+}
+
+.stall-closed {
+  fill: var(--stall-ink);
+  font-size: 10px;
+  font-style: italic;
   text-anchor: middle;
   dominant-baseline: central;
 }
