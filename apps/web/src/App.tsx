@@ -133,6 +133,7 @@ function Table({
       <main className="board-area">
         <Board
           state={view}
+          names={names}
           highlights={hidden ? undefined : lit}
           onSlot={(location, slot) => {
             if (state.phase.kind === 'shortfall') submit({ type: 'removeTile', location, slot });

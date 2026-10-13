@@ -18,7 +18,9 @@ const GAP = 5;
 const NO_HIGHLIGHTS: Highlights = { slots: new Set(), links: new Set(), selectedSlots: new Set(), selectedLinks: new Set() };
 
 interface BoardProps {
-  state?: Pick<brass.BrassView, 'tiles' | 'links' | 'merchants' | 'coalMarket' | 'ironMarket'>;
+  state?: Pick<brass.BrassView, 'tiles' | 'links' | 'merchants' | 'coalMarket' | 'ironMarket' | 'players' | 'turnOrder' | 'turnIndex' | 'phase'>;
+  /** Player names, for the turn order panel. */
+  names?: readonly string[] | undefined;
   highlights?: Highlights | undefined;
   onSlot?: (location: brass.LocationId, slot: number) => void;
   onLink?: (id: string) => void;
@@ -141,7 +143,7 @@ function Slots({
   );
 }
 
-export function Board({ state, highlights = NO_HIGHLIGHTS, onSlot, onLink, focus }: BoardProps) {
+export function Board({ state, names, highlights = NO_HIGHLIGHTS, onSlot, onLink, focus }: BoardProps) {
   const tiles = state?.tiles ?? {};
   const links = state?.links ?? {};
   const zoom = useRef<ReactZoomPanPinchRef>(null);
@@ -190,6 +192,7 @@ export function Board({ state, highlights = NO_HIGHLIGHTS, onSlot, onLink, focus
           <rect width={BOARD_SIZE} height={BOARD_SIZE} className="board-wash" />
 
           {state && <Markets coal={state.coalMarket} iron={state.ironMarket} />}
+          {state && names && <TurnOrder state={state} names={names} />}
 
           {brass.LINKS.map((l) => {
             const owner = links[l.id];
@@ -369,6 +372,61 @@ function MerchantMarker({ loc, spaces }: { loc: brass.MerchantDef; spaces: brass
  * Markets fill from the most expensive space, so cubes are bought cheapest
  * first; the next cube to be bought is ringed.
  */
+/** The turn order panel, in the empty lower-left corner of the map (like the Character tiles track on the real board). */
+const ORDER = { left: 22, top: 664, width: 212, headerH: 50, rowH: 54 };
+
+/**
+ * Money spent this round by each player, in next round's turn order: least
+ * spent goes first, ties keep their current order (rulebook p.6).
+ */
+function TurnOrder({
+  state,
+  names,
+}: {
+  state: Pick<brass.BrassView, 'players' | 'turnOrder' | 'turnIndex' | 'phase'>;
+  names: readonly string[];
+}) {
+  const next = [...state.turnOrder].sort((a, b) => state.players[a]!.spent - state.players[b]!.spent);
+  const acting = state.phase.kind === 'actions' ? state.turnOrder[state.turnIndex] : undefined;
+  const height = ORDER.headerH + next.length * ORDER.rowH + 8;
+  const nameOf = (id: number) => {
+    const name = names[id] ?? `Player ${id + 1}`;
+    return name.length > 11 ? `${name.slice(0, 10)}…` : name;
+  };
+  return (
+    <g className="turn-order">
+      <title>Money spent this round. Least spent plays first next round; ties keep their order.</title>
+      <rect x={ORDER.left} y={ORDER.top} width={ORDER.width} height={height} rx={10} className="market-panel" />
+      <text x={ORDER.left + 14} y={ORDER.top + 22} className="turn-order-title">
+        Next round order
+      </text>
+      <text x={ORDER.left + 14} y={ORDER.top + 39} className="turn-order-sub">
+        Spent this round · least goes first
+      </text>
+      {next.map((id, i) => {
+        const y = ORDER.top + ORDER.headerH + i * ORDER.rowH;
+        const cy = y + ORDER.rowH / 2;
+        return (
+          <g key={id} className={`turn-order-row owner-${id} ${id === acting ? 'acting' : ''}`}>
+            <rect x={ORDER.left + 6} y={y + 3} width={ORDER.width - 12} height={ORDER.rowH - 6} rx={8} className="turn-order-bg" />
+            <circle cx={ORDER.left + 26} cy={cy} r={12} className="market-price" />
+            <text x={ORDER.left + 26} y={cy} className="turn-order-rank">
+              {i + 1}
+            </text>
+            <circle cx={ORDER.left + 52} cy={cy} r={8} className="turn-order-dot" />
+            <text x={ORDER.left + 66} y={cy} className="turn-order-name">
+              {nameOf(id)}
+            </text>
+            <text x={ORDER.left + ORDER.width - 16} y={cy} className="turn-order-spent">
+              £{state.players[id]!.spent}
+            </text>
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
 const MARKET = { left: 852, top: 261, width: 142, rowGap: 44, firstRowY: 282, cell: 20 };
 const COAL_X = [889, 913];
 const IRON_X = [945, 969];

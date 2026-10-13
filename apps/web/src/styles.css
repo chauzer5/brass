@@ -1511,6 +1511,60 @@ button {
   color: #f1e6d6;
 }
 
+/* ---- Turn order panel (lower-left corner of the map) ---- */
+
+.turn-order-title {
+  fill: #f1e6d6;
+  font-size: 17px;
+  font-weight: 800;
+  dominant-baseline: central;
+}
+
+.turn-order-sub {
+  fill: #b09c88;
+  font-size: 11.5px;
+  dominant-baseline: central;
+}
+
+.turn-order-bg {
+  fill: rgba(255, 255, 255, 0.05);
+}
+
+.turn-order-row.acting .turn-order-bg {
+  fill: rgba(255, 255, 255, 0.1);
+  stroke: var(--highlight);
+  stroke-width: 2;
+}
+
+.turn-order-rank {
+  fill: var(--stall-ink);
+  font-size: 13px;
+  font-weight: 800;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.turn-order-dot {
+  fill: var(--owner);
+  stroke: #f1e6d6;
+  stroke-width: 1.5;
+}
+
+.turn-order-name {
+  fill: #f1e6d6;
+  font-size: 16px;
+  font-weight: 600;
+  dominant-baseline: central;
+}
+
+.turn-order-spent {
+  fill: #f1e6d6;
+  font-size: 17px;
+  font-weight: 800;
+  text-anchor: end;
+  dominant-baseline: central;
+}
+
 /* Tightly overlapped hand: slightly smaller text so names fit the visible strip. */
 .hand-row.tight .card-title {
   font-size: 9.5px;
