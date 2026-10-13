@@ -1093,8 +1093,19 @@ button {
   stroke-width: 1;
 }
 
-.market-cube.empty-price {
-  opacity: 0.85;
+.market-infinity {
+  font-size: 24px;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.market-infinity.coal {
+  fill: #d6d6d6;
+}
+
+.market-infinity.iron {
+  fill: #f0a050;
 }
 
 .market-next {

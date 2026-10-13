@@ -359,8 +359,9 @@ function MerchantMarker({ loc, spaces }: { loc: brass.MerchantDef; spaces: brass
 /*
  * The coal and iron markets, drawn in the empty strip down the board's right
  * edge like the printed board: a price column from £8 down to £1, two coal
- * spaces per price (£1–£7) and two iron spaces per price (£1–£5). The lone
- * cube at £8 (coal) and £6 (iron) is the price when that market is empty.
+ * spaces per price (£1–£7) and two iron spaces per price (£1–£5). The ∞ at
+ * £8 (coal) and £6 (iron) means that once a market is empty, any number of
+ * cubes can be bought at that price.
  * Markets fill from the most expensive space, so cubes are bought cheapest
  * first; the next cube to be bought is ringed.
  */
@@ -370,7 +371,7 @@ const IRON_X = [945, 969];
 
 function Markets({ coal, iron }: { coal: number; iron: number }) {
   const rowY = (price: number) => MARKET.firstRowY + (8 - price) * MARKET.rowGap;
-  const bottom = rowY(1) + 52;
+  const bottom = rowY(1) + 23;
 
   const spaces = (def: brass.MarketDef, cubes: number, xs: number[], kind: 'coal' | 'iron') => {
     const n = def.prices.length;
@@ -391,17 +392,17 @@ function Markets({ coal, iron }: { coal: number; iron: number }) {
     });
   };
 
-  // The "market empty" price: a single cube drawn beside the price, not a space.
-  const emptyPrice = (def: brass.MarketDef, xs: number[], kind: 'coal' | 'iron') => {
-    const x = (xs[0]! + xs[1]!) / 2 - MARKET.cell / 2 + 2;
-    const y = rowY(def.emptyPrice) - MARKET.cell / 2 + 2;
-    return <rect x={x} y={y} width={MARKET.cell - 4} height={MARKET.cell - 4} rx={2} className={`market-cube ${kind} empty-price`} />;
-  };
+  // The "market empty" price: unlimited cubes at this price once the market runs out.
+  const emptyPrice = (def: brass.MarketDef, xs: number[], kind: 'coal' | 'iron') => (
+    <text x={(xs[0]! + xs[1]!) / 2} y={rowY(def.emptyPrice)} className={`market-infinity ${kind}`}>
+      ∞
+    </text>
+  );
 
   return (
     <g className="markets" aria-label={`Coal market ${coal} cubes, iron market ${iron} cubes`}>
       <title>{`Coal market: ${coal} cubes. Iron market: ${iron} cubes. Cubes are bought from the cheapest price up; an empty market sells at £8 (coal) or £6 (iron).`}</title>
-      <rect x={MARKET.left} y={MARKET.top} width={MARKET.width} height={bottom - MARKET.top + 30} rx={10} className="market-panel" />
+      <rect x={MARKET.left} y={MARKET.top} width={MARKET.width} height={bottom - MARKET.top + 28} rx={10} className="market-panel" />
       <rect x={IRON_X[0]! - 16} y={rowY(6) - 18} width={IRON_X[1]! - IRON_X[0]! + 32} height={rowY(1) - rowY(6) + 36} rx={6} className="market-iron-bg" />
       {[8, 7, 6, 5, 4, 3, 2, 1].map((price) => (
         <g key={price}>
