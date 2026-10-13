@@ -52,19 +52,41 @@ export function usableCards(cards: Cards, hand: readonly brass.CardId[], legal: 
   return new Set(hand.filter((id) => sigs.has(sig(cards, id))));
 }
 
-export function buildIndustries(cards: Cards, legal: readonly brass.BrassAction[], card: brass.CardId): brass.Industry[] {
+function buildMoves(cards: Cards, legal: readonly brass.BrassAction[], d: Draft) {
+  if (d.kind !== 'build' || !d.card) return [];
+  return withCard(cards, legal, 'build', d.card).map((a) => a as Extract<brass.BrassAction, { type: 'build' }>);
+}
+
+/** Every space the chosen card can build on, with any industry. */
+export function buildSlots(cards: Cards, legal: readonly brass.BrassAction[], d: Draft): brass.SlotKey[] {
+  return [...new Set(buildMoves(cards, legal, d).map((a) => brass.slotKey(a.location, a.slot)))];
+}
+
+/** Industries that can be built on one space with the chosen card. */
+export function buildIndustriesAt(cards: Cards, legal: readonly brass.BrassAction[], d: Draft, key: brass.SlotKey): brass.Industry[] {
   const set = new Set(
-    withCard(cards, legal, 'build', card).map((a) => (a as Extract<brass.BrassAction, { type: 'build' }>).industry),
+    buildMoves(cards, legal, d)
+      .filter((a) => brass.slotKey(a.location, a.slot) === key)
+      .map((a) => a.industry),
   );
   return brass.INDUSTRIES.filter((i) => set.has(i));
 }
 
-export function buildSlots(cards: Cards, legal: readonly brass.BrassAction[], d: Draft): brass.SlotKey[] {
-  if (d.kind !== 'build' || !d.card || !d.industry) return [];
-  return withCard(cards, legal, 'build', d.card)
-    .map((a) => a as Extract<brass.BrassAction, { type: 'build' }>)
-    .filter((a) => a.industry === d.industry)
-    .map((a) => brass.slotKey(a.location, a.slot));
+/**
+ * Chooses the space to build on. If only one industry can go there it is
+ * chosen too; otherwise the player picks between them next.
+ */
+export function chooseBuildSlot(
+  cards: Cards,
+  legal: readonly brass.BrassAction[],
+  d: Draft,
+  location: brass.LocationId,
+  slot: number,
+): Draft {
+  const options = buildIndustriesAt(cards, legal, d, brass.slotKey(location, slot));
+  if (options.length === 0) return d;
+  const industry = options.length === 1 ? options[0]! : d.industry && options.includes(d.industry) ? d.industry : null;
+  return { ...d, slot: { location, slot }, industry };
 }
 
 /** Links that can be placed next: the first link, or the second rail link. */

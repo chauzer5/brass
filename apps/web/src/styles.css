@@ -1019,3 +1019,13 @@ button {
   font-weight: 600;
   cursor: pointer;
 }
+
+.chip.with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.build-summary svg {
+  vertical-align: -3px;
+}

@@ -2,8 +2,9 @@ import { brass } from '@brass/engine';
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 import {
   EMPTY_DRAFT,
-  buildIndustries,
+  buildIndustriesAt,
   buildSlots,
+  chooseBuildSlot,
   compose,
   developIndustries,
   networkLinks,
@@ -12,7 +13,7 @@ import {
 } from '../game/draft.ts';
 import { INDUSTRY_NAME, cardName, linkName, merchantName, roman, slotName } from '../game/labels.ts';
 import { ACTION_LABEL } from './ActionRail.tsx';
-import { ActionIcon } from './icons.tsx';
+import { ActionIcon, IndustryIcon } from './icons.tsx';
 
 interface StepPanelProps {
   view: brass.BrassView;
@@ -149,50 +150,52 @@ type StepProps = {
 };
 
 function BuildSteps({ view, me, legal, draft, setDraft }: StepProps & { me: brass.PlayerView }) {
-  const industries = buildIndustries(view.cards, legal, draft.card!);
   const slots = buildSlots(view.cards, legal, draft);
+  const chosenKey = draft.slot ? brass.slotKey(draft.slot.location, draft.slot.slot) : null;
+  const industries = chosenKey ? buildIndustriesAt(view.cards, legal, draft, chosenKey) : [];
   const tile = draft.industry ? brass.tileStats(draft.industry, me.mat[draft.industry].findIndex((n) => n > 0) + 1) : null;
   return (
     <>
-      <Step title="Choose an industry">
+      <Step title="Choose where (tap the board or pick below)">
         <div className="chips">
-          {industries.map((ind) => (
-            <button
-              key={ind}
-              className={`chip ${draft.industry === ind ? 'selected' : ''}`}
-              onClick={() => setDraft((d) => ({ ...d, industry: ind, slot: null }))}
-            >
-              {INDUSTRY_NAME[ind]} {lowest(me, ind)}
-            </button>
-          ))}
+          {slots.map((key) => {
+            const { location, index } = brass.parseSlotKey(key);
+            return (
+              <button
+                key={key}
+                className={`chip ${key === chosenKey ? 'selected' : ''}`}
+                onClick={() => setDraft((d) => chooseBuildSlot(view.cards, legal, d, location, index))}
+              >
+                {slotName(location, index)}
+                {view.tiles[key] ? ' (overbuild)' : ''}
+              </button>
+            );
+          })}
         </div>
-        {tile && (
-          <p className="muted">
-            Costs £{tile.cost}
-            {tile.coal ? `, ${tile.coal} coal` : ''}
-            {tile.iron ? `, ${tile.iron} iron` : ''}. Flipped: {tile.vp} VP, +{tile.income} income.
-          </p>
-        )}
       </Step>
-      {draft.industry && (
-        <Step title="Choose where (or tap the board)">
+      {industries.length > 1 && (
+        <Step title="Which industry?">
           <div className="chips">
-            {slots.map((key) => {
-              const { location, index } = brass.parseSlotKey(key);
-              const selected = draft.slot?.location === location && draft.slot.slot === index;
-              return (
-                <button
-                  key={key}
-                  className={`chip ${selected ? 'selected' : ''}`}
-                  onClick={() => setDraft((d) => ({ ...d, slot: { location, slot: index } }))}
-                >
-                  {slotName(location, index)}
-                  {view.tiles[key] ? ' (overbuild)' : ''}
-                </button>
-              );
-            })}
+            {industries.map((ind) => (
+              <button
+                key={ind}
+                className={`chip with-icon ${draft.industry === ind ? 'selected' : ''}`}
+                onClick={() => setDraft((d) => ({ ...d, industry: ind }))}
+              >
+                <IndustryIcon industry={ind} size={18} />
+                {INDUSTRY_NAME[ind]} {lowest(me, ind)}
+              </button>
+            ))}
           </div>
         </Step>
+      )}
+      {tile && draft.industry && (
+        <p className="muted build-summary">
+          <IndustryIcon industry={draft.industry} size={16} /> {INDUSTRY_NAME[draft.industry]} {lowest(me, draft.industry)}:
+          £{tile.cost}
+          {tile.coal ? `, ${tile.coal} coal` : ''}
+          {tile.iron ? `, ${tile.iron} iron` : ''}. Flipped: {tile.vp} VP, +{tile.income} income.
+        </p>
       )}
     </>
   );
@@ -282,7 +285,7 @@ function SellSteps({ view, legal, draft, setDraft }: StepProps) {
 
 /** Applies a tap on the board to the draft. */
 export function tapSlot(draft: Draft, location: brass.LocationId, slot: number, view: brass.BrassView, legal: readonly brass.BrassAction[]): Draft {
-  if (draft.kind === 'build') return { ...draft, slot: { location, slot } };
+  if (draft.kind === 'build') return chooseBuildSlot(view.cards, legal, draft, location, slot);
   if (draft.kind === 'sell') {
     const key = brass.slotKey(location, slot);
     if (draft.sales.some((s) => brass.slotKey(s.location, s.slot) === key)) {
