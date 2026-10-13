@@ -1,10 +1,13 @@
 import { brass, type Outcome } from '@brass/engine';
 import { useState } from 'react';
 import { PLAYER_COLORS } from '../game/labels.ts';
+import { useTheme, type ThemeSetting } from '../settings.ts';
 
 export function NewGame({ onStart, onResume }: { onStart: (names: string[]) => void; onResume?: (() => void) | undefined }) {
   const [count, setCount] = useState(2);
   const [names, setNames] = useState(['Player 1', 'Player 2', 'Player 3', 'Player 4']);
+  const [showSettings, setShowSettings] = useState(false);
+  if (showSettings) return <Settings onClose={() => setShowSettings(false)} />;
   return (
     <div className="screen">
       <div className="screen-card">
@@ -37,6 +40,49 @@ export function NewGame({ onStart, onResume }: { onStart: (names: string[]) => v
         </div>
         <button className="confirm" onClick={() => onStart(names.slice(0, count).map((n, i) => n.trim() || `Player ${i + 1}`))}>
           Start new game
+        </button>
+        <button className="secondary" onClick={() => setShowSettings(true)}>
+          Settings
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const THEME_OPTIONS: { value: ThemeSetting; label: string }[] = [
+  { value: 'system', label: 'Match phone' },
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+];
+
+export function Settings({ onClose }: { onClose: () => void }) {
+  const { theme, setTheme } = useTheme();
+  return (
+    <div className="screen">
+      <div className="screen-card">
+        <div className="panel-header">
+          <button className="close" onClick={onClose} aria-label="Back to menu">
+            ‹
+          </button>
+          <h2>Settings</h2>
+        </div>
+        <h3>Appearance</h3>
+        <div className="segmented" role="radiogroup" aria-label="Appearance">
+          {THEME_OPTIONS.map((o) => (
+            <button
+              key={o.value}
+              role="radio"
+              aria-checked={theme === o.value}
+              className={theme === o.value ? 'selected' : ''}
+              onClick={() => setTheme(o.value)}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+        <p className="muted">"Match phone" follows your phone's light or dark setting.</p>
+        <button className="confirm" onClick={onClose}>
+          Done
         </button>
       </div>
     </div>

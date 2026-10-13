@@ -13,6 +13,13 @@
     <link rel="icon" href="/icon-192.png" type="image/png" sizes="192x192" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>Brass</title>
+    <script>
+      // Apply a theme chosen in Settings before first paint, so there's no flash of the wrong one.
+      try {
+        var t = localStorage.getItem('brass:theme');
+        if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -31,6 +31,7 @@
   color-scheme: light;
 }
 
+/* Dark theme: follows the phone unless a theme is chosen in Settings (data-theme on <html>). */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     --bg: #1c1612;
@@ -64,6 +65,39 @@
     --beer: #e0a463;
     color-scheme: dark;
   }
+}
+
+:root[data-theme='dark'] {
+  --bg: #1c1612;
+  --surface: #2a211b;
+  --ink: #f1e6d6;
+  --muted: #b09c88;
+  --line: #4a3b2f;
+  --accent: #e08a4c;
+  --board: #2f2620;
+  --board-wash: rgba(20, 14, 10, 0.38);
+  --canal: #3e6f94;
+  --rail: #e6d6c0;
+  --banner-blue: #7fa8e8;
+  --banner-teal: #6cc7bf;
+  --banner-red: #e88a8a;
+  --banner-yellow: #e3c46a;
+  --banner-purple: #c39be3;
+  --shadow: 0 -4px 24px rgba(0, 0, 0, 0.5);
+  --danger: #f08a8a;
+  --p0: #a77de0;
+  --p1: #e6bd4c;
+  --p2: #ef7a5f;
+  --p3: #57c1b8;
+  --highlight: #ffa04d;
+  --stall: #3b2a1e;
+  --stall-edge: #c0703f;
+  --stall-ink: #f6e3c7;
+  --stall-stripe: #b5503a;
+  --token: #4a3524;
+  --token-rim: #e0b35a;
+  --beer: #e0a463;
+  color-scheme: dark;
 }
 
 * {
@@ -974,4 +1008,13 @@ button {
 
 .hand-tray[data-dragging='true'] {
   transition: none;
+}
+
+.secondary {
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  font-weight: 600;
+  cursor: pointer;
 }
