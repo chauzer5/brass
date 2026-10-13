@@ -165,11 +165,14 @@ export function HandTray({
           const row = Math.floor(i / perRow);
           const col = i % perRow;
           const rowEnd = col === perRow - 1 || i === n - 1;
+          // Centre each row; the last row may hold fewer cards.
+          const inRow = Math.min(perRow, n - row * perRow);
+          const offset = Math.max(0, (width - ((inRow - 1) * step + CARD_WIDTH)) / 2);
           return (
             <button
               key={id}
               className={`hand-card ${isSelected ? 'selected' : ''} ${usable && disabled ? 'unusable' : ''} ${rowEnd ? 'row-end' : ''}`}
-              style={{ left: col * step, top: 16 + row * ROW_STEP, zIndex: isSelected ? 50 : i }}
+              style={{ left: offset + col * step, top: 16 + row * ROW_STEP, zIndex: isSelected ? 50 : i }}
               disabled={disabled}
               aria-pressed={isSelected}
               onClick={() => onPick(id)}
