@@ -1442,6 +1442,66 @@ button {
 .legend-swatch.rail-only { background: var(--rail); }
 .mat-legend .mat-bulb { margin-left: 4px; }
 
+.discard-sheet {
+  gap: 10px;
+  padding: 14px;
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+}
+
+.discard-player h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+
+.discard-player h3 .muted {
+  font-weight: 400;
+  font-size: 13px;
+}
+
+.discard-player p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.discard-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.discard-cards > .game-card,
+.discard-facedown {
+  width: 70px;
+  height: 96px;
+}
+
+.discard-cards .card-title {
+  max-width: none;
+}
+
+.discard-facedown {
+  position: relative;
+  display: grid;
+}
+
+.discard-facedown span {
+  position: absolute;
+  inset: auto 0 8px;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.game-card.back {
+  background: repeating-linear-gradient(45deg, var(--accent) 0 6px, color-mix(in srgb, var(--accent) 80%, #000) 6px 12px);
+  border-color: color-mix(in srgb, var(--accent) 70%, #000);
+}
+
 .mat-sheet {
   gap: 8px;
   padding: 14px;
@@ -1534,6 +1594,53 @@ button {
 
 .market-legend {
   color: #f1e6d6;
+}
+
+/* ---- Deck and discard piles (top-left corner of the map) ---- */
+
+.pile-card.deck,
+.pile-under.deck {
+  fill: var(--accent);
+  stroke: #f1e6d6;
+  stroke-width: 1.5;
+}
+
+.pile-card.discard,
+.pile-under.discard {
+  fill: var(--token);
+  stroke: var(--token-rim);
+  stroke-width: 1.5;
+}
+
+.pile-under {
+  opacity: 0.85;
+}
+
+.pile-empty {
+  fill: none;
+  stroke: #7a6656;
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+
+.pile-count {
+  font-size: 20px;
+  font-weight: 800;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.pile-count.deck { fill: #fff; }
+.pile-count.discard { fill: var(--stall-ink); }
+
+.pile-label {
+  fill: #b09c88;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-anchor: middle;
+  dominant-baseline: central;
 }
 
 /* ---- Turn order panel (lower-left corner of the map) ---- */

@@ -6,7 +6,7 @@ import { canUndo, useGame, type Game } from './game/useGame.ts';
 import { ActionRail } from './ui/ActionRail.tsx';
 import { HandTray, type TrayTab } from './ui/HandTray.tsx';
 import { PlayerMat } from './ui/PlayerMat.tsx';
-import { GameOver, Handoff, MatSheet, NewGame, PlayerStrip } from './ui/Screens.tsx';
+import { DiscardSheet, GameOver, Handoff, MatSheet, NewGame, PlayerStrip } from './ui/Screens.tsx';
 import { StepPanel, pickCard, tapMatRow, tapSlot } from './ui/TurnPanel.tsx';
 
 export function App() {
@@ -62,6 +62,7 @@ function Table({
   const [trayTab, setTrayTab] = useState<TrayTab>('hand');
   /** Another player whose mat is open in a sheet. */
   const [matFor, setMatFor] = useState<number | null>(null);
+  const [showDiscards, setShowDiscards] = useState(false);
 
   // A new player (or a new phase) starts with a fresh draft.
   useEffect(() => setDraft(EMPTY_DRAFT), [player, state.phase.kind, match.log.length]);
@@ -134,6 +135,7 @@ function Table({
         <Board
           state={view}
           names={names}
+          onDiscards={() => setShowDiscards(true)}
           highlights={hidden ? undefined : lit}
           onSlot={(location, slot) => {
             if (state.phase.kind === 'shortfall') submit({ type: 'removeTile', location, slot });
@@ -210,6 +212,7 @@ function Table({
           </HandTray>
         )}
       </main>
+      {showDiscards && <DiscardSheet view={view} names={names} onClose={() => setShowDiscards(false)} />}
       {matFor !== null && (
         <MatSheet
           player={view.players[matFor]!}

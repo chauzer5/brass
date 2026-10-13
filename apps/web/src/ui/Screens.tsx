@@ -1,5 +1,6 @@
 import { brass, type Outcome } from '@brass/engine';
 import { useState } from 'react';
+import { GameCard } from './HandTray.tsx';
 import { PlayerMat } from './PlayerMat.tsx';
 import { useTheme, type ThemeSetting } from '../settings.ts';
 
@@ -187,6 +188,58 @@ export function GameOver({ outcome, names, onNewGame }: { outcome: Outcome; name
         <button className="confirm" onClick={onNewGame}>
           New game
         </button>
+      </div>
+    </div>
+  );
+}
+
+/** Every player's discard pile, newest card first. Discards are face up, so anyone may look. */
+export function DiscardSheet({
+  view,
+  names,
+  onClose,
+}: {
+  view: brass.BrassView;
+  names: readonly string[];
+  onClose: () => void;
+}) {
+  return (
+    <div className="overlay mat-overlay" onClick={onClose}>
+      <div className="screen-card discard-sheet" role="dialog" aria-label="Discard piles" onClick={(e) => e.stopPropagation()}>
+        <div className="mat-sheet-header">
+          <h2>Discards</h2>
+          <span className="muted">Deck: {view.deckSize} cards left</span>
+          <button className="close" onClick={onClose} aria-label="Close">
+            ✕
+          </button>
+        </div>
+        {view.turnOrder.map((id) => {
+          const p = view.players[id]!;
+          const count = p.discard.length + (p.hasFaceDownDiscard ? 1 : 0);
+          return (
+            <section key={id} className="discard-player">
+              <h3>
+                <span className={`dot owner-${id}`} aria-hidden /> {names[id]}
+                <span className="muted"> · {count} card{count === 1 ? '' : 's'}</span>
+              </h3>
+              {count === 0 ? (
+                <p className="muted">Nothing discarded yet.</p>
+              ) : (
+                <div className="discard-cards">
+                  {[...p.discard].reverse().map((cardId) => (
+                    <GameCard key={cardId} card={view.cards[cardId]} />
+                  ))}
+                  {p.hasFaceDownDiscard && (
+                    <div className="discard-facedown" title="Discarded face down at the start of the game">
+                      <GameCard card={undefined} />
+                      <span>Face down</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </section>
+          );
+        })}
       </div>
     </div>
   );

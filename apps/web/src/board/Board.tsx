@@ -18,9 +18,11 @@ const GAP = 5;
 const NO_HIGHLIGHTS: Highlights = { slots: new Set(), links: new Set(), selectedSlots: new Set(), selectedLinks: new Set() };
 
 interface BoardProps {
-  state?: Pick<brass.BrassView, 'tiles' | 'links' | 'merchants' | 'coalMarket' | 'ironMarket' | 'players' | 'turnOrder' | 'turnIndex' | 'phase'>;
+  state?: Pick<brass.BrassView, 'tiles' | 'links' | 'merchants' | 'coalMarket' | 'ironMarket' | 'players' | 'turnOrder' | 'turnIndex' | 'phase' | 'deckSize'>;
   /** Player names, for the turn order panel. */
   names?: readonly string[] | undefined;
+  /** Tapping the discard pile. */
+  onDiscards?: (() => void) | undefined;
   highlights?: Highlights | undefined;
   onSlot?: (location: brass.LocationId, slot: number) => void;
   onLink?: (id: string) => void;
@@ -143,7 +145,7 @@ function Slots({
   );
 }
 
-export function Board({ state, names, highlights = NO_HIGHLIGHTS, onSlot, onLink, focus }: BoardProps) {
+export function Board({ state, names, onDiscards, highlights = NO_HIGHLIGHTS, onSlot, onLink, focus }: BoardProps) {
   const tiles = state?.tiles ?? {};
   const links = state?.links ?? {};
   const zoom = useRef<ReactZoomPanPinchRef>(null);
@@ -193,6 +195,7 @@ export function Board({ state, names, highlights = NO_HIGHLIGHTS, onSlot, onLink
 
           {state && <Markets coal={state.coalMarket} iron={state.ironMarket} />}
           {state && names && <TurnOrder state={state} names={names} />}
+          {state && <Piles state={state} onDiscards={onDiscards} />}
 
           {brass.LINKS.map((l) => {
             const owner = links[l.id];
@@ -372,6 +375,63 @@ function MerchantMarker({ loc, spaces }: { loc: brass.MerchantDef; spaces: brass
  * Markets fill from the most expensive space, so cubes are bought cheapest
  * first; the next cube to be bought is ringed.
  */
+/** The draw deck and discard piles, in the empty top-left corner of the map (as on the real board). */
+const PILES = { left: 18, top: 18, card: { w: 50, h: 70 }, gap: 12, pad: 10, labelH: 18 };
+
+function Piles({
+  state,
+  onDiscards,
+}: {
+  state: Pick<brass.BrassView, 'players' | 'deckSize'>;
+  onDiscards?: (() => void) | undefined;
+}) {
+  // Every player's discards, including the face-down card each discarded at setup.
+  const discards = state.players.reduce((n, p) => n + p.discard.length + (p.hasFaceDownDiscard ? 1 : 0), 0);
+  const { w, h } = PILES.card;
+  const width = PILES.pad * 2 + w * 2 + PILES.gap;
+  const height = PILES.pad * 2 + h + PILES.labelH;
+  const deckX = PILES.left + PILES.pad;
+  const discardX = deckX + w + PILES.gap;
+  const y = PILES.top + PILES.pad;
+  // A pile looks thicker the more cards it holds.
+  const stack = (n: number) => Math.min(3, Math.ceil(n / 12));
+  const pile = (x: number, n: number, kind: 'deck' | 'discard') => (
+    <>
+      {Array.from({ length: stack(n) }, (_, i) => (
+        <rect key={i} x={x + (stack(n) - i) * 2} y={y - (stack(n) - i) * 2 + 4} width={w} height={h - 4} rx={5} className={`pile-under ${kind}`} />
+      ))}
+      <rect x={x} y={y} width={w} height={h} rx={5} className={n ? `pile-card ${kind}` : 'pile-empty'} />
+      <text x={x + w / 2} y={y + h / 2} className={`pile-count ${kind}`}>
+        {n}
+      </text>
+    </>
+  );
+  return (
+    <g className="piles">
+      <rect x={PILES.left} y={PILES.top} width={width} height={height} rx={10} className="market-panel" />
+      <g aria-label={`Draw deck: ${state.deckSize} cards`}>
+        <title>{`Draw deck: ${state.deckSize} cards`}</title>
+        {pile(deckX, state.deckSize, 'deck')}
+        <text x={deckX + w / 2} y={y + h + PILES.labelH / 2 + 3} className="pile-label">
+          Deck
+        </text>
+      </g>
+      <g
+        className={onDiscards ? 'tappable' : undefined}
+        role={onDiscards ? 'button' : undefined}
+        aria-label={`Discard piles: ${discards} cards. Show them`}
+        onClick={onDiscards}
+      >
+        <title>{`Discard piles: ${discards} cards. Tap to see them.`}</title>
+        {pile(discardX, discards, 'discard')}
+        <text x={discardX + w / 2} y={y + h + PILES.labelH / 2 + 3} className="pile-label">
+          Discard
+        </text>
+      </g>
+    </g>
+  );
+}
+
 /**
  * The turn order panel, in the empty lower-left corner of the map (like the
  * Character tiles track on the real board). Sized to match the markets.
