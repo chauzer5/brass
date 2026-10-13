@@ -6,7 +6,13 @@
   --line: #d9cbb6;
   --accent: #b5652b;
   --board: #e8dcc6;
-  --board-grid: rgba(43, 29, 20, 0.08);
+  --canal: #8fb8d6;
+  --rail: #3b2a1f;
+  --banner-blue: #2c5aa0;
+  --banner-teal: #237a74;
+  --banner-red: #9c2f2f;
+  --banner-yellow: #8a6a12;
+  --banner-purple: #6b3f8f;
   --shadow: 0 -4px 24px rgba(43, 29, 20, 0.15);
   color-scheme: light;
 }
@@ -20,7 +26,13 @@
     --line: #4a3b2f;
     --accent: #e08a4c;
     --board: #2f2620;
-    --board-grid: rgba(241, 230, 214, 0.06);
+    --canal: #3e6f94;
+    --rail: #e6d6c0;
+    --banner-blue: #7fa8e8;
+    --banner-teal: #6cc7bf;
+    --banner-red: #e88a8a;
+    --banner-yellow: #e3c46a;
+    --banner-purple: #c39be3;
     --shadow: 0 -4px 24px rgba(0, 0, 0, 0.5);
     color-scheme: dark;
   }
@@ -109,18 +121,61 @@ button {
   fill: var(--board);
 }
 
-.board-grid {
+.link {
   fill: none;
-  stroke: var(--board-grid);
+  stroke-linecap: round;
+}
+
+.link-canal {
+  stroke: var(--canal);
+  stroke-width: 9;
+}
+
+.link-rail {
+  stroke: var(--rail);
+  stroke-width: 4;
+  stroke-dasharray: 2 3;
+}
+
+.link-rail.link-both {
+  stroke-width: 3;
+}
+
+.slot {
+  fill: var(--surface);
+  stroke: var(--ink);
   stroke-width: 1;
 }
 
-.board-placeholder {
-  fill: var(--muted);
-  font-size: 36px;
+.slot-label {
+  fill: var(--ink);
+  font-size: 8px;
   text-anchor: middle;
-  dominant-baseline: middle;
+  dominant-baseline: central;
 }
+
+.merchant {
+  fill: var(--surface);
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.location-name {
+  fill: var(--ink);
+  font-size: 11px;
+  font-weight: 600;
+  text-anchor: middle;
+  dominant-baseline: central;
+  paint-order: stroke;
+  stroke: var(--board);
+  stroke-width: 3px;
+}
+
+.banner-blue { fill: var(--banner-blue); }
+.banner-teal { fill: var(--banner-teal); }
+.banner-red { fill: var(--banner-red); }
+.banner-yellow { fill: var(--banner-yellow); }
+.banner-purple { fill: var(--banner-purple); }
 
 .sheet {
   grid-area: sheet;

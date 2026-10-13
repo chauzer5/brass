@@ -44,3 +44,7 @@ pnpm test        # engine tests
 pnpm typecheck
 pnpm build
 ```
+
+## Deploying (Vercel)
+
+`vercel.json` at the repo root sets the install command, the build command and the output directory (`apps/web/dist`). Import the GitHub repo in Vercel and keep the Root Directory as the repo root. Every push to `main` deploys to production, and other branches get preview URLs.
