@@ -156,23 +156,16 @@ function BuildSteps({ view, me, legal, draft, setDraft }: StepProps & { me: bras
   const tile = draft.industry ? brass.tileStats(draft.industry, me.mat[draft.industry].findIndex((n) => n > 0) + 1) : null;
   return (
     <>
-      <Step title="Choose where (tap the board or pick below)">
-        <div className="chips">
-          {slots.map((key) => {
-            const { location, index } = brass.parseSlotKey(key);
-            return (
-              <button
-                key={key}
-                className={`chip ${key === chosenKey ? 'selected' : ''}`}
-                onClick={() => setDraft((d) => chooseBuildSlot(view.cards, legal, d, location, index))}
-              >
-                {slotName(location, index)}
-                {view.tiles[key] ? ' (overbuild)' : ''}
-              </button>
-            );
-          })}
-        </div>
-      </Step>
+      {draft.slot ? (
+        <p className="hint">
+          Building in <strong>{slotName(draft.slot.location, draft.slot.slot)}</strong>
+          {chosenKey && view.tiles[chosenKey] ? ' (overbuild)' : ''}. Tap another highlighted space to change it.
+        </p>
+      ) : (
+        <p className="hint">
+          Tap a highlighted space on the map ({slots.length} available).
+        </p>
+      )}
       {industries.length > 1 && (
         <Step title="Which industry?">
           <div className="chips">
