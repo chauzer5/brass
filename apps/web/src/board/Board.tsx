@@ -18,7 +18,7 @@ const GAP = 5;
 const NO_HIGHLIGHTS: Highlights = { slots: new Set(), links: new Set(), selectedSlots: new Set(), selectedLinks: new Set() };
 
 interface BoardProps {
-  state?: Pick<brass.BrassView, 'tiles' | 'links' | 'merchants'>;
+  state?: Pick<brass.BrassView, 'tiles' | 'links' | 'merchants' | 'coalMarket' | 'ironMarket'>;
   highlights?: Highlights | undefined;
   onSlot?: (location: brass.LocationId, slot: number) => void;
   onLink?: (id: string) => void;
@@ -185,6 +185,8 @@ export function Board({ state, highlights = NO_HIGHLIGHTS, onSlot, onLink, focus
           {/* Softens the art so links, spaces and labels stay readable on top of it. */}
           <rect width={BOARD_SIZE} height={BOARD_SIZE} className="board-wash" />
 
+          {state && <Markets coal={state.coalMarket} iron={state.ironMarket} />}
+
           {brass.LINKS.map((l) => {
             const owner = links[l.id];
             const lit = highlights.links.has(l.id);
@@ -350,6 +352,73 @@ function MerchantMarker({ loc, spaces }: { loc: brass.MerchantDef; spaces: brass
           closed
         </text>
       )}
+    </g>
+  );
+}
+
+/*
+ * The coal and iron markets, drawn in the empty strip down the board's right
+ * edge like the printed board: a price column from £8 down to £1, two coal
+ * spaces per price (£1–£7) and two iron spaces per price (£1–£5). The lone
+ * cube at £8 (coal) and £6 (iron) is the price when that market is empty.
+ * Markets fill from the most expensive space, so cubes are bought cheapest
+ * first; the next cube to be bought is ringed.
+ */
+const MARKET = { left: 852, top: 248, width: 142, rowGap: 44, firstRowY: 282, cell: 20 };
+const COAL_X = [889, 913];
+const IRON_X = [945, 969];
+
+function Markets({ coal, iron }: { coal: number; iron: number }) {
+  const rowY = (price: number) => MARKET.firstRowY + (8 - price) * MARKET.rowGap;
+  const bottom = rowY(1) + 52;
+
+  const spaces = (def: brass.MarketDef, cubes: number, xs: number[], kind: 'coal' | 'iron') => {
+    const n = def.prices.length;
+    const nextIndex = cubes > 0 ? n - cubes : -1;
+    return def.prices.map((price, j) => {
+      const filled = j >= n - cubes;
+      const x = xs[j % 2]! - MARKET.cell / 2;
+      const y = rowY(price) - MARKET.cell / 2;
+      return (
+        <g key={`${kind}-${j}`}>
+          <rect x={x} y={y} width={MARKET.cell} height={MARKET.cell} rx={3} className="market-space" />
+          {filled && <rect x={x + 2} y={y + 2} width={MARKET.cell - 4} height={MARKET.cell - 4} rx={2} className={`market-cube ${kind}`} />}
+          {j === nextIndex && (
+            <rect x={x - 3} y={y - 3} width={MARKET.cell + 6} height={MARKET.cell + 6} rx={5} className="market-next" />
+          )}
+        </g>
+      );
+    });
+  };
+
+  // The "market empty" price: a single cube drawn beside the price, not a space.
+  const emptyPrice = (def: brass.MarketDef, xs: number[], kind: 'coal' | 'iron') => {
+    const x = (xs[0]! + xs[1]!) / 2 - MARKET.cell / 2 + 2;
+    const y = rowY(def.emptyPrice) - MARKET.cell / 2 + 2;
+    return <rect x={x} y={y} width={MARKET.cell - 4} height={MARKET.cell - 4} rx={2} className={`market-cube ${kind} empty-price`} />;
+  };
+
+  return (
+    <g className="markets" aria-label={`Coal market ${coal} cubes, iron market ${iron} cubes`}>
+      <title>{`Coal market: ${coal} cubes. Iron market: ${iron} cubes. Cubes are bought from the cheapest price up; an empty market sells at £8 (coal) or £6 (iron).`}</title>
+      <rect x={MARKET.left} y={MARKET.top} width={MARKET.width} height={bottom - MARKET.top + 30} rx={10} className="market-panel" />
+      <rect x={IRON_X[0]! - 16} y={rowY(6) - 18} width={IRON_X[1]! - IRON_X[0]! + 32} height={rowY(1) - rowY(6) + 36} rx={6} className="market-iron-bg" />
+      {[8, 7, 6, 5, 4, 3, 2, 1].map((price) => (
+        <g key={price}>
+          <circle cx={MARKET.left + 16} cy={rowY(price)} r={10} className="market-price" />
+          <text x={MARKET.left + 16} y={rowY(price)} className="market-price-label">
+            {price}
+          </text>
+        </g>
+      ))}
+      {spaces(brass.COAL_MARKET, coal, COAL_X, 'coal')}
+      {spaces(brass.IRON_MARKET, iron, IRON_X, 'iron')}
+      {emptyPrice(brass.COAL_MARKET, COAL_X, 'coal')}
+      {emptyPrice(brass.IRON_MARKET, IRON_X, 'iron')}
+      <g className="market-legend">
+        <IndustryIcon industry="coal" size={22} x={(COAL_X[0]! + COAL_X[1]!) / 2 - 11} y={bottom - 6} />
+        <IndustryIcon industry="iron" size={22} x={(IRON_X[0]! + IRON_X[1]!) / 2 - 11} y={bottom - 6} />
+      </g>
     </g>
   );
 }

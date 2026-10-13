@@ -28,6 +28,9 @@
   --token: #fff6dc;
   --token-rim: #c9962f;
   --beer: #8a5a2b;
+  --market-bg: #2a2420;
+  --market-edge: #7a6656;
+  --market-iron-bg: #4a2f22;
   color-scheme: light;
 }
 
@@ -63,6 +66,9 @@
     --token: #4a3524;
     --token-rim: #e0b35a;
     --beer: #e0a463;
+    --market-bg: #1e1915;
+    --market-edge: #6a5444;
+    --market-iron-bg: #3c2519;
     color-scheme: dark;
   }
 }
@@ -97,6 +103,9 @@
   --token: #4a3524;
   --token-rim: #e0b35a;
   --beer: #e0a463;
+  --market-bg: #1e1915;
+  --market-edge: #6a5444;
+  --market-iron-bg: #3c2519;
   color-scheme: dark;
 }
 
@@ -1033,4 +1042,67 @@ button {
 
 .build-summary svg {
   vertical-align: -3px;
+}
+
+/* ---- Coal and iron markets ---- */
+
+.markets {
+  pointer-events: none;
+}
+
+.market-panel {
+  fill: var(--market-bg);
+  stroke: var(--market-edge);
+  stroke-width: 2;
+}
+
+.market-iron-bg {
+  fill: var(--market-iron-bg);
+}
+
+.market-price {
+  fill: var(--token);
+  stroke: var(--token-rim);
+  stroke-width: 1.5;
+}
+
+.market-price-label {
+  fill: var(--stall-ink);
+  font-size: 11px;
+  font-weight: 800;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.market-space {
+  fill: rgba(255, 255, 255, 0.04);
+  stroke: rgba(255, 255, 255, 0.28);
+  stroke-width: 1;
+  stroke-dasharray: 2.5 2;
+}
+
+.market-cube.coal {
+  fill: #4a4a4a;
+  stroke: #c9c9c9;
+  stroke-width: 1.5;
+}
+
+.market-cube.iron {
+  fill: #e8892f;
+  stroke: #ffc27a;
+  stroke-width: 1;
+}
+
+.market-cube.empty-price {
+  opacity: 0.85;
+}
+
+.market-next {
+  fill: none;
+  stroke: var(--highlight);
+  stroke-width: 2;
+}
+
+.market-legend {
+  color: #f1e6d6;
 }
