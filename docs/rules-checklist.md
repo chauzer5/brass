@@ -50,11 +50,12 @@ Data lives in `packages/engine/src/brass/data/`.
 These are places where the rulebook text leaves room; the engine currently does the following.
 
 - **Merchant beer only counts toward beer the tile needs.** A tile that needs no beer can't take the Merchant's barrel (or its bonus).
-- **Overbuilding is allowed even when an empty space is available** in that location.
 - **A player whose hand runs out early (e.g. after Scouting) skips their turns** until the era ends.
 - **Coal for a rail link** may come from a mine connected to either end of the link.
 - **Coal and iron:** all available cubes on the board are used before buying from the market, even mid-action.
 
-## Open questions
+## Settled
 
-- ~~Do link icons on unflipped tiles count?~~ No. Unflipped tiles show no link icons; only flipped (black-top) tiles display them (p.7 illustration).
+- **Overbuilding:** you may always overbuild your own tiles (with a higher level of the same industry), even when an empty space is free. You may overbuild an opponent's Coal Mine or Iron Works only when there is none of that resource on any tile or in its market. Anything else of an opponent's can't be overbuilt.
+
+- **Link icons:** only flipped tiles count; unflipped tiles show no link icons. (p.7 illustration)

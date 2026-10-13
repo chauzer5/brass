@@ -237,6 +237,42 @@ describe('build (rulebook pp.9–10)', () => {
     expect(s.tiles['cannock#1']).toEqual(tile(0, 'coal', 2, 3));
   });
 
+  it('always lets you overbuild your own tile, even with an empty space in that town', () => {
+    const s = game();
+    s.tiles['worcester#0'] = tile(0, 'cotton', 1, 0, true);
+    s.players[0]!.mat.cotton[0] = 0;
+    const [c] = giveHand(s, 0, [loc('worcester'), ind('coal')]);
+    // Cotton II needs coal: give it a connected mine.
+    s.tiles['kidderminster#0'] = tile(1, 'coal', 2, 1);
+    s.links['kidderminster~worcester~farm-brewery-south'] = 1;
+    run(s, 0, { type: 'build', card: c!, industry: 'cotton', location: 'worcester', slot: 0 });
+    expect(s.tiles['worcester#0']).toEqual(tile(0, 'cotton', 2));
+    expect(s.tiles['worcester#1']).toBeUndefined();
+  });
+
+  it('only overbuilds with a higher level of the same industry', () => {
+    const s = game();
+    s.tiles['worcester#0'] = tile(0, 'cotton', 1, 0, true);
+    const [c] = giveHand(s, 0, [loc('worcester'), ind('coal')]);
+    expect(illegal(s, 0, { type: 'build', card: c!, industry: 'cotton', location: 'worcester', slot: 0 })).toMatch(
+      /higher-level/,
+    );
+  });
+
+  it('overbuilds an opponent’s Iron Works only when no iron is left on any tile or in the market', () => {
+    const s = game();
+    s.tiles['dudley#1'] = tile(1, 'iron', 1, 0, true);
+    s.tiles['coalbrookdale#1'] = tile(1, 'iron', 1, 1);
+    s.ironMarket = 0;
+    s.players[0]!.mat.iron[0] = 0;
+    s.tiles['dudley#0'] = tile(1, 'coal', 1, 2);
+    const [c] = giveHand(s, 0, [loc('dudley'), ind('coal')]);
+    const action: BrassAction = { type: 'build', card: c!, industry: 'iron', location: 'dudley', slot: 1 };
+    expect(illegal(s, 0, action)).toMatch(/no iron left/);
+    s.tiles['coalbrookdale#1']!.cubes = 0;
+    expect(illegal(s, 0, action)).toBeNull();
+  });
+
   it('never overbuilds an opponent’s other industries', () => {
     const s = game();
     s.tiles['worcester#0'] = tile(1, 'cotton', 1, 0, true);
