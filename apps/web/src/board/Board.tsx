@@ -365,7 +365,7 @@ function MerchantMarker({ loc, spaces }: { loc: brass.MerchantDef; spaces: brass
  * Markets fill from the most expensive space, so cubes are bought cheapest
  * first; the next cube to be bought is ringed.
  */
-const MARKET = { left: 852, top: 248, width: 142, rowGap: 44, firstRowY: 282, cell: 20 };
+const MARKET = { left: 852, top: 261, width: 142, rowGap: 44, firstRowY: 282, cell: 20 };
 const COAL_X = [889, 913];
 const IRON_X = [945, 969];
 
