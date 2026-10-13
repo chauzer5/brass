@@ -59,6 +59,8 @@ const INDUSTRY_LABEL: Record<brass.Industry, string> = {
 
 const townLabel = (id: brass.LocationId) => TOWN_LABEL[id] ?? brass.TOWNS.find((t) => t.id === id)!.name;
 
+export type TrayTab = 'hand' | 'mat';
+
 /** One card from the hand, drawn like the physical card. */
 export function GameCard({ card }: { card: brass.Card | undefined }) {
   if (!card) return <div className="game-card back" />;
@@ -124,6 +126,9 @@ export function HandTray({
   tucked,
   onTuckedChange,
   header,
+  tab,
+  onTabChange,
+  mat,
   children,
 }: {
   cards: Record<brass.CardId, brass.Card>;
@@ -136,6 +141,10 @@ export function HandTray({
   tucked: boolean;
   onTuckedChange: (tucked: boolean) => void;
   header: ReactNode;
+  /** Which side of the tray shows: the hand, or the player's own mat. */
+  tab: TrayTab;
+  onTabChange: (tab: TrayTab) => void;
+  mat: ReactNode;
   children?: ReactNode;
 }) {
   const rowRef = useRef<HTMLDivElement>(null);
@@ -245,32 +254,45 @@ export function HandTray({
     >
       <div
         className="tray-bar"
-        role="button"
-        tabIndex={0}
-        aria-expanded={!tucked}
-        aria-label={tucked ? 'Show hand' : 'Hide hand'}
         onPointerDown={onBarDown}
         onPointerMove={onBarMove}
         onPointerUp={onBarUp}
         onPointerCancel={() => setDrag(null)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            onTuckedChange(!tucked);
-          }
-        }}
       >
         <span className="tray-grip" aria-hidden />
-        <span className="tray-tab">
-          <span className="tray-chevron" aria-hidden>
-            {tucked ? '▴' : '▾'}
-          </span>
-          Hand ({n})
+        <button
+          className="tray-toggle"
+          aria-expanded={!tucked}
+          aria-label={tucked ? 'Show tray' : 'Hide tray'}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={() => onTuckedChange(!tucked)}
+        >
+          {tucked ? '▴' : '▾'}
+        </button>
+        <span className="tray-tabs" role="tablist">
+          {(['hand', 'mat'] as const).map((t) => (
+            <button
+              key={t}
+              role="tab"
+              className="tray-tab"
+              aria-selected={tab === t}
+              // The tabs sit on the bar, so keep their taps from toggling or dragging it.
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => {
+                onTabChange(t);
+                if (tucked) onTuckedChange(false);
+              }}
+            >
+              {t === 'hand' ? `Hand (${n})` : 'Board'}
+            </button>
+          ))}
         </span>
         <span className="tray-info">{header}</span>
       </div>
-      {children && <div className="tray-panel">{children}</div>}
+      {tab === 'mat' && <div className="tray-mat">{mat}</div>}
+      {tab === 'hand' && children && <div className="tray-panel">{children}</div>}
       <div
+        hidden={tab !== 'hand'}
         className={`hand-row ${step < TIGHT_PEEK ? 'tight' : ''}`}
         data-peeking={peek !== null}
         ref={rowRef}

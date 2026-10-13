@@ -1,6 +1,6 @@
 import { brass, type Outcome } from '@brass/engine';
 import { useState } from 'react';
-import { PLAYER_COLORS } from '../game/labels.ts';
+import { PlayerMat } from './PlayerMat.tsx';
 import { useTheme, type ThemeSetting } from '../settings.ts';
 
 export function NewGame({ onStart, onResume }: { onStart: (names: string[]) => void; onResume?: (() => void) | undefined }) {
@@ -89,22 +89,71 @@ export function Settings({ onClose }: { onClose: () => void }) {
   );
 }
 
-export function PlayerStrip({ view, names, active }: { view: brass.BrassView; names: string[]; active: number | null }) {
+export function PlayerStrip({
+  view,
+  names,
+  active,
+  onSelect,
+}: {
+  view: brass.BrassView;
+  names: string[];
+  active: number | null;
+  /** Tapping a player shows their mat. */
+  onSelect: (id: number) => void;
+}) {
   return (
     <div className="player-strip">
       {view.turnOrder.map((id) => {
         const p = view.players[id]!;
         return (
-          <div key={id} className={`player-chip ${id === active ? 'active' : ''}`} title={`${PLAYER_COLORS[id]}`}>
+          <button
+            key={id}
+            className={`player-chip ${id === active ? 'active' : ''}`}
+            aria-label={`${names[id]}: show board`}
+            onClick={() => onSelect(id)}
+          >
             <span className={`dot owner-${id}`} aria-hidden />
             <span className="player-name">{names[id]}</span>
             <span className="player-stats">
               £{p.money} · {brass.incomeLevel(p.incomeSpace) >= 0 ? '+' : ''}
               {brass.incomeLevel(p.incomeSpace)} · {p.vp} VP
             </span>
-          </div>
+          </button>
         );
       })}
+    </div>
+  );
+}
+
+/** Another player's mat, in a sheet over the table. Mats are public, as at the real table. */
+export function MatSheet({
+  player,
+  name,
+  era,
+  onClose,
+}: {
+  player: brass.PlayerView;
+  name: string;
+  era: brass.Era;
+  onClose: () => void;
+}) {
+  const income = brass.incomeLevel(player.incomeSpace);
+  return (
+    <div className="overlay mat-overlay" onClick={onClose}>
+      <div className="screen-card mat-sheet" role="dialog" aria-label={`${name}'s board`} onClick={(e) => e.stopPropagation()}>
+        <div className="mat-sheet-header">
+          <span className={`dot owner-${player.id}`} aria-hidden />
+          <h2>{name}</h2>
+          <span className="muted">
+            £{player.money} · {income >= 0 ? '+' : ''}
+            {income} · {player.vp} VP · {player.handSize} cards
+          </span>
+          <button className="close" onClick={onClose} aria-label="Close">
+            ✕
+          </button>
+        </div>
+        <PlayerMat player={player} era={era} />
+      </div>
     </div>
   );
 }

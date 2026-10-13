@@ -14,6 +14,7 @@ import {
 import { INDUSTRY_NAME, cardName, linkName, merchantName, roman, slotName } from '../game/labels.ts';
 import { ACTION_LABEL } from './ActionRail.tsx';
 import { ActionIcon, IndustryIcon } from './icons.tsx';
+import { TileStats } from './PlayerMat.tsx';
 
 interface StepPanelProps {
   view: brass.BrassView;
@@ -184,10 +185,8 @@ function BuildSteps({ view, me, legal, draft, setDraft }: StepProps & { me: bras
       )}
       {tile && draft.industry && (
         <p className="muted build-summary">
-          <IndustryIcon industry={draft.industry} size={16} /> {INDUSTRY_NAME[draft.industry]} {lowest(me, draft.industry)}:
-          £{tile.cost}
-          {tile.coal ? `, ${tile.coal} coal` : ''}
-          {tile.iron ? `, ${tile.iron} iron` : ''}. Flipped: {tile.vp} VP, +{tile.income} income.
+          <IndustryIcon industry={draft.industry} size={16} /> {INDUSTRY_NAME[draft.industry]} {lowest(me, draft.industry)}
+          <TileStats tile={tile} />
         </p>
       )}
     </>

@@ -4,8 +4,9 @@ import { Board } from './board/Board.tsx';
 import { EMPTY_DRAFT, availableKinds, highlights, usableCards, type Draft } from './game/draft.ts';
 import { canUndo, useGame, type Game } from './game/useGame.ts';
 import { ActionRail } from './ui/ActionRail.tsx';
-import { HandTray } from './ui/HandTray.tsx';
-import { GameOver, Handoff, NewGame, PlayerStrip } from './ui/Screens.tsx';
+import { HandTray, type TrayTab } from './ui/HandTray.tsx';
+import { PlayerMat } from './ui/PlayerMat.tsx';
+import { GameOver, Handoff, MatSheet, NewGame, PlayerStrip } from './ui/Screens.tsx';
 import { StepPanel, pickCard, tapSlot } from './ui/TurnPanel.tsx';
 
 export function App() {
@@ -58,6 +59,9 @@ function Table({
   const [revealedFor, setRevealedFor] = useState<number | null>(names.length === 1 ? player : null);
   const [message, setMessage] = useState<string | null>(null);
   const [tucked, setTucked] = useState(false);
+  const [trayTab, setTrayTab] = useState<TrayTab>('hand');
+  /** Another player whose mat is open in a sheet. */
+  const [matFor, setMatFor] = useState<number | null>(null);
 
   // A new player (or a new phase) starts with a fresh draft.
   useEffect(() => setDraft(EMPTY_DRAFT), [player, state.phase.kind, match.log.length]);
@@ -111,7 +115,18 @@ function Table({
           )}
         </span>
       </header>
-      <PlayerStrip view={view} names={names} active={player} />
+      <PlayerStrip
+        view={view}
+        names={names}
+        active={player}
+        onSelect={(id) => {
+          // Your own mat lives in the tray; anyone else's opens in a sheet.
+          if (id === player && showControls) {
+            setTrayTab('mat');
+            setTucked(false);
+          } else setMatFor(id);
+        }}
+      />
       <main className="board-area">
         <Board
           state={view}
@@ -130,7 +145,10 @@ function Table({
             onSelect={(kind) => {
               setDraft(kind ? { ...EMPTY_DRAFT, kind } : EMPTY_DRAFT);
               setMessage(null);
-              if (kind) setTucked(false);
+              if (kind) {
+                setTucked(false);
+                setTrayTab('hand');
+              }
             }}
             canUndo={canUndo(match)}
             onUndo={undoLast}
@@ -146,6 +164,9 @@ function Table({
             onDoubleTap={peekAt}
             tucked={tucked}
             onTuckedChange={setTucked}
+            tab={trayTab}
+            onTabChange={setTrayTab}
+            mat={<PlayerMat player={p!} era={state.era} />}
             header={
               <>
                 Deck {view.deckSize} · Coal £{coalPrice} · Iron £{ironPrice}
@@ -165,6 +186,14 @@ function Table({
           </HandTray>
         )}
       </main>
+      {matFor !== null && (
+        <MatSheet
+          player={view.players[matFor]!}
+          name={names[matFor]!}
+          era={state.era}
+          onClose={() => setMatFor(null)}
+        />
+      )}
       {hidden && player !== null && <Handoff name={names[player]!} onReady={() => setRevealedFor(player)} />}
       {outcome && <GameOver outcome={outcome} names={names} onNewGame={onNewGame} />}
     </div>

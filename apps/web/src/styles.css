@@ -497,6 +497,11 @@ button {
 }
 
 .player-chip {
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: none;
+  cursor: pointer;
   display: grid;
   grid-template-columns: auto 1fr;
   column-gap: 6px;
@@ -511,6 +516,10 @@ button {
 
 .player-chip.active {
   border-color: var(--highlight);
+}
+
+.player-chip:not(.active) {
+  border-color: var(--line);
 }
 
 .player-chip .dot { grid-row: span 2; }
@@ -849,22 +858,61 @@ button {
   background: var(--line);
 }
 
-.tray-tab {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.tray-toggle {
+  flex: none;
+  min-width: 32px;
   min-height: 40px;
-  padding: 0 10px;
-  font-weight: 700;
-  font-size: 14px;
-}
-
-.tray-chevron {
+  padding: 0;
+  border: 0;
+  background: none;
   font-size: 12px;
   color: var(--muted);
+  cursor: pointer;
+}
+
+.tray-tabs {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  margin-right: auto;
+  padding: 2px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--line) 45%, transparent);
+}
+
+.tray-tab {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tray-tab[aria-selected='true'] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.hand-tray[data-tucked='true'] .tray-mat {
+  display: none;
+}
+
+.tray-mat {
+  min-height: 0;
+  max-height: 55dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 2px 12px 8px;
 }
 
 .tray-info {
+  min-width: 0;
   font-size: 12px;
   color: var(--muted);
   white-space: nowrap;
@@ -1080,8 +1128,203 @@ button {
   gap: 6px;
 }
 
-.build-summary svg {
+.build-summary > svg {
   vertical-align: -3px;
+}
+
+.build-summary .tile-stats {
+  margin-left: 6px;
+}
+
+.build-summary .tile-cost::after {
+  content: '·';
+  margin: 0 5px;
+}
+
+/* ---- Player mat ---- */
+
+.glyph {
+  flex: none;
+  vertical-align: -1px;
+}
+
+.glyph-coal { fill: #222; stroke: var(--muted); stroke-width: 0.6; }
+.glyph-iron { fill: #e07b1f; }
+.glyph-beer { fill: var(--beer); }
+.glyph-beer .glyph-band { stroke: color-mix(in srgb, var(--beer) 50%, #000); stroke-width: 1; fill: none; }
+.glyph-link { fill: var(--muted); }
+.glyph-link .glyph-line { stroke: var(--muted); stroke-width: 1.6; }
+
+.tile-stats .stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 6px;
+}
+
+.player-mat {
+  display: flex;
+  flex-direction: column;
+}
+
+.mat-row {
+  display: grid;
+  grid-template-columns: 26px 140px 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+}
+
+.mat-icon {
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+}
+
+.mat-track {
+  display: flex;
+  gap: 2px;
+}
+
+.mat-level {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 15.5px;
+  padding: 2px 0 3px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  border-bottom-width: 3px;
+  font-size: 8.5px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.mat-level.canal-only { border-bottom-color: var(--canal); }
+.mat-level.rail-only { border-bottom-color: var(--rail); }
+
+.mat-level.next {
+  border-color: var(--accent);
+  border-width: 2px 2px 3px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.mat-level.next.canal-only { border-bottom-color: var(--canal); }
+.mat-level.next.rail-only { border-bottom-color: var(--rail); }
+
+.mat-level.gone {
+  opacity: 0.35;
+}
+
+.mat-pips {
+  display: flex;
+  gap: 1.5px;
+}
+
+.pip {
+  width: 3.5px;
+  height: 3.5px;
+  border-radius: 50%;
+  background: var(--ink);
+}
+
+.pip.used {
+  background: none;
+  box-shadow: inset 0 0 0 0.75px var(--muted);
+}
+
+.mat-bulb {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f2c230;
+  box-shadow: 0 0 0 1px var(--surface);
+}
+
+.mat-bulb.inline {
+  position: static;
+  display: inline-block;
+}
+
+.mat-next {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.mat-next .tile-stats {
+  display: flex;
+  flex-direction: column;
+}
+
+.mat-next .tile-cost {
+  font-weight: 700;
+}
+
+.mat-next .tile-reward {
+  color: var(--muted);
+}
+
+.mat-note {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.mat-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.mat-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.legend-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 3px;
+  margin-left: 4px;
+  border-radius: 1px;
+}
+
+.legend-swatch.canal-only { background: var(--canal); }
+.legend-swatch.rail-only { background: var(--rail); }
+.mat-legend .mat-bulb { margin-left: 4px; }
+
+.mat-sheet {
+  gap: 8px;
+  padding: 14px;
+}
+
+.mat-sheet-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mat-sheet-header h2 {
+  font-size: 18px;
+}
+
+.mat-sheet-header .muted {
+  flex: 1;
+  font-size: 12px;
 }
 
 /* ---- Coal and iron markets ---- */
