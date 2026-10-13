@@ -710,20 +710,13 @@ button {
 .hand-row {
   position: relative;
   flex: none;
-  height: 116px;
   padding: 0 12px;
-  overflow: hidden auto;
-  overscroll-behavior: contain;
-  scrollbar-width: none;
+  overflow: hidden;
   transition: height 0.2s ease;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .hand-row { transition: none; }
-}
-
-.hand-row::-webkit-scrollbar {
-  display: none;
 }
 
 .hand-row-inner {
@@ -733,7 +726,6 @@ button {
 
 .hand-card {
   position: absolute;
-  top: 16px;
   width: 70px;
   height: 96px;
   padding: 0;
@@ -793,7 +785,7 @@ button {
 }
 
 .hand-card.selected .card-title,
-.hand-card:last-child .card-title {
+.hand-card.row-end .card-title {
   max-width: none;
 }
 

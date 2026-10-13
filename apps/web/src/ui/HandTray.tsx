@@ -5,8 +5,11 @@ import { IndustryIcon } from './icons.tsx';
 
 const CARD_WIDTH = 70;
 const CARD_GAP = 6;
-/** Narrowest strip of a card left showing when the hand overlaps; below this the row scrolls. */
+/** Narrowest strip of a card left showing when the hand overlaps; below this the hand wraps to 2 rows. */
 const MIN_PEEK = 50;
+/** Vertical distance between the two rows of cards. */
+const ROW_STEP = 104;
+const ONE_ROW_HEIGHT = 116;
 
 /**
  * Card labels with soft hyphens (\u00AD), so long names break neatly inside
@@ -90,8 +93,9 @@ export function GameCard({ card }: { card: brass.Card | undefined }) {
 }
 
 /**
- * The hand: a row of cards along the bottom. Cards overlap like a fanned hand
- * when there isn't room for all of them; the chosen card lifts out.
+ * The hand: cards along the bottom. They overlap like a fanned hand when
+ * there isn't room for all of them, and wrap onto a second row rather than
+ * overlapping so much that their names can't be read. The chosen card lifts out.
  * The whole tray (with whatever sits above it) tucks away to show the board.
  */
 export function HandTray({
@@ -127,9 +131,10 @@ export function HandTray({
   }, []);
 
   const n = hand.length;
-  const fit = n > 1 ? (width - CARD_WIDTH) / (n - 1) : CARD_WIDTH;
-  const step = Math.max(MIN_PEEK, Math.min(CARD_WIDTH + CARD_GAP, fit));
-  const rowWidth = n > 0 ? step * (n - 1) + CARD_WIDTH : 0;
+  const stepFor = (perRow: number) => (perRow > 1 ? (width - CARD_WIDTH) / (perRow - 1) : CARD_WIDTH);
+  const rows = stepFor(n) >= MIN_PEEK ? 1 : 2;
+  const perRow = Math.ceil(n / rows);
+  const step = Math.min(CARD_WIDTH + CARD_GAP, stepFor(perRow));
 
   return (
     <section className="hand-tray" data-tucked={tucked}>
@@ -146,17 +151,25 @@ export function HandTray({
       <div
         className="hand-row"
         ref={rowRef}
-        style={{ height: tucked ? 0 : undefined, '--peek': `${Math.min(step, CARD_WIDTH)}px` } as CSSProperties}
+        style={
+          {
+            height: tucked ? 0 : ONE_ROW_HEIGHT + (rows - 1) * ROW_STEP,
+            '--peek': `${Math.min(step, CARD_WIDTH)}px`,
+          } as CSSProperties
+        }
       >
-        <div className="hand-row-inner" style={{ width: rowWidth }}>
+        <div className="hand-row-inner">
         {hand.map((id, i) => {
           const isSelected = selected.has(id);
           const disabled = !usable || !usable.has(id);
+          const row = Math.floor(i / perRow);
+          const col = i % perRow;
+          const rowEnd = col === perRow - 1 || i === n - 1;
           return (
             <button
               key={id}
-              className={`hand-card ${isSelected ? 'selected' : ''} ${usable && disabled ? 'unusable' : ''}`}
-              style={{ left: i * step, zIndex: isSelected ? 50 : i }}
+              className={`hand-card ${isSelected ? 'selected' : ''} ${usable && disabled ? 'unusable' : ''} ${rowEnd ? 'row-end' : ''}`}
+              style={{ left: col * step, top: 16 + row * ROW_STEP, zIndex: isSelected ? 50 : i }}
               disabled={disabled}
               aria-pressed={isSelected}
               onClick={() => onPick(id)}
