@@ -88,9 +88,20 @@ const ACTION_PATHS: Record<ActionKind | 'undo', ReactElement> = {
   ),
 };
 
-export function IndustryIcon({ industry, size = 20 }: { industry: brass.Industry; size?: number }) {
+export function IndustryIcon({
+  industry,
+  size = 20,
+  x,
+  y,
+}: {
+  industry: brass.Industry;
+  size?: number;
+  /** Position, when drawn inside another SVG. */
+  x?: number;
+  y?: number;
+}) {
   return (
-    <svg {...svgProps} width={size} height={size}>
+    <svg {...svgProps} width={size} height={size} {...(x !== undefined ? { x } : {})} {...(y !== undefined ? { y } : {})}>
       {INDUSTRY_PATHS[industry]}
     </svg>
   );

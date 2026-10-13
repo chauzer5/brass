@@ -197,11 +197,19 @@ button {
   stroke-width: 1;
 }
 
-.slot-label {
-  fill: var(--ink);
-  font-size: 9.5px;
-  text-anchor: middle;
-  dominant-baseline: central;
+.slot-icons,
+.tile-face {
+  color: var(--ink);
+  pointer-events: none;
+}
+
+.slot-icons {
+  opacity: 0.8;
+}
+
+.slot-divider {
+  stroke: var(--line);
+  stroke-width: 1;
 }
 
 .merchant {
@@ -278,7 +286,6 @@ button {
   cursor: pointer;
 }
 
-.tile-label,
 .tile-level {
   fill: var(--ink);
   text-anchor: middle;
@@ -286,7 +293,6 @@ button {
   font-weight: 700;
 }
 
-.tile-label { font-size: 11px; }
 .tile-level { font-size: 9.5px; }
 
 .cube { stroke: var(--surface); stroke-width: 1; }

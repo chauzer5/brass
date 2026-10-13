@@ -1,7 +1,8 @@
 import { brass } from '@brass/engine';
 import { TransformComponent, TransformWrapper } from 'react-zoom-pan-pinch';
 import type { Highlights } from '../game/draft.ts';
-import { INDUSTRY_SHORT, roman } from '../game/labels.ts';
+import { INDUSTRY_NAME, INDUSTRY_SHORT, roman } from '../game/labels.ts';
+import { IndustryIcon } from '../ui/icons.tsx';
 
 /**
  * Board canvas: an SVG in map coordinates (0–1000), wrapped in pinch-zoom/pan.
@@ -31,6 +32,35 @@ function linkPath(ends: readonly brass.LocationId[]): string {
   return `M ${a!.x} ${a!.y} L ${b!.x} ${b!.y} M ${mx} ${my} L ${c.x} ${c.y}`;
 }
 
+/** Grid of a town's spaces: one row for up to 2, otherwise 2 columns (a 2×2 grid for 3–4). */
+function slotLayout(count: number) {
+  const cols = count <= 2 ? count : 2;
+  const rows = Math.ceil(count / cols);
+  return { cols, rows, width: cols * SLOT + (cols - 1) * GAP, height: rows * SLOT + (rows - 1) * GAP };
+}
+
+function slotPosition(i: number, count: number) {
+  const { cols, width } = slotLayout(count);
+  const row = Math.floor(i / cols);
+  const col = i % cols;
+  // A lone space on the last row is centred under the ones above.
+  const inRow = Math.min(cols, count - row * cols);
+  const rowWidth = inRow * SLOT + (inRow - 1) * GAP;
+  return { x: (width - rowWidth) / 2 + col * (SLOT + GAP), y: row * (SLOT + GAP) };
+}
+
+/** Icons for an empty space: one large icon, or two smaller ones for a shared space. */
+function SlotIcons({ slot }: { slot: brass.Slot }) {
+  if (slot.length === 1) return <IndustryIcon industry={slot[0]!} size={24} x={(SLOT - 24) / 2} y={(SLOT - 24) / 2} />;
+  return (
+    <>
+      <IndustryIcon industry={slot[0]!} size={17} x={2} y={2} />
+      <path d={`M ${SLOT - 9} 9 L 9 ${SLOT - 9}`} className="slot-divider" />
+      <IndustryIcon industry={slot[1]!} size={17} x={SLOT - 19} y={SLOT - 19} />
+    </>
+  );
+}
+
 function Slots({
   location,
   slots,
@@ -48,9 +78,9 @@ function Slots({
   highlights: Highlights;
   onSlot: BoardProps['onSlot'];
 }) {
-  const width = slots.length * SLOT + (slots.length - 1) * GAP;
+  const { width, height } = slotLayout(slots.length);
   return (
-    <g transform={`translate(${x - width / 2} ${y - SLOT / 2})`}>
+    <g transform={`translate(${x - width / 2} ${y - height / 2})`}>
       {slots.map((slot, i) => {
         const key = brass.slotKey(location, i);
         const tile = tiles[key];
@@ -59,22 +89,22 @@ function Slots({
         const cls = ['slot', tile ? `owner-${tile.owner}` : '', tile?.flipped ? 'flipped' : '', lit ? 'lit' : '', selected ? 'selected' : '']
           .filter(Boolean)
           .join(' ');
+        const pos = slotPosition(i, slots.length);
         return (
           <g
             key={i}
-            transform={`translate(${i * (SLOT + GAP)} 0)`}
+            transform={`translate(${pos.x} ${pos.y})`}
             className={lit ? 'tappable' : undefined}
             onClick={lit ? () => onSlot?.(location, i) : undefined}
           >
+            <title>{tile ? `${INDUSTRY_NAME[tile.industry]} ${roman(tile.level)}` : slot.map((ind) => INDUSTRY_NAME[ind]).join(' or ')}</title>
             {/* Generous invisible hit area for fingers. */}
             {lit && <rect x={-6} y={-6} width={SLOT + 12} height={SLOT + 12} className="hit" />}
             <rect width={SLOT} height={SLOT} rx={4} className={cls} />
             {tile ? (
-              <>
-                <text x={SLOT / 2} y={SLOT / 2 - 6} className="tile-label">
-                  {INDUSTRY_SHORT[tile.industry]}
-                </text>
-                <text x={SLOT / 2} y={SLOT / 2 + 8} className="tile-level">
+              <g className="tile-face">
+                <IndustryIcon industry={tile.industry} size={20} x={(SLOT - 20) / 2} y={3} />
+                <text x={SLOT / 2} y={SLOT - 7} className="tile-level">
                   {roman(tile.level)}
                 </text>
                 {tile.cubes > 0 && (
@@ -83,11 +113,11 @@ function Slots({
                     <text className="cube-count">{tile.cubes}</text>
                   </g>
                 )}
-              </>
+              </g>
             ) : (
-              <text x={SLOT / 2} y={SLOT / 2} className="slot-label">
-                {slot.map((ind) => INDUSTRY_SHORT[ind]).join('/')}
-              </text>
+              <g className="slot-icons">
+                <SlotIcons slot={slot} />
+              </g>
             )}
           </g>
         );
@@ -152,7 +182,11 @@ export function Board({ state, highlights = NO_HIGHLIGHTS, onSlot, onLink }: Boa
                     onSlot={onSlot}
                   />
                   {loc.kind === 'town' && (
-                    <text x={loc.pos.x} y={loc.pos.y + SLOT / 2 + 13} className={`location-name banner-${loc.color}`}>
+                    <text
+                      x={loc.pos.x}
+                      y={loc.pos.y + slotLayout(loc.slots.length).height / 2 + 13}
+                      className={`location-name banner-${loc.color}`}
+                    >
                       {loc.name}
                     </text>
                   )}
