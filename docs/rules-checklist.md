@@ -2,13 +2,13 @@
 
 Each rule enters the engine together with a test that cites the rulebook page it comes from (`// Rulebook p.N: "..."`). Source: the official Roxley rulebook (2018-11-20 revision with highlights).
 
-Data lives in `packages/engine/src/brass/data/`. Values the rulebook's pictures don't show legibly are listed in each tile's `unverified` field.
+Data lives in `packages/engine/src/brass/data/`. Values not yet confirmed against the physical components are listed in each tile's `unverified` field.
 
 ## Data (`packages/engine/src/brass/data/`)
 
 - [x] Locations: towns, merchant locations, farm breweries, and the industry slots in each (which industry types each slot accepts)
 - [x] Links: endpoints, and whether each is canal-only, rail-only, or both
-- [~] Industry tiles per type and level. Most values were read from the mat photo on p.5. Still to confirm against a real mat: the count of each level, Cotton I and Manufacturer II income, Manufacturer III beer, Manufacturer VII link VP and beer, Manufacturer VIII, Iron III–IV, and the coal/iron that Coal IV and Iron II–IV produce
+- [~] Industry tiles per type and level: every stat confirmed from a photo of a physical mat. **Still to confirm**: how many tiles of each level (hidden by the stacks; only each industry's total is printed)
 - [x] Coal and iron markets: spaces, prices, starting fill
 - [x] Income track: positions mapped to income levels
 - [x] Cards: location and industry cards, with counts by player count (from the Card Distribution player aid; `data/cards.ts`)
