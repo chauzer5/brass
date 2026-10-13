@@ -303,6 +303,18 @@ describe('network (rulebook p.11)', () => {
     expect(illegal(s, 0, { type: 'network', card: c!, links: ['leek~belper'] })).toMatch(/rail only/);
   });
 
+  it('takes a rail link’s coal from a mine connected to it once it is placed', () => {
+    const s = game('rail');
+    s.tiles['birmingham#0'] = tile(0, 'cotton', 2, 0, true);
+    s.tiles['wolverhampton#1'] = tile(1, 'coal', 2, 1);
+    s.links['wolverhampton~dudley'] = 1;
+    const [c] = giveHand(s, 0, [ind('coal'), ind('coal')]);
+    // Before the link, the mine only reaches Dudley; the new link connects it to Birmingham too.
+    run(s, 0, { type: 'network', card: c!, links: ['birmingham~dudley'] });
+    expect(s.tiles['wolverhampton#1']!.flipped).toBe(true);
+    expect(s.coalMarket).toBe(13);
+  });
+
   it('builds 2 rail links for £15, 1 coal each and 1 beer', () => {
     const s = game('rail');
     s.tiles['birmingham#0'] = tile(0, 'cotton', 2, 0, true);
@@ -386,6 +398,18 @@ describe('sell (rulebook p.10)', () => {
     expect(s.players[0]!.incomeSpace).toBe(15);
     expect(s.players[0]!.vp).toBe(4); // Shrewsbury bonus
     expect(s.merchants[0]!.beer).toBe(false);
+  });
+
+  it('leaves Merchant beer alone when the tile needs no beer', () => {
+    const { s, action } = sellable();
+    s.links['kidderminster~coalbrookdale'] = 1;
+    s.links['coalbrookdale~shrewsbury'] = 1;
+    s.tiles['kidderminster#1'] = tile(0, 'manufacturer', 3); // Manufacturer III needs no beer
+    s.merchants[0] = { location: 'shrewsbury', tile: { industries: ['manufacturer'] }, beer: true };
+    run(s, 0, action);
+    expect(s.merchants[0]!.beer).toBe(true);
+    expect(s.players[0]!.vp).toBe(0);
+    expect(s.tiles['kidderminster#1']!.flipped).toBe(true);
   });
 
   it('cannot sell without beer', () => {

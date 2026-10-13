@@ -45,16 +45,11 @@ Data lives in `packages/engine/src/brass/data/`.
 - [x] End of canal era: scoring links and flipped industries, removing level 1 tiles and links, resetting merchant beer, reshuffling
 - [x] End of rail era: final scoring and tie-breakers
 
-## Interpretations to confirm
-
-These are places where the rulebook text leaves room; the engine currently does the following.
-
-- **Merchant beer only counts toward beer the tile needs.** A tile that needs no beer can't take the Merchant's barrel (or its bonus).
-- **Coal for a rail link** may come from a mine connected to either end of the link.
-- **Coal and iron:** all available cubes on the board are used before buying from the market, even mid-action.
-
 ## Settled
 
+- **Merchant beer only counts toward beer the tile needs.** A tile that needs no beer can't take the Merchant's barrel or its bonus.
+- **Coal for a rail link** comes from a mine connected to the link once it is placed, i.e. connected to either end (rulebook p.11).
+- **Coal and iron** come from tiles on the board first, moving to the next closest mine as one runs out, and only then from the market (rulebook p.8).
 - **Hands never run out early.** Scouting discards 3 cards and returns 2 Wilds, so every action costs one card, and the deck runs out at a round boundary. Tests check every era lasts exactly the printed 10/9/8 rounds with every player taking every turn.
 - **Overbuilding:** you may always overbuild your own tiles (with a higher level of the same industry), even when an empty space is free. You may overbuild an opponent's Coal Mine or Iron Works only when there is none of that resource on any tile or in its market. Anything else of an opponent's can't be overbuilt.
 
