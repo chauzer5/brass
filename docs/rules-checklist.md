@@ -8,7 +8,7 @@ Data lives in `packages/engine/src/brass/data/`. Values the rulebook's pictures 
 
 - [x] Locations: towns, merchant locations, farm breweries, and the industry slots in each (which industry types each slot accepts)
 - [x] Links: endpoints, and whether each is canal-only, rail-only, or both
-- [~] Industry tiles per type and level. Most values were read from the mat photo on p.5. Still to confirm against a real mat: the count of each level, Cotton I and Manufacturer II income, Manufacturer III beer, Manufacturer VII link VP and beer, Manufacturer VIII, Coal IV, Iron III–IV, and the iron each Iron Works produces (cropped off the photo)
+- [~] Industry tiles per type and level. Most values were read from the mat photo on p.5. Still to confirm against a real mat: the count of each level, Cotton I and Manufacturer II income, Manufacturer III beer, Manufacturer VII link VP and beer, Manufacturer VIII, Iron III–IV, and the coal/iron that Coal IV and Iron II–IV produce
 - [x] Coal and iron markets: spaces, prices, starting fill
 - [x] Income track: positions mapped to income levels
 - [ ] Cards: location and industry cards, with counts by player count. **Not in the rulebook**: needs the physical cards

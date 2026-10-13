@@ -111,7 +111,7 @@ export const INDUSTRY_TILES: Readonly<Record<Industry, readonly TileLevel[]>> = 
     { count: 1, cost: 5, vp: 1, income: 4, linkVP: 2, produces: 2, canalOnly: true, unverified: [C] },
     { count: 2, cost: 7, vp: 2, income: 7, linkVP: 1, produces: 3, unverified: [C] },
     { count: 2, cost: 8, iron: 1, vp: 3, income: 6, linkVP: 1, produces: 4, unverified: [C] },
-    { count: 2, cost: 10, iron: 1, vp: 4, income: 5, linkVP: 1, produces: 5, unverified: [C, 'vp', 'income', 'linkVP', 'produces', 'era'] },
+    { count: 2, cost: 10, iron: 1, vp: 4, income: 5, linkVP: 1, produces: 5, unverified: [C, 'produces'] },
   ]),
   iron: levels([
     { count: 1, cost: 5, coal: 1, vp: 3, income: 3, linkVP: 1, produces: 4, canalOnly: true, unverified: [C] },
