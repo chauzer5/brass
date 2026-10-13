@@ -260,15 +260,6 @@ export function HandTray({
         onPointerCancel={() => setDrag(null)}
       >
         <span className="tray-grip" aria-hidden />
-        <button
-          className="tray-toggle"
-          aria-expanded={!tucked}
-          aria-label={tucked ? 'Show tray' : 'Hide tray'}
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={() => onTuckedChange(!tucked)}
-        >
-          {tucked ? '▴' : '▾'}
-        </button>
         <span className="tray-tabs" role="tablist">
           {(['hand', 'mat'] as const).map((t) => (
             <button
