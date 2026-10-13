@@ -113,7 +113,11 @@ function Slots({
             {lit && <rect x={-6} y={-6} width={SLOT + 12} height={SLOT + 12} className="hit" />}
             <rect width={SLOT} height={SLOT} rx={4} className={cls} />
             {tile ? (
-              <g className="tile-face">
+              <g className={`tile-face ${tile.flipped ? 'flipped' : ''}`}>
+                {/* Flipped tiles get a dark top band, like the black top half of a flipped tile. */}
+                {tile.flipped && (
+                  <path d={`M0 11 V4 a4 4 0 0 1 4 -4 H${SLOT - 4} a4 4 0 0 1 4 4 V11 Z`} className="tile-flip-band" />
+                )}
                 <IndustryIcon industry={tile.industry} size={20} x={(SLOT - 20) / 2} y={3} />
                 <text x={SLOT / 2} y={SLOT - 7} className="tile-level">
                   {roman(tile.level)}

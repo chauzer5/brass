@@ -294,18 +294,31 @@ button {
 .owner-2 { --owner: var(--p2); }
 .owner-3 { --owner: var(--p3); }
 
+/* Built tiles are opaque: a light tint of the owner's colour, full colour once flipped. */
 .slot.owner-0,
 .slot.owner-1,
 .slot.owner-2,
 .slot.owner-3 {
-  fill: var(--owner);
-  fill-opacity: 0.35;
+  fill: color-mix(in srgb, var(--owner) 45%, var(--surface));
   stroke: var(--owner);
   stroke-width: 2;
 }
 
 .slot.flipped {
-  fill-opacity: 0.85;
+  fill: var(--owner);
+}
+
+.tile-flip-band {
+  fill: rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+
+.tile-face.flipped {
+  color: #fff;
+}
+
+.tile-face.flipped .tile-level {
+  fill: #fff;
 }
 
 .slot.lit {
