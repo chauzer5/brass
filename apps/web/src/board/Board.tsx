@@ -104,6 +104,9 @@ export function Board({ state, highlights = NO_HIGHLIGHTS, onSlot, onLink }: Boa
       <TransformComponent wrapperClass="board-viewport" contentClass="board-content">
         <svg className="board-svg" viewBox={`0 0 ${BOARD_SIZE} ${BOARD_SIZE}`} role="img" aria-label="Game board">
           <rect width={BOARD_SIZE} height={BOARD_SIZE} className="board-bg" />
+          <image href="/board-bg.webp" width={BOARD_SIZE} height={BOARD_SIZE} preserveAspectRatio="xMidYMid slice" />
+          {/* Softens the art so links, spaces and labels stay readable on top of it. */}
+          <rect width={BOARD_SIZE} height={BOARD_SIZE} className="board-wash" />
 
           {brass.LINKS.map((l) => {
             const owner = links[l.id];

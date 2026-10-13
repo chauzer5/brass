@@ -6,6 +6,7 @@
   --line: #d9cbb6;
   --accent: #b5652b;
   --board: #e8dcc6;
+  --board-wash: rgba(244, 237, 225, 0.35);
   --canal: #8fb8d6;
   --rail: #3b2a1f;
   --banner-blue: #2c5aa0;
@@ -32,6 +33,7 @@
     --line: #4a3b2f;
     --accent: #e08a4c;
     --board: #2f2620;
+    --board-wash: rgba(20, 14, 10, 0.55);
     --canal: #3e6f94;
     --rail: #e6d6c0;
     --banner-blue: #7fa8e8;
@@ -151,6 +153,11 @@ button {
 
 .board-bg {
   fill: var(--board);
+}
+
+.board-wash {
+  fill: var(--board-wash);
+  pointer-events: none;
 }
 
 .link {
