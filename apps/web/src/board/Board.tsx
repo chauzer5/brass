@@ -267,7 +267,7 @@ function MerchantMarker({ loc, spaces }: { loc: brass.MerchantDef; spaces: brass
   const awning = 10;
   const scallops = Math.round(width / 12);
   const scallopW = width / scallops;
-  const tokensY = y + 10;
+  const tokensY = y + 14;
   return (
     <g className={`merchant-stall ${open ? '' : 'closed'}`}>
       <title>
@@ -276,7 +276,7 @@ function MerchantMarker({ loc, spaces }: { loc: brass.MerchantDef; spaces: brass
           : `${loc.name} merchant (not used with this many players)`}
       </title>
       {/* Stall body */}
-      <rect x={left} y={top + awning - 2} width={width} height={56} rx={5} className="stall-body" />
+      <rect x={left} y={top + awning - 2} width={width} height={60} rx={5} className="stall-body" />
       {/* Striped awning with a scalloped edge */}
       <g clipPath={`url(#awning-${loc.id})`}>
         <rect x={left - 2} y={top - 2} width={width + 4} height={awning + 8} className="stall-awning" />
@@ -287,7 +287,7 @@ function MerchantMarker({ loc, spaces }: { loc: brass.MerchantDef; spaces: brass
           <circle key={i} cx={left + scallopW * (i + 0.5)} cy={top + awning} r={scallopW / 2} />
         ))}
       </clipPath>
-      <text x={x} y={top + awning + 8} className="stall-name">
+      <text x={x} y={top + awning + 11} className="stall-name">
         {loc.name}
       </text>
       {open ? (
@@ -304,9 +304,9 @@ function MerchantMarker({ loc, spaces }: { loc: brass.MerchantDef; spaces: brass
             );
           })}
           <g className="stall-bonus">
-            <rect x={x - 42} y={top + 66} width={84} height={20} rx={10} />
-            <IndustryIcon industry="brewery" size={13} x={x - 36} y={top + 69.5} />
-            <text x={x + 6} y={top + 76}>
+            <rect x={x - 42} y={top + 70} width={84} height={20} rx={10} />
+            <IndustryIcon industry="brewery" size={13} x={x - 36} y={top + 73.5} />
+            <text x={x + 6} y={top + 80}>
               {BONUS_LABEL(loc.beerBonus)}
             </text>
           </g>
