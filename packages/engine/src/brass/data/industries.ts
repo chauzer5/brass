@@ -4,9 +4,8 @@ import type { Industry } from '../types.ts';
  * Industry tile data, read from a photo of a physical Player Mat and
  * cross-checked against the mat and flipped tiles pictured in the rulebook
  * (v2018.11, pp.5, 7–8). Where they disagreed, the physical mat wins: the
- * rulebook's mat photo is too blurry to read some digits.
- *
- * Fields that still need checking are listed in `unverified`.
+ * rulebook's mat photo is too blurry to read some digits. Tile counts per
+ * level were counted from one player colour's punchboard (45 tiles).
  */
 
 export type TileField =
@@ -70,51 +69,47 @@ const levels = (rows: LevelInput[]): TileLevel[] =>
     ...r,
   }));
 
-// The number of tiles of each level is hidden by the stacks on the mat; only
-// each industry's total is printed (rulebook p.1). Every count is unverified.
-const C = 'count' as const;
-
 export const INDUSTRY_TILES: Readonly<Record<Industry, readonly TileLevel[]>> = {
   cotton: levels([
-    { count: 3, cost: 12, vp: 5, income: 5, linkVP: 1, beer: 1, canalOnly: true, unverified: [C] },
-    { count: 2, cost: 14, coal: 1, vp: 5, income: 4, linkVP: 2, beer: 1, unverified: [C] },
-    { count: 3, cost: 16, coal: 1, iron: 1, vp: 9, income: 3, linkVP: 1, beer: 1, unverified: [C] },
-    { count: 3, cost: 18, coal: 1, iron: 1, vp: 12, income: 2, linkVP: 1, beer: 1, unverified: [C] },
+    { count: 3, cost: 12, vp: 5, income: 5, linkVP: 1, beer: 1, canalOnly: true },
+    { count: 2, cost: 14, coal: 1, vp: 5, income: 4, linkVP: 2, beer: 1 },
+    { count: 3, cost: 16, coal: 1, iron: 1, vp: 9, income: 3, linkVP: 1, beer: 1 },
+    { count: 3, cost: 18, coal: 1, iron: 1, vp: 12, income: 2, linkVP: 1, beer: 1 },
   ]),
   manufacturer: levels([
-    { count: 1, cost: 8, coal: 1, vp: 3, income: 5, linkVP: 2, beer: 1, canalOnly: true, unverified: [C] },
-    { count: 2, cost: 10, iron: 1, vp: 5, income: 1, linkVP: 1, beer: 1, unverified: [C] },
-    { count: 1, cost: 12, coal: 2, vp: 4, income: 4, linkVP: 0, beer: 0, unverified: [C] },
-    { count: 1, cost: 8, iron: 1, vp: 3, income: 6, linkVP: 1, beer: 1, unverified: [C] },
-    { count: 2, cost: 16, coal: 1, vp: 8, income: 2, linkVP: 2, beer: 2, unverified: [C] },
-    { count: 1, cost: 20, vp: 7, income: 6, linkVP: 1, beer: 1, unverified: [C] },
-    { count: 1, cost: 16, coal: 1, iron: 1, vp: 9, income: 4, linkVP: 1, beer: 0, unverified: [C] },
-    { count: 2, cost: 20, iron: 2, vp: 11, income: 1, linkVP: 1, beer: 1, unverified: [C] },
+    { count: 1, cost: 8, coal: 1, vp: 3, income: 5, linkVP: 2, beer: 1, canalOnly: true },
+    { count: 2, cost: 10, iron: 1, vp: 5, income: 1, linkVP: 1, beer: 1 },
+    { count: 1, cost: 12, coal: 2, vp: 4, income: 4, linkVP: 0, beer: 0 },
+    { count: 1, cost: 8, iron: 1, vp: 3, income: 6, linkVP: 1, beer: 1 },
+    { count: 2, cost: 16, coal: 1, vp: 8, income: 2, linkVP: 2, beer: 2 },
+    { count: 1, cost: 20, vp: 7, income: 6, linkVP: 1, beer: 1 },
+    { count: 1, cost: 16, coal: 1, iron: 1, vp: 9, income: 4, linkVP: 1, beer: 0 },
+    { count: 2, cost: 20, iron: 2, vp: 11, income: 1, linkVP: 1, beer: 1 },
   ]),
   pottery: levels([
-    { count: 1, cost: 17, iron: 1, vp: 10, income: 5, linkVP: 1, beer: 1, cannotDevelop: true, unverified: [C] },
-    { count: 1, cost: 0, coal: 1, vp: 1, income: 1, linkVP: 1, beer: 1, unverified: [C] },
-    { count: 1, cost: 22, coal: 2, vp: 11, income: 5, linkVP: 1, beer: 2, cannotDevelop: true, unverified: [C] },
-    { count: 1, cost: 0, coal: 1, vp: 1, income: 1, linkVP: 1, beer: 1, unverified: [C] },
-    { count: 1, cost: 24, coal: 2, vp: 20, income: 5, linkVP: 1, beer: 2, railOnly: true, unverified: [C] },
+    { count: 1, cost: 17, iron: 1, vp: 10, income: 5, linkVP: 1, beer: 1, cannotDevelop: true },
+    { count: 1, cost: 0, coal: 1, vp: 1, income: 1, linkVP: 1, beer: 1 },
+    { count: 1, cost: 22, coal: 2, vp: 11, income: 5, linkVP: 1, beer: 2, cannotDevelop: true },
+    { count: 1, cost: 0, coal: 1, vp: 1, income: 1, linkVP: 1, beer: 1 },
+    { count: 1, cost: 24, coal: 2, vp: 20, income: 5, linkVP: 1, beer: 2, railOnly: true },
   ]),
   coal: levels([
-    { count: 1, cost: 5, vp: 1, income: 4, linkVP: 2, produces: 2, canalOnly: true, unverified: [C] },
-    { count: 2, cost: 7, vp: 2, income: 7, linkVP: 1, produces: 3, unverified: [C] },
-    { count: 2, cost: 8, iron: 1, vp: 3, income: 6, linkVP: 1, produces: 4, unverified: [C] },
-    { count: 2, cost: 10, iron: 1, vp: 4, income: 5, linkVP: 1, produces: 5, unverified: [C] },
+    { count: 1, cost: 5, vp: 1, income: 4, linkVP: 2, produces: 2, canalOnly: true },
+    { count: 2, cost: 7, vp: 2, income: 7, linkVP: 1, produces: 3 },
+    { count: 2, cost: 8, iron: 1, vp: 3, income: 6, linkVP: 1, produces: 4 },
+    { count: 2, cost: 10, iron: 1, vp: 4, income: 5, linkVP: 1, produces: 5 },
   ]),
   iron: levels([
-    { count: 1, cost: 5, coal: 1, vp: 3, income: 3, linkVP: 1, produces: 4, canalOnly: true, unverified: [C] },
-    { count: 1, cost: 7, coal: 1, vp: 5, income: 3, linkVP: 1, produces: 4, unverified: [C] },
-    { count: 1, cost: 9, coal: 1, vp: 7, income: 2, linkVP: 1, produces: 5, unverified: [C] },
-    { count: 1, cost: 12, coal: 1, vp: 9, income: 1, linkVP: 1, produces: 6, unverified: [C] },
+    { count: 1, cost: 5, coal: 1, vp: 3, income: 3, linkVP: 1, produces: 4, canalOnly: true },
+    { count: 1, cost: 7, coal: 1, vp: 5, income: 3, linkVP: 1, produces: 4 },
+    { count: 1, cost: 9, coal: 1, vp: 7, income: 2, linkVP: 1, produces: 5 },
+    { count: 1, cost: 12, coal: 1, vp: 9, income: 1, linkVP: 1, produces: 6 },
   ]),
   brewery: levels([
-    { count: 2, cost: 5, iron: 1, vp: 4, income: 4, linkVP: 2, canalOnly: true, unverified: [C] },
-    { count: 2, cost: 7, iron: 1, vp: 5, income: 5, linkVP: 2, unverified: [C] },
-    { count: 2, cost: 9, iron: 1, vp: 7, income: 5, linkVP: 2, unverified: [C] },
-    { count: 1, cost: 9, iron: 1, vp: 10, income: 5, linkVP: 2, railOnly: true, unverified: [C] },
+    { count: 2, cost: 5, iron: 1, vp: 4, income: 4, linkVP: 2, canalOnly: true },
+    { count: 2, cost: 7, iron: 1, vp: 5, income: 5, linkVP: 2 },
+    { count: 2, cost: 9, iron: 1, vp: 7, income: 5, linkVP: 2 },
+    { count: 1, cost: 9, iron: 1, vp: 10, income: 5, linkVP: 2, railOnly: true },
   ]),
 };
 

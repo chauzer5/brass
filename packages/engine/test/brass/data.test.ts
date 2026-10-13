@@ -104,3 +104,9 @@ describe('progress track', () => {
     expect(highestSpaceOfLevel(11)).toBe(33);
   });
 });
+
+describe('tile data provenance', () => {
+  it('has every industry tile field confirmed against the physical components', () => {
+    for (const ind of INDUSTRIES) for (const t of INDUSTRY_TILES[ind]) expect(t.unverified, `${ind} ${t.level}`).toEqual([]);
+  });
+});
