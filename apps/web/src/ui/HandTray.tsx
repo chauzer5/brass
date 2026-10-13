@@ -18,6 +18,10 @@ const ONE_ROW_HEIGHT = 110;
 const DRAG_THRESHOLD = 12;
 /** Two taps on the same card within this many ms count as a double-tap. */
 const DOUBLE_TAP_MS = 350;
+/** Holding a finger on the hand this long lifts the card under it for a closer look. */
+const HOLD_MS = 300;
+/** A finger that moves further than this (px) before the hold kicks in is a swipe, not a hold. */
+const HOLD_SLOP = 10;
 
 /**
  * Card labels with soft hyphens (\u00AD), so long names break neatly inside
@@ -157,6 +161,13 @@ export function HandTray({
     onPick(id);
   };
 
+  // Hold a finger on the hand to lift the card under it, then slide to fan
+  // through the others. Letting go puts the card back without choosing it.
+  const [peek, setPeek] = useState<number | null>(null);
+  const hold = useRef<{ x: number; y: number; timer: number } | null>(null);
+  const swallowClick = useRef(false);
+  const innerRef = useRef<HTMLDivElement>(null);
+
   // Tap the bar to toggle; drag it down to tuck the hand away or up to show it.
   const [drag, setDrag] = useState<{ startY: number; dy: number } | null>(null);
   const onBarDown = (e: PointerEvent<HTMLDivElement>) => {
@@ -181,6 +192,49 @@ export function HandTray({
   const rows = stepFor(n) >= MIN_PEEK ? 1 : 2;
   const perRow = Math.ceil(n / rows);
   const step = Math.min(CARD_WIDTH + CARD_GAP, stepFor(perRow));
+  // Each row is centred; the last row may hold fewer cards.
+  const rowCount = (row: number) => Math.min(perRow, n - row * perRow);
+  const rowOffset = (row: number) => Math.max(0, (width - ((rowCount(row) - 1) * step + CARD_WIDTH)) / 2);
+
+  /** The card whose visible strip is under a point on screen. */
+  const cardAt = (x: number, y: number) => {
+    const rect = innerRef.current!.getBoundingClientRect();
+    const row = rows > 1 && y - rect.top >= CARD_TOP + ROW_STEP ? 1 : 0;
+    const col = Math.floor((x - rect.left - rowOffset(row)) / step);
+    return row * perRow + Math.max(0, Math.min(rowCount(row) - 1, col));
+  };
+
+  const endHold = () => {
+    if (hold.current) clearTimeout(hold.current.timer);
+    hold.current = null;
+    setPeek(null);
+  };
+  const onHandDown = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    swallowClick.current = false;
+    const { clientX: x, clientY: y, pointerId } = e;
+    const target = e.currentTarget;
+    const timer = window.setTimeout(() => {
+      target.setPointerCapture(pointerId);
+      swallowClick.current = true;
+      setPeek(cardAt(x, y));
+      navigator.vibrate?.(8);
+    }, HOLD_MS);
+    hold.current = { x, y, timer };
+  };
+  const onHandMove = (e: PointerEvent<HTMLDivElement>) => {
+    const h = hold.current;
+    if (!h) return;
+    if (peek === null) {
+      if (Math.hypot(e.clientX - h.x, e.clientY - h.y) > HOLD_SLOP) endHold();
+      return;
+    }
+    const i = cardAt(e.clientX, e.clientY);
+    if (i !== peek) {
+      setPeek(i);
+      navigator.vibrate?.(4);
+    }
+  };
 
   return (
     <section
@@ -218,6 +272,7 @@ export function HandTray({
       {children && <div className="tray-panel">{children}</div>}
       <div
         className={`hand-row ${step < TIGHT_PEEK ? 'tight' : ''}`}
+        data-peeking={peek !== null}
         ref={rowRef}
         style={
           {
@@ -226,7 +281,22 @@ export function HandTray({
           } as CSSProperties
         }
       >
-        <div className="hand-row-inner">
+        <div
+          className="hand-row-inner"
+          ref={innerRef}
+          onPointerDown={onHandDown}
+          onPointerMove={onHandMove}
+          onPointerUp={endHold}
+          onPointerCancel={endHold}
+          onContextMenu={(e) => e.preventDefault()}
+          onClickCapture={(e) => {
+            // The release that ends a hold isn't a tap.
+            if (swallowClick.current) {
+              swallowClick.current = false;
+              e.stopPropagation();
+            }
+          }}
+        >
         {hand.map((id, i) => {
           const isSelected = selected.has(id);
           // With no action chosen, cards can still be tapped (double-tap shows a town on the map).
@@ -234,17 +304,18 @@ export function HandTray({
           const row = Math.floor(i / perRow);
           const col = i % perRow;
           const rowEnd = col === perRow - 1 || i === n - 1;
-          // Centre each row; the last row may hold fewer cards.
-          const inRow = Math.min(perRow, n - row * perRow);
-          const offset = Math.max(0, (width - ((inRow - 1) * step + CARD_WIDTH)) / 2);
+          const peeked = peek === i;
           return (
             <button
               key={id}
-              className={`hand-card ${isSelected ? 'selected' : ''} ${usable && disabled ? 'unusable' : ''} ${rowEnd ? 'row-end' : ''}`}
-              style={{ left: offset + col * step, top: CARD_TOP + row * ROW_STEP, zIndex: isSelected ? 50 : i }}
-              disabled={disabled}
+              className={`hand-card ${isSelected ? 'selected' : ''} ${usable && disabled ? 'unusable' : ''} ${rowEnd ? 'row-end' : ''} ${peeked ? 'peeked' : ''}`}
+              style={{ left: rowOffset(row) + col * step, top: CARD_TOP + row * ROW_STEP, zIndex: peeked ? 60 : isSelected ? 50 : i }}
+              // Not `disabled`: a disabled button swallows the pointer events that start a hold.
+              aria-disabled={disabled}
               aria-pressed={isSelected}
-              onClick={() => tapCard(id)}
+              onClick={() => {
+                if (!disabled) tapCard(id);
+              }}
             >
               <GameCard card={cards[id]} />
             </button>

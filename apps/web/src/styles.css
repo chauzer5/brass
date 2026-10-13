@@ -914,13 +914,26 @@ button {
   box-shadow: -2px 0 6px rgba(0, 0, 0, 0.18);
 }
 
-.hand-card:disabled {
+.hand-card[aria-disabled='true'] {
   cursor: default;
 }
 
-/* Cards take double-taps themselves (to show a town), so the browser mustn't zoom on them. */
-.hand-card {
-  touch-action: manipulation;
+/* The hand handles its own touches (double-tap to show a town, hold and slide
+   to fan through the cards), so the browser mustn't zoom or pan on it. */
+.hand-row-inner {
+  touch-action: none;
+}
+
+/* While fanning through the hand, the lifted card may rise over the panel above. */
+.hand-row[data-peeking='true'] {
+  overflow: visible;
+}
+
+.hand-row .hand-card.peeked {
+  transform: translateY(-16px) scale(1.15);
+  transform-origin: 50% 100%;
+  filter: none;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
 }
 
 .hand-card.unusable {
@@ -967,6 +980,7 @@ button {
 }
 
 .hand-card.selected .card-title,
+.hand-card.peeked .card-title,
 .hand-card.row-end .card-title {
   max-width: none;
 }
