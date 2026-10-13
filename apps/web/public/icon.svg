@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="38%" r="75%">
+      <stop offset="0" stop-color="#4a2f1c"/>
+      <stop offset="1" stop-color="#160d07"/>
+    </radialGradient>
+    <linearGradient id="brass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f6d58a"/>
+      <stop offset="0.45" stop-color="#d49a3c"/>
+      <stop offset="1" stop-color="#8a5a1c"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffb35c"/>
+      <stop offset="1" stop-color="#e0661b"/>
+    </linearGradient>
+    <clipPath id="face"><circle cx="256" cy="262" r="118"/></clipPath>
+  </defs>
+
+  <!-- Full-bleed background, so the same art works as a maskable icon. -->
+  <rect width="512" height="512" fill="url(#bg)"/>
+
+  <!-- Brass gear: 12 teeth around a ring. -->
+  <g fill="url(#brass)">
+    <g id="tooth">
+      <rect x="236" y="88" width="40" height="44" rx="6"/>
+    </g>
+    <use href="#tooth" transform="rotate(30 256 262)"/>
+    <use href="#tooth" transform="rotate(60 256 262)"/>
+    <use href="#tooth" transform="rotate(90 256 262)"/>
+    <use href="#tooth" transform="rotate(120 256 262)"/>
+    <use href="#tooth" transform="rotate(150 256 262)"/>
+    <use href="#tooth" transform="rotate(180 256 262)"/>
+    <use href="#tooth" transform="rotate(210 256 262)"/>
+    <use href="#tooth" transform="rotate(240 256 262)"/>
+    <use href="#tooth" transform="rotate(270 256 262)"/>
+    <use href="#tooth" transform="rotate(300 256 262)"/>
+    <use href="#tooth" transform="rotate(330 256 262)"/>
+    <circle cx="256" cy="262" r="146"/>
+  </g>
+
+  <!-- Night sky face of the gear. -->
+  <circle cx="256" cy="262" r="118" fill="#1f140c"/>
+
+  <g clip-path="url(#face)">
+    <!-- Furnace glow on the horizon. -->
+    <ellipse cx="256" cy="372" rx="170" ry="70" fill="url(#glow)" opacity="0.55"/>
+    <!-- Smoke from the chimney. -->
+    <g fill="#c2ad98" opacity="0.7">
+      <circle cx="304" cy="180" r="10"/>
+      <circle cx="284" cy="170" r="13"/>
+      <circle cx="258" cy="164" r="16"/>
+    </g>
+    <!-- Mill silhouette: chimney and sawtooth roof. -->
+    <g fill="url(#brass)">
+      <rect x="298" y="198" width="26" height="118"/>
+      <rect x="292" y="192" width="38" height="12" rx="2"/>
+      <path d="M150 316 V262 L190 236 V262 L230 236 V262 L270 236 V262 L298 246 V316 Z"/>
+      <rect x="140" y="312" width="232" height="20"/>
+    </g>
+    <!-- Lit windows. -->
+    <g fill="#ffb35c">
+      <rect x="166" y="282" width="14" height="18" rx="2"/>
+      <rect x="196" y="282" width="14" height="18" rx="2"/>
+      <rect x="226" y="282" width="14" height="18" rx="2"/>
+      <rect x="256" y="282" width="14" height="18" rx="2"/>
+    </g>
+    <!-- Rail line across the front. -->
+    <rect x="120" y="340" width="272" height="8" fill="#1f140c"/>
+    <g fill="#1f140c">
+      <rect x="140" y="336" width="8" height="16"/>
+      <rect x="180" y="336" width="8" height="16"/>
+      <rect x="220" y="336" width="8" height="16"/>
+      <rect x="260" y="336" width="8" height="16"/>
+      <rect x="300" y="336" width="8" height="16"/>
+      <rect x="340" y="336" width="8" height="16"/>
+    </g>
+  </g>
+
+  <!-- Hub ring highlight. -->
+  <circle cx="256" cy="262" r="118" fill="none" stroke="#f6d58a" stroke-opacity="0.35" stroke-width="3"/>
+</svg>
