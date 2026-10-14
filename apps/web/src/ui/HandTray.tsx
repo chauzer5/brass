@@ -339,7 +339,12 @@ export function HandTray({
         <span className="tray-info">{header}</span>
       </div>
       {(tab === 'hand' || panelOnMat) && children && <div className="tray-panel">{children}</div>}
-      {tab === 'mat' && <div className="tray-mat">{mat}</div>}
+      {tab === 'mat' && (
+        // Collapses to nothing when tucked, sliding like the hand row does.
+        <div className="tray-mat">
+          <div className="tray-mat-scroll">{mat}</div>
+        </div>
+      )}
       <div
         hidden={tab !== 'hand'}
         className={`hand-row ${step < TIGHT_PEEK ? 'tight' : ''}`}

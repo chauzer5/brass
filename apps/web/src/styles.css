@@ -1085,16 +1085,31 @@ button {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
-.hand-tray[data-tucked='true'] .tray-mat {
-  display: none;
+.tray-mat {
+  display: grid;
+  grid-template-rows: 1fr;
+  min-height: 0;
+  overflow: hidden;
+  transition: grid-template-rows 0.2s ease;
 }
 
-.tray-mat {
+.hand-tray[data-tucked='true'] .tray-mat {
+  grid-template-rows: 0fr;
+}
+
+.tray-mat-scroll {
   min-height: 0;
   max-height: 55dvh;
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+.tray-mat-scroll > .player-mat {
   padding: 2px 12px 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tray-mat { transition: none; }
 }
 
 .tray-info {
