@@ -174,30 +174,22 @@ function Table({
   const [resultsHidden, setResultsHidden] = useState(false);
   const summaryOpen = outcome ? !resultsHidden : view.eraScores.length > seenEras;
 
-  // What the others did since this player's last turn: listed on the handoff screen, then glowing on the map
-  // until this player starts an action.
+  // What the others did since this player's last turn: listed on the handoff screen.
   const recap = useMemo(
     () => (hidden && player !== null ? recapSince(match, player) : []),
     [hidden, player, match.log.length], // eslint-disable-line react-hooks/exhaustive-deps
   );
-  const [recent, setRecent] = useState<{ slots: Set<brass.SlotKey>; links: Set<string>; at: number } | null>(null);
-  const showRecent = recent && recent.at === match.log.length && !draft.kind && !hidden;
   // Playing alone against bots there's nothing to hide: when the turn comes back, what the bots did is
-  // listed on a "Your turn" screen (and glows on the map) instead.
+  // listed on a "Your turn" screen instead.
   const [soloRecap, setSoloRecap] = useState<RecapItem[]>([]);
   const lastController = useRef<number | null>(null);
   useEffect(() => {
     if (humans.length === 1 && player !== null && lastController.current !== player) {
       const items = recapSince(match, player);
       setSoloRecap(items);
-      setRecent({ slots: new Set(items.flatMap((r) => r.slots)), links: new Set(items.flatMap((r) => r.links)), at: match.log.length });
     }
     lastController.current = player;
   }, [player, match.log.length]); // eslint-disable-line react-hooks/exhaustive-deps
-  const shown = useMemo(
-    () => (showRecent ? { ...lit, recentSlots: recent!.slots, recentLinks: recent!.links } : lit),
-    [lit, showRecent, recent],
-  );
 
 
   const submit = (action: brass.BrassAction) => {
@@ -340,7 +332,7 @@ function Table({
               : undefined
           }
           onDiscards={() => setShowDiscards(true)}
-          highlights={hidden ? undefined : shown}
+          highlights={hidden ? undefined : lit}
           onSlot={(location, slot) => {
             if (state.phase.kind === 'shortfall') submit({ type: 'removeTile', location, slot });
             else {
@@ -488,14 +480,7 @@ function Table({
           name={names[player]!}
           names={names}
           recap={recap}
-          onReady={() => {
-            setRevealedFor(player);
-            setRecent({
-              slots: new Set(recap.flatMap((r) => r.slots)),
-              links: new Set(recap.flatMap((r) => r.links)),
-              at: match.log.length,
-            });
-          }}
+          onReady={() => setRevealedFor(player)}
         />
       )}
       {soloRecap.length > 0 && player !== null && !sale && !summaryOpen && (

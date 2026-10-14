@@ -3,20 +3,17 @@ import { INDUSTRY_NAME, linkName, locationName, roman } from './labels.ts';
 
 type BrassMatch = Match<brass.BrassConfig, brass.BrassState, brass.BrassAction>;
 
-/** One thing another player did, in words, with where it happened on the map. */
+/** One thing another player did, in words. */
 export interface RecapItem {
   player: number;
   text: string;
-  /** Spaces built on or sold from, to point out on the map. */
-  slots: brass.SlotKey[];
-  links: string[];
 }
 
 const join = (parts: string[]) => (parts.length <= 1 ? (parts[0] ?? '') : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`);
 
 /** Describes one action, comparing the state just before and after it. */
 function describe(before: brass.BrassState, after: brass.BrassState, player: number, a: brass.BrassAction): RecapItem {
-  const item = (text: string, slots: brass.SlotKey[] = [], links: string[] = []): RecapItem => ({ player, text, slots, links });
+  const item = (text: string): RecapItem => ({ player, text });
   switch (a.type) {
     case 'build': {
       const key = brass.slotKey(a.location, a.slot);
@@ -29,11 +26,11 @@ function describe(before: brass.BrassState, after: brass.BrassState, player: num
         const sold = after[field] - before[field];
         if (sold > 0) text += ` and sold ${sold} ${a.industry} to the market`;
       }
-      return item(text, [key]);
+      return item(text);
     }
     case 'network': {
       const kind = before.era === 'canal' ? 'canal' : a.links.length > 1 ? 'rail links' : 'rail link';
-      return item(`built ${before.era === 'canal' ? 'a canal' : kind} ${join(a.links.map(linkName))}`, [], a.links);
+      return item(`built ${before.era === 'canal' ? 'a canal' : kind} ${join(a.links.map(linkName))}`);
     }
     case 'develop':
       return item(`developed ${join(a.industries.map((ind) => INDUSTRY_NAME[ind]))}`);
@@ -43,7 +40,7 @@ function describe(before: brass.BrassState, after: brass.BrassState, player: num
         const what = tile ? `${INDUSTRY_NAME[tile.industry]} ${roman(tile.level)}` : 'a tile';
         return `${what} in ${locationName(s.location)} to ${locationName(before.merchants[s.merchant]!.location)}`;
       });
-      return item(`sold ${join(parts)}`, a.sales.map((s) => brass.slotKey(s.location, s.slot)));
+      return item(`sold ${join(parts)}`);
     }
     case 'loan':
       return item(`took a loan (+£${brass.LOAN_AMOUNT})`);

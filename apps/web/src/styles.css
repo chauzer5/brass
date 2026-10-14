@@ -506,21 +506,6 @@ button {
   fill: transparent;
 }
 
-/* ---- What others did since your last turn: a steady glow in the builder's colour until you start an action ---- */
-
-.slot.recent {
-  stroke: var(--owner);
-  stroke-width: 3.5;
-  filter: drop-shadow(0 0 4px var(--owner));
-}
-
-.link-recent {
-  stroke: var(--owner);
-  stroke-width: 14;
-  stroke-opacity: 0.45;
-  filter: drop-shadow(0 0 3px var(--owner));
-}
-
 /* ---- End of era / game over ---- */
 
 .era-summary {
