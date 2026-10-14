@@ -6,6 +6,7 @@ import { explainBuild } from './game/explain.ts';
 import { canUndo, useGame, type Game } from './game/useGame.ts';
 import { ActionRail } from './ui/ActionRail.tsx';
 import { HandTray, type Arriving, type TrayTab } from './ui/HandTray.tsx';
+import { IncomeTrack } from './ui/IncomeTrack.tsx';
 import { PlayerMat } from './ui/PlayerMat.tsx';
 import { DiscardSheet, GameOver, Handoff, MatSheet, NewGame, PlayerStrip } from './ui/Screens.tsx';
 import { StepPanel, pickCard, tapMatRow, tapSlot } from './ui/TurnPanel.tsx';
@@ -229,7 +230,12 @@ function Table({
             tab={trayTab}
             onTabChange={setTrayTab}
             mat={
-              developing ? (
+              <>
+              <div className="tray-income">
+                <h3>Income</h3>
+                <IncomeTrack players={view.players} focus={player!} />
+              </div>
+              {developing ? (
                 <PlayerMat
                   player={p!}
                   era={state.era}
@@ -240,7 +246,8 @@ function Table({
                 />
               ) : (
                 <PlayerMat player={p!} era={state.era} />
-              )
+              )}
+              </>
             }
             panelOnMat={developing}
             header={
@@ -266,6 +273,7 @@ function Table({
       {matFor !== null && (
         <MatSheet
           player={view.players[matFor]!}
+          players={view.players}
           name={names[matFor]!}
           era={state.era}
           onClose={() => setMatFor(null)}

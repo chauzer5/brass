@@ -1362,6 +1362,86 @@ button {
   margin: 0 5px;
 }
 
+/* ---- Income track ---- */
+
+.income-track {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  margin: 0 -2px;
+  padding: 0 2px;
+  /* Fade the ends so it reads as a strip that continues. */
+  mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
+}
+
+.income-track::-webkit-scrollbar {
+  display: none;
+}
+
+.income-track svg {
+  display: block;
+}
+
+.income-level-label {
+  fill: var(--muted);
+  font-size: 8px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+
+.income-level-bg {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.income-level.neg .income-level-bg { fill: color-mix(in srgb, var(--danger) 18%, var(--surface)); }
+.income-level.zero .income-level-bg { fill: var(--surface); }
+.income-level.b1 .income-level-bg { fill: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+.income-level.b2 .income-level-bg { fill: color-mix(in srgb, var(--accent) 20%, var(--surface)); }
+.income-level.b3 .income-level-bg { fill: color-mix(in srgb, var(--accent) 32%, var(--surface)); }
+
+.income-space-tick {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.income-marker {
+  fill: var(--owner);
+  stroke: var(--surface);
+  stroke-width: 1.5;
+}
+
+.income-marker.focus {
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+
+.income-ghost {
+  fill: none;
+  stroke: var(--owner);
+  stroke-width: 2;
+  stroke-dasharray: 3 2;
+}
+
+.income-preview-arrow {
+  fill: none;
+  stroke: var(--owner);
+  stroke-width: 1.5;
+}
+
+.tray-income {
+  padding: 0 12px;
+}
+
+.tray-income h3 {
+  margin: 4px 0 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
 /* ---- Player mat ---- */
 
 .glyph {

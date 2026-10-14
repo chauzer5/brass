@@ -15,6 +15,7 @@ import {
 import { INDUSTRY_NAME, cardName, linkName, merchantName, roman, slotName } from '../game/labels.ts';
 import { ACTION_LABEL } from './ActionRail.tsx';
 import { ActionIcon, IndustryIcon } from './icons.tsx';
+import { IncomeTrack } from './IncomeTrack.tsx';
 import { TileStats } from './PlayerMat.tsx';
 
 interface StepPanelProps {
@@ -85,6 +86,7 @@ export function StepPanel({ view, player, legal, draft, setDraft, validate, onPl
         <NetworkSteps view={view} legal={legal} draft={draft} setDraft={setDraft} />
       )}
       {draft.kind === 'develop' && draft.card && <DevelopSteps draft={draft} />}
+      {draft.kind === 'loan' && <LoanSteps view={view} player={player} />}
       {draft.kind === 'sell' && draft.card && <SellSteps view={view} legal={legal} draft={draft} setDraft={setDraft} />}
 
       {action && (
@@ -120,6 +122,26 @@ export function tapMatRow(d: Draft, industry: brass.Industry, addable: ReadonlyS
   if (addable.has(industry)) return { ...d, industries: [...d.industries, industry] };
   const i = d.industries.lastIndexOf(industry);
   return i < 0 ? d : { ...d, industries: d.industries.filter((_, j) => j !== i) };
+}
+
+const signed = (n: number) => (n >= 0 ? `+${n}` : `${n}`);
+
+/** A loan's effect, with the income track showing where every player stands and where this player would land. */
+function LoanSteps({ view, player }: { view: brass.BrassView; player: number }) {
+  const me = view.players[player]!;
+  const level = brass.incomeLevel(me.incomeSpace);
+  const after = level - brass.LOAN_INCOME_LEVELS;
+  const allowed = after >= brass.MIN_INCOME_LEVEL_FOR_LOAN;
+  return (
+    <>
+      <p className="hint">
+        {allowed
+          ? `+£${brass.LOAN_AMOUNT} now · income ${signed(level)} → ${signed(after)} per round`
+          : `A loan would take your income below ${brass.MIN_INCOME_LEVEL_FOR_LOAN}.`}
+      </p>
+      <IncomeTrack players={view.players} focus={player} preview={allowed ? brass.highestSpaceOfLevel(after) : undefined} />
+    </>
+  );
 }
 
 /** Develop is played on the player mat, which numbers the picks; this only says what to do. */

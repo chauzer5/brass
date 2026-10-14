@@ -1,6 +1,7 @@
 import { brass, type Outcome } from '@brass/engine';
 import { useEffect, useRef, useState } from 'react';
 import { GameCard } from './HandTray.tsx';
+import { IncomeTrack } from './IncomeTrack.tsx';
 import { PlayerMat } from './PlayerMat.tsx';
 import { useTheme, type ThemeSetting } from '../settings.ts';
 
@@ -140,11 +141,14 @@ export function PlayerStrip({
 /** Another player's mat, in a sheet over the table. Mats are public, as at the real table. */
 export function MatSheet({
   player,
+  players,
   name,
   era,
   onClose,
 }: {
   player: brass.PlayerView;
+  /** Everyone, for the income track. */
+  players: readonly brass.PlayerView[];
   name: string;
   era: brass.Era;
   onClose: () => void;
@@ -164,6 +168,7 @@ export function MatSheet({
             ✕
           </button>
         </div>
+        <IncomeTrack players={players} focus={player.id} />
         <PlayerMat player={player} era={era} />
       </div>
     </div>
