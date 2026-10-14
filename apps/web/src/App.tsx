@@ -107,6 +107,7 @@ function Table({
     <div className="app">
       <header className="topbar">
         <button className="brand" onClick={onMenu} aria-label="Menu">
+          <img src="/icon.svg" alt="" className="brand-logo" />
           Brass ☰
         </button>
         <span className="topbar-status">

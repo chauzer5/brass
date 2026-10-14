@@ -12,7 +12,8 @@ export function NewGame({ onStart, onResume }: { onStart: (names: string[]) => v
   return (
     <div className="screen">
       <div className="screen-card">
-        <h1>Brass: Birmingham</h1>
+        <img src="/icon.svg" alt="" className="menu-logo" />
+        <h1 className="menu-title">Brass: Birmingham</h1>
         <p className="muted">Pass-and-play on one device. Bot opponents are coming next.</p>
         {onResume && (
           <button className="confirm" onClick={onResume}>
