@@ -197,6 +197,8 @@ export function Board({ state, names, onDiscards, highlights = NO_HIGHLIGHTS, on
           {state && names && <TurnOrder state={state} names={names} />}
           {state && <Piles state={state} onDiscards={onDiscards} />}
 
+          {/* Once a link is chosen, the other options fade so the choice stands out. */}
+          <g className={highlights.selectedLinks.size > 0 ? 'links has-chosen' : 'links'}>
           {brass.LINKS.map((l) => {
             const owner = links[l.id];
             const lit = highlights.links.has(l.id);
@@ -206,17 +208,18 @@ export function Board({ state, names, onDiscards, highlights = NO_HIGHLIGHTS, on
               <g
                 key={l.id}
                 data-link={l.id}
-                className={lit ? 'tappable' : undefined}
-                onClick={lit ? () => onLink?.(l.id) : undefined}
+                className={lit || selected ? 'tappable' : undefined}
+                onClick={lit || selected ? () => onLink?.(l.id) : undefined}
               >
                 {l.canal && <path d={d} className="link link-canal" />}
                 {l.rail && <path d={d} className={l.canal ? 'link link-rail link-both' : 'link link-rail'} />}
                 {owner !== undefined && <path d={d} className={`link link-owned owner-${owner}`} />}
                 {(lit || selected) && <path d={d} className={selected ? 'link link-selected' : 'link link-lit'} />}
-                {lit && <path d={d} className="link link-hit" />}
+                {(lit || selected) && <path d={d} className="link link-hit" />}
               </g>
             );
           })}
+          </g>
 
           {brass.LOCATIONS.map((loc) => (
             <g key={loc.id} data-location={loc.id}>

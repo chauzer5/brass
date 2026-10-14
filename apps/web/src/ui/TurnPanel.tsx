@@ -8,6 +8,7 @@ import {
   compose,
   developIndustries,
   networkLinks,
+  offersSecondLink,
   sellOptions,
   type Draft,
 } from '../game/draft.ts';
@@ -192,37 +193,19 @@ function BuildSteps({ view, me, legal, draft, setDraft }: StepProps & { me: bras
   );
 }
 
-function NetworkSteps({ view, legal, draft, setDraft }: StepProps) {
-  const options = networkLinks(view.cards, legal, draft);
+/** Network is played on the map: lit lines can be tapped, and a chosen link tapped again to take it back. */
+function NetworkSteps({ view, legal, draft }: StepProps) {
   const rail = view.era === 'rail';
-  return (
-    <Step
-      title={
-        draft.links.length === 0
-          ? `Choose a ${rail ? 'rail' : 'canal'} link (or tap the board)`
-          : rail && draft.links.length === 1
-            ? 'Add a second rail link (£15 total and 1 beer), or confirm just this one'
-            : 'Link chosen'
-      }
-    >
-      <div className="chips">
-        {draft.links.map((id) => (
-          <button
-            key={id}
-            className="chip selected"
-            onClick={() => setDraft((d) => ({ ...d, links: d.links.slice(0, d.links.indexOf(id)) }))}
-          >
-            {linkName(id)} ✕
-          </button>
-        ))}
-        {options.map((id) => (
-          <button key={id} className="chip" onClick={() => setDraft((d) => ({ ...d, links: [...d.links, id] }))}>
-            {linkName(id)}
-          </button>
-        ))}
-      </div>
-    </Step>
-  );
+  const kind = rail ? 'rail' : 'canal';
+  const options = networkLinks(view.cards, legal, draft).length;
+  const [first, second] = draft.links;
+  let hint: string;
+  if (!first) hint = `Tap a highlighted ${kind} line on the map (${options} available).`;
+  else if (second) hint = `Links: ${linkName(first)} and ${linkName(second)}. Tap one to take it back.`;
+  else if (offersSecondLink(view.cards, legal, draft))
+    hint = `Link: ${linkName(first)}. Tap another highlighted line for a second rail (£15, 2 coal, 1 beer in all), or confirm just this one.`;
+  else hint = `Link: ${linkName(first)}. Tap another highlighted line to change it.`;
+  return <p className="hint">{hint}</p>;
 }
 
 function SellSteps({ view, legal, draft, setDraft }: StepProps) {

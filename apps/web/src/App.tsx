@@ -1,7 +1,7 @@
 import { brass } from '@brass/engine';
 import { useEffect, useMemo, useState } from 'react';
 import { Board } from './board/Board.tsx';
-import { EMPTY_DRAFT, availableKinds, developIndustries, highlights, usableCards, type Draft } from './game/draft.ts';
+import { EMPTY_DRAFT, availableKinds, developIndustries, highlights, tapLink, usableCards, type Draft } from './game/draft.ts';
 import { canUndo, useGame, type Game } from './game/useGame.ts';
 import { ActionRail } from './ui/ActionRail.tsx';
 import { HandTray, type TrayTab } from './ui/HandTray.tsx';
@@ -141,7 +141,7 @@ function Table({
             if (state.phase.kind === 'shortfall') submit({ type: 'removeTile', location, slot });
             else setDraft((d) => tapSlot(d, location, slot, view, legal));
           }}
-          onLink={(id) => setDraft((d) => ({ ...d, links: [...d.links, id] }))}
+          onLink={(id) => setDraft((d) => tapLink(view.cards, legal, d, id))}
           focus={buildFocus ?? peek}
         />
         {showControls && state.phase.kind === 'actions' && (

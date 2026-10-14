@@ -93,11 +93,28 @@ export function chooseBuildSlot(
 export function networkLinks(cards: Cards, legal: readonly brass.BrassAction[], d: Draft): string[] {
   if (d.kind !== 'network' || !d.card) return [];
   const moves = withCard(cards, legal, 'network', d.card).map((a) => a as Extract<brass.BrassAction, { type: 'network' }>);
-  if (d.links.length === 0) return [...new Set(moves.map((a) => a.links[0]!))];
+  const firsts = [...new Set(moves.map((a) => a.links[0]!))];
+  if (d.links.length === 0) return firsts;
   if (d.links.length === 1) {
-    return [...new Set(moves.filter((a) => a.links.length === 2 && a.links[0] === d.links[0]).map((a) => a.links[1]!))];
+    const seconds = [...new Set(moves.filter((a) => a.links.length === 2 && a.links[0] === d.links[0]).map((a) => a.links[1]!))];
+    // No second link possible (always so in the Canal Era): the other lines stay lit, and tapping one swaps the choice.
+    return seconds.length > 0 ? seconds : firsts.filter((l) => l !== d.links[0]);
   }
   return [];
+}
+
+/** Whether `networkLinks` is offering second links (rather than swaps for the first). */
+export function offersSecondLink(cards: Cards, legal: readonly brass.BrassAction[], d: Draft): boolean {
+  if (d.kind !== 'network' || !d.card || d.links.length !== 1) return false;
+  return withCard(cards, legal, 'network', d.card).some((a) => a.type === 'network' && a.links.length === 2 && a.links[0] === d.links[0]);
+}
+
+/** Tapping a line on the map while networking: unpick a chosen link, add a second, or swap the first. */
+export function tapLink(cards: Cards, legal: readonly brass.BrassAction[], d: Draft, id: string): Draft {
+  const i = d.links.indexOf(id);
+  if (i >= 0) return { ...d, links: d.links.slice(0, i) };
+  if (offersSecondLink(cards, legal, d)) return { ...d, links: [...d.links, id] };
+  return { ...d, links: [id] };
 }
 
 export function developIndustries(cards: Cards, legal: readonly brass.BrassAction[], d: Draft): brass.Industry[] {

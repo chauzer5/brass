@@ -399,7 +399,13 @@ button {
 
 .link-selected {
   stroke: var(--highlight);
-  stroke-width: 10;
+  stroke-width: 12;
+  filter: drop-shadow(0 0 3px #fff) drop-shadow(0 0 2px var(--highlight));
+}
+
+.links.has-chosen .link-lit {
+  stroke-width: 6;
+  stroke-opacity: 0.3;
 }
 
 .link-hit {
