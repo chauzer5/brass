@@ -1,5 +1,5 @@
 import { brass, type Outcome } from '@brass/engine';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { GameCard } from './HandTray.tsx';
 import { PlayerMat } from './PlayerMat.tsx';
 import { useTheme, type ThemeSetting } from '../settings.ts';
@@ -102,22 +102,32 @@ export function PlayerStrip({
   /** Tapping a player shows their mat. */
   onSelect: (id: number) => void;
 }) {
+  // When the chips don't all fit, the strip scrolls; keep the player taking their turn in view.
+  const stripRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const chip = stripRef.current?.querySelector<HTMLElement>('.player-chip.active');
+    chip?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+  }, [active]);
   return (
-    <div className="player-strip">
+    <div className="player-strip" ref={stripRef}>
       {view.turnOrder.map((id) => {
         const p = view.players[id]!;
+        const income = brass.incomeLevel(p.incomeSpace);
         return (
           <button
             key={id}
-            className={`player-chip ${id === active ? 'active' : ''}`}
-            aria-label={`${names[id]}: show board`}
+            className={`player-chip owner-${id} ${id === active ? 'active' : ''}`}
+            aria-label={`${names[id]}: £${p.money}, income ${income}, ${p.vp} VP. Show board`}
             onClick={() => onSelect(id)}
           >
-            <span className={`dot owner-${id}`} aria-hidden />
             <span className="player-name">{names[id]}</span>
             <span className="player-stats">
-              £{p.money} · {brass.incomeLevel(p.incomeSpace) >= 0 ? '+' : ''}
-              {brass.incomeLevel(p.incomeSpace)} · {p.vp} VP
+              <span>£{p.money}</span>
+              <span>
+                {income >= 0 ? '+' : ''}
+                {income}
+              </span>
+              <span>{p.vp} VP</span>
             </span>
           </button>
         );

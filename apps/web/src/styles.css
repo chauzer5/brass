@@ -488,41 +488,61 @@ button {
 .player-strip {
   grid-area: strip;
   display: flex;
-  gap: 6px;
-  padding: 6px 16px;
+  gap: 4px;
+  padding: 6px 10px;
   overflow-x: auto;
   overscroll-behavior: contain;
+  scrollbar-width: none;
   background: var(--surface);
   border-bottom: 1px solid var(--line);
 }
 
+.player-strip::-webkit-scrollbar {
+  display: none;
+}
+
+/* Chips share the row, but never shrink below their contents: if they can't all fit, the strip scrolls. */
 .player-chip {
   font: inherit;
   color: inherit;
   text-align: left;
   background: none;
   cursor: pointer;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  column-gap: 6px;
-  align-items: center;
-  padding: 4px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1 0 auto;
+  padding: 4px 6px 4px 8px;
   border-radius: 8px;
-  border: 1px solid transparent;
-  font-size: 12px;
-  min-width: 0;
-  flex: 1 1 0;
+  border: 1px solid var(--line);
+  /* The player's colour, as a stripe down the left edge. */
+  box-shadow: inset 4px 0 0 var(--owner);
+  font-size: 11.5px;
 }
 
 .player-chip.active {
   border-color: var(--highlight);
+  box-shadow: inset 4px 0 0 var(--owner), 0 0 0 1px var(--highlight);
 }
 
-.player-chip:not(.active) {
-  border-color: var(--line);
+.player-name {
+  max-width: 96px;
+  padding-left: 2px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.player-chip .dot { grid-row: span 2; }
+.player-stats {
+  display: flex;
+  gap: 4px;
+  padding-left: 2px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.dot { grid-row: span 2; }
 
 .player-name {
   font-weight: 600;
