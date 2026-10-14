@@ -209,6 +209,7 @@ function Slots({
           selected ? 'selected' : '',
           source ? 'source' : '',
           sourceChosen ? 'source-chosen' : '',
+          highlights.recentSlots?.has(key) ? 'recent' : '',
         ]
           .filter(Boolean)
           .join(' ');
@@ -437,6 +438,7 @@ export function Board({
                 {owner !== undefined && <path d={d} className={`link link-owned owner-${owner}`} />}
                 {/* Keep the railway visible on a claimed line, so a canal shows whether it can become a rail later. */}
                 {owner !== undefined && l.rail && <path d={d} className="link link-rail link-rail-over" />}
+                {highlights.recentLinks?.has(l.id) && <path d={d} className="link link-recent" />}
                 {(lit || selected) && <path d={d} className={selected ? 'link link-selected' : 'link link-lit'} />}
                 {(lit || selected) && <path d={d} className="link link-hit" />}
               </g>

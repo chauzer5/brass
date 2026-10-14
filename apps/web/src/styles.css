@@ -506,6 +506,67 @@ button {
   fill: transparent;
 }
 
+/* ---- What others did since your last turn: a gold glow until you start an action ---- */
+
+.slot.recent {
+  stroke: #f2c230;
+  stroke-width: 3.5;
+  filter: drop-shadow(0 0 4px #f2c230);
+  animation: recent-glow 1.6s ease-in-out infinite;
+}
+
+.link-recent {
+  stroke: #f2c230;
+  stroke-width: 14;
+  stroke-opacity: 0.55;
+  filter: drop-shadow(0 0 3px #f2c230);
+  animation: recent-glow 1.6s ease-in-out infinite;
+}
+
+@keyframes recent-glow {
+  50% { stroke-opacity: 0.25; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slot.recent,
+  .link-recent { animation: none; }
+}
+
+/* ---- Handoff recap ---- */
+
+.recap h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.recap ol {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 40dvh;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.recap li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.recap .dot {
+  flex: none;
+  transform: translateY(1px);
+}
+
 /* ---- Choosing where coal, iron and beer come from ---- */
 
 /* Sources are blue, so they never read as "build or sell here" (orange). */

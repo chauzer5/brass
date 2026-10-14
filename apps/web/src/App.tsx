@@ -11,6 +11,7 @@ import { PlayerMat } from './ui/PlayerMat.tsx';
 import { DiscardSheet, GameOver, Handoff, MatSheet, NewGame, PlayerStrip } from './ui/Screens.tsx';
 import { StepPanel, pickCard, tapMatRow, tapMerchant, tapSlot } from './ui/TurnPanel.tsx';
 import { choosable, chosenSource, sourceNeeds } from './game/sources.ts';
+import { recapSince } from './game/recap.ts';
 
 export function App() {
   const { game, start, play, undoLast, quit } = useGame();
@@ -148,6 +149,20 @@ function Table({
 
   const hidden = player !== null && revealedFor !== player;
 
+  // What the others did since this player's last turn: listed on the handoff screen, then glowing on the map
+  // until this player starts an action.
+  const recap = useMemo(
+    () => (hidden && player !== null ? recapSince(match, player) : []),
+    [hidden, player, match.log.length], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const [recent, setRecent] = useState<{ slots: Set<brass.SlotKey>; links: Set<string>; at: number } | null>(null);
+  const showRecent = recent && recent.at === match.log.length && !draft.kind && !hidden;
+  const shown = useMemo(
+    () => (showRecent ? { ...lit, recentSlots: recent!.slots, recentLinks: recent!.links } : lit),
+    [lit, showRecent, recent],
+  );
+
+
   const submit = (action: brass.BrassAction) => {
     if (player === null) return;
     const error = play(player, action);
@@ -258,7 +273,7 @@ function Table({
               : undefined
           }
           onDiscards={() => setShowDiscards(true)}
-          highlights={hidden ? undefined : lit}
+          highlights={hidden ? undefined : shown}
           onSlot={(location, slot) => {
             if (state.phase.kind === 'shortfall') submit({ type: 'removeTile', location, slot });
             else {
@@ -365,7 +380,21 @@ function Table({
         />
       )}
       {/* The next player's screen waits for a sale animation to finish, so whoever built sees it. */}
-      {hidden && player !== null && !sale && <Handoff name={names[player]!} onReady={() => setRevealedFor(player)} />}
+      {hidden && player !== null && !sale && (
+        <Handoff
+          name={names[player]!}
+          names={names}
+          recap={recap}
+          onReady={() => {
+            setRevealedFor(player);
+            setRecent({
+              slots: new Set(recap.flatMap((r) => r.slots)),
+              links: new Set(recap.flatMap((r) => r.links)),
+              at: match.log.length,
+            });
+          }}
+        />
+      )}
       {outcome && <GameOver outcome={outcome} names={names} onNewGame={onNewGame} />}
     </div>
   );

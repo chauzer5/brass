@@ -186,6 +186,9 @@ export interface Highlights {
   /** Merchants to tap: to sell a tile to, or for their beer; and the chosen one. */
   merchants?: Set<brass.LocationId>;
   selectedMerchant?: brass.LocationId | null;
+  /** What the other players built or sold since this player's last turn, glowing until they start acting. */
+  recentSlots?: Set<brass.SlotKey>;
+  recentLinks?: Set<string>;
 }
 
 export function highlights(state: brass.BrassView, player: number, legal: readonly brass.BrassAction[], d: Draft): Highlights {

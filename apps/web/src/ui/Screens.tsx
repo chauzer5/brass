@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { GameCard } from './HandTray.tsx';
 import { IncomeTrack } from './IncomeTrack.tsx';
 import { PlayerMat } from './PlayerMat.tsx';
+import type { RecapItem } from '../game/recap.ts';
 import { useTheme, type ThemeSetting } from '../settings.ts';
 
 export function NewGame({ onStart, onResume }: { onStart: (names: string[]) => void; onResume?: (() => void) | undefined }) {
@@ -175,11 +176,37 @@ export function MatSheet({
   );
 }
 
-export function Handoff({ name, onReady }: { name: string; onReady: () => void }) {
+export function Handoff({
+  name,
+  names,
+  recap,
+  onReady,
+}: {
+  name: string;
+  names: readonly string[];
+  /** What the other players did since this player's last turn. */
+  recap: readonly RecapItem[];
+  onReady: () => void;
+}) {
   return (
     <div className="overlay">
-      <div className="screen-card">
+      <div className="screen-card handoff">
         <h2>{name}'s turn</h2>
+        {recap.length > 0 && (
+          <section className="recap">
+            <h3>Since your last turn</h3>
+            <ol>
+              {recap.map((r, i) => (
+                <li key={i}>
+                  <span className={`dot owner-${r.player}`} aria-hidden />
+                  <span>
+                    <strong>{names[r.player]}</strong> {r.text}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
         <p className="muted">Pass the device to {name}, then tap to see your hand.</p>
         <button className="confirm" onClick={onReady} autoFocus>
           I'm {name}
