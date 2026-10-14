@@ -695,6 +695,7 @@ button {
   align-self: flex-end;
 }
 
+.seat-kind button:disabled,
 .seat-difficulty button:disabled {
   opacity: 0.45;
   cursor: default;

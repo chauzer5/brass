@@ -36,6 +36,11 @@ export function NewGame({
   };
   const chosen = seats.slice(0, count);
   const humans = chosen.filter((s) => s.kind === 'human').length;
+  // At least one player is human. Dropping seats could leave only bots: then the first seat becomes human again.
+  const changeCount = (n: number) => {
+    setCount(n);
+    if (!seats.slice(0, n).some((s) => s.kind === 'human')) setSeat(0, HUMAN);
+  };
 
   return (
     <div className="screen">
@@ -43,9 +48,7 @@ export function NewGame({
         <img src="/icon.svg" alt="" className="menu-logo" />
         <h1 className="menu-title">Brass: Birmingham</h1>
         <p className="muted">
-          {humans === 0
-            ? 'Bots only: watch them play.'
-            : humans === 1
+          {humans === 1
               ? 'You against the bots.'
               : 'Pass the device between players; bots take their turns on their own.'}
         </p>
@@ -57,7 +60,7 @@ export function NewGame({
         <h3>Players</h3>
         <div className="segmented" role="radiogroup" aria-label="Number of players">
           {[2, 3, 4].map((n) => (
-            <button key={n} role="radio" aria-checked={count === n} className={count === n ? 'selected' : ''} onClick={() => setCount(n)}>
+            <button key={n} role="radio" aria-checked={count === n} className={count === n ? 'selected' : ''} onClick={() => changeCount(n)}>
               {n}
             </button>
           ))}
@@ -81,6 +84,8 @@ export function NewGame({
                         role="radio"
                         aria-checked={seat.kind === kind}
                         className={seat.kind === kind ? 'selected' : ''}
+                        disabled={kind === 'bot' && seat.kind === 'human' && humans === 1}
+                        title={kind === 'bot' && seat.kind === 'human' && humans === 1 ? 'At least one player must be human' : undefined}
                         onClick={() => setSeat(i, kind === 'human' ? HUMAN : { kind: 'bot', difficulty: 'normal' })}
                       >
                         {kind === 'human' ? 'Human' : 'Bot'}
