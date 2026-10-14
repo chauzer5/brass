@@ -1155,6 +1155,8 @@ button {
   overflow-y: auto;
   overscroll-behavior: contain;
   display: grid;
+  /* One column, never wider than the screen: wide content (the income track) scrolls inside instead of stretching the card. */
+  grid-template-columns: minmax(0, 1fr);
   place-items: center;
   padding: 16px;
 }
@@ -2162,7 +2164,13 @@ button {
 
 .mat-sheet {
   gap: 8px;
-  padding: 14px;
+  /* Narrow sides, so the mat's rows get about as much width as in the tray. */
+  padding: 12px 8px;
+}
+
+.mat-overlay {
+  padding-left: 8px;
+  padding-right: 8px;
 }
 
 .mat-sheet-header {
