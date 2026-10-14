@@ -217,6 +217,9 @@ export function PlayerMat({
               {levels.map((def) => {
                 const left = player.mat[industry][def.level - 1] ?? 0;
                 const going = removed[def.level - 1] ?? 0;
+                // The picks that take a tile from this level: the lowest levels go first.
+                const before = removed.slice(0, def.level - 1).reduce((a, n) => a + n, 0);
+                const pickHere = order.slice(before, before + going);
                 return (
                   <span
                     key={def.level}
@@ -237,6 +240,23 @@ export function PlayerMat({
                       ))}
                     </span>
                     {def.cannotDevelop && <span className="mat-bulb" title="Can't be developed" />}
+                    {pickHere.length > 0 && (
+                      <span className="mat-picks">
+                        {pickHere.map((i) => (
+                          <button
+                            key={i}
+                            className="mat-pick"
+                            aria-label={`Undo pick ${i + 1}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onUnpick?.(i);
+                            }}
+                          >
+                            {i + 1}
+                          </button>
+                        ))}
+                      </span>
+                    )}
                   </span>
                 );
               })}
@@ -246,8 +266,8 @@ export function PlayerMat({
                 // Drawn over the next tile's stats, so the row keeps its height while sliding.
                 <span className="mat-held-card">
                   <span className="mat-held-label">
-                    {INDUSTRY_NAME[industry]} {roman(heldTile.level)} · {player.mat[industry][heldTile.level - 1] ?? 0} of{' '}
-                    {heldTile.count} left
+                    {/* The row already says which industry; keep the label short so the card stays clear of the boxes. */}
+                    Level {roman(heldTile.level)} · {player.mat[industry][heldTile.level - 1] ?? 0} of {heldTile.count} left
                   </span>
                   <TileStats tile={heldTile} />
                   {[
@@ -272,23 +292,6 @@ export function PlayerMat({
                 <span className="muted">All built</span>
               )}
             </span>
-            {choosing && (
-              <span className="mat-picks">
-                {order.map((i) => (
-                  <button
-                    key={i}
-                    className="mat-pick"
-                    aria-label={`Undo pick ${i + 1}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onUnpick?.(i);
-                    }}
-                  >
-                    {i + 1}
-                  </button>
-                ))}
-              </span>
-            )}
           </div>
         );
       })}

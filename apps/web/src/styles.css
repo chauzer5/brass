@@ -1355,7 +1355,8 @@ button {
 
 .mat-row {
   display: grid;
-  grid-template-columns: 26px 140px 1fr;
+  /* The track fits 8 square levels (Manufacturers); the stats sit against the right edge. */
+  grid-template-columns: 26px 190px 1fr;
   align-items: center;
   gap: 8px;
   padding: 5px 0;
@@ -1403,29 +1404,39 @@ button {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--danger) 35%, transparent);
 }
 
-.player-mat.choosing .mat-row {
-  grid-template-columns: 26px 140px 1fr auto;
-}
-
+/* Develop picks: numbered badges on the corner of the level box each one removes. */
 .mat-picks {
+  position: absolute;
+  z-index: 1;
+  top: -9px;
+  right: -9px;
   display: flex;
-  gap: 4px;
+  gap: 1px;
 }
 
 .mat-pick {
+  position: relative;
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: 17px;
+  height: 17px;
   padding: 0;
-  border: 0;
+  border: 1.5px solid var(--surface);
   border-radius: 50%;
   background: var(--danger);
   color: var(--surface);
   font: inherit;
-  font-size: 13px;
+  font-size: 10px;
   font-weight: 800;
+  line-height: 1;
   cursor: pointer;
+}
+
+/* A bigger invisible target than the badge itself. */
+.mat-pick::after {
+  content: '';
+  position: absolute;
+  inset: -7px;
 }
 
 .mat-icon {
@@ -1444,9 +1455,12 @@ button {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  width: 15.5px;
-  padding: 2px 0 3px;
+  justify-content: center;
+  gap: 3px;
+  width: 22px;
+  height: 22px;
+  box-sizing: border-box;
+  padding: 0;
   border-radius: 4px;
   border: 1px solid var(--line);
   border-bottom-width: 3px;
@@ -1465,7 +1479,8 @@ button {
 }
 
 .mat-level.held {
-  z-index: 1;
+  /* Above the stats card, which can spread left over the track. */
+  z-index: 3;
   opacity: 1;
   transform: translateY(-3px) scale(1.25);
   background: var(--surface);
@@ -1479,8 +1494,10 @@ button {
 .mat-held-card {
   position: absolute;
   z-index: 2;
-  left: -6px;
   right: -6px;
+  min-width: calc(100% + 12px);
+  width: max-content;
+  text-align: left;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
@@ -1563,6 +1580,8 @@ button {
 .mat-next {
   display: flex;
   flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
   min-width: 0;
   font-size: 12px;
   line-height: 1.35;
@@ -1571,6 +1590,7 @@ button {
 .mat-next .tile-stats {
   display: flex;
   flex-direction: column;
+  align-items: flex-end;
 }
 
 .mat-next .tile-cost {
