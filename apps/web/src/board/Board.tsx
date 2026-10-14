@@ -18,7 +18,7 @@ const GAP = 5;
 const NO_HIGHLIGHTS: Highlights = { slots: new Set(), links: new Set(), selectedSlots: new Set(), selectedLinks: new Set() };
 
 interface BoardProps {
-  state?: Pick<brass.BrassView, 'tiles' | 'links' | 'merchants' | 'coalMarket' | 'ironMarket' | 'players' | 'turnOrder' | 'turnIndex' | 'phase' | 'deckSize'>;
+  state?: Pick<brass.BrassView, 'tiles' | 'links' | 'merchants' | 'coalMarket' | 'ironMarket' | 'players' | 'turnOrder' | 'turnIndex' | 'phase' | 'deckSize' | 'era'>;
   /** Player names, for the turn order panel. */
   names?: readonly string[] | undefined;
   /** Tapping the discard pile. */
@@ -45,6 +45,84 @@ function linkPath(ends: readonly brass.LocationId[]): string {
   const mx = (a!.x + b!.x) / 2;
   const my = (a!.y + b!.y) / 2;
   return `M ${a!.x} ${a!.y} L ${b!.x} ${b!.y} M ${mx} ${my} L ${c.x} ${c.y}`;
+}
+
+/** The box a location takes up on the map, relative to its position (spaces, ribbon, or merchant stall). */
+function footprint(id: brass.LocationId) {
+  const loc = brass.LOCATION_BY_ID[id];
+  const pad = 6;
+  if (loc.kind === 'merchant') {
+    const width = Math.max(92, loc.spaces * SPACE_WIDTH + 16);
+    return { left: -width / 2 - pad, right: width / 2 + pad, top: -30 - pad, bottom: 52 + pad };
+  }
+  const { width, height } = slotLayout(loc.slots.length);
+  // Towns have a name ribbon below their spaces.
+  const below = loc.kind === 'town' ? height / 2 + 22 : height / 2;
+  return { left: -width / 2 - pad, right: width / 2 + pad, top: -height / 2 - pad, bottom: below + pad };
+}
+
+/**
+ * Where a link's token sits: the middle of the longest stretch of the line
+ * that isn't under either end's spaces, so it never covers a town.
+ */
+function tokenSpot(ends: readonly brass.LocationId[]): { x: number; y: number } {
+  const [a, b] = ends.slice(0, 2).map((id) => ({ pos: brass.LOCATION_BY_ID[id].pos, box: footprint(id) }));
+  const inside = (p: { x: number; y: number }, e: typeof a) =>
+    p.x > e!.pos.x + e!.box.left && p.x < e!.pos.x + e!.box.right && p.y > e!.pos.y + e!.box.top && p.y < e!.pos.y + e!.box.bottom;
+  const at = (t: number) => ({ x: a!.pos.x + (b!.pos.x - a!.pos.x) * t, y: a!.pos.y + (b!.pos.y - a!.pos.y) * t });
+  let best = { from: 0.5, to: 0.5 };
+  let start: number | null = null;
+  for (let i = 0; i <= 100; i++) {
+    const t = i / 100;
+    const clear = !inside(at(t), a) && !inside(at(t), b);
+    if (clear && start === null) start = t;
+    if ((!clear || i === 100) && start !== null) {
+      const end = clear ? t : (i - 1) / 100;
+      if (end - start > best.to - best.from) best = { from: start, to: end };
+      start = null;
+    }
+  }
+  return at((best.from + best.to) / 2);
+}
+
+/** Token positions, worked out on first use (they depend on layout constants defined further down). */
+let tokenSpots: Map<string, { x: number; y: number }> | null = null;
+const spotFor = (id: string) => (tokenSpots ??= new Map(brass.LINKS.map((l) => [l.id, tokenSpot(l.ends)]))).get(id)!;
+const TOKEN_W = 29;
+const TOKEN_H = 22;
+const TOKEN_ICON = 1.25;
+
+/** A claimed link's piece: a boat in the Canal Era, a train in the Rail Era, in its owner's colour. */
+function LinkToken({ id, owner, rail }: { id: string; owner: number; rail: boolean }) {
+  const { x, y } = spotFor(id);
+  return (
+    <g className={`link-token owner-${owner}`} transform={`translate(${x - TOKEN_W / 2} ${y - TOKEN_H / 2})`}>
+      <rect width={TOKEN_W} height={TOKEN_H} rx={5} className="link-token-bg" />
+      <g
+        transform={`translate(${(TOKEN_W - 16 * TOKEN_ICON) / 2} ${(TOKEN_H - 16 * TOKEN_ICON) / 2 + 0.5}) scale(${TOKEN_ICON})`}
+        className="link-token-icon"
+      >
+        {rail ? (
+          <>
+            {/* Locomotive: boiler, cab, chimney and wheels. */}
+            <rect x={1.5} y={6} width={9} height={5} rx={1} />
+            <rect x={9.5} y={2.5} width={5} height={8.5} rx={0.8} />
+            <rect x={3} y={2.5} width={2.2} height={3.5} />
+            <circle cx={4} cy={13} r={1.9} />
+            <circle cx={8.5} cy={13} r={1.9} />
+            <circle cx={12.5} cy={13} r={1.9} />
+          </>
+        ) : (
+          <>
+            {/* Narrowboat: hull with a cabin. */}
+            <path d="M0.5 9 H15.5 L13 13 H3 Z" />
+            <rect x={5} y={5} width={7} height={4} rx={0.8} />
+            <rect x={2.5} y={6.5} width={1.6} height={2.5} />
+          </>
+        )}
+      </g>
+    </g>
+  );
 }
 
 /** Grid of a town's spaces: one row for up to 2, otherwise 2 columns (a 2×2 grid for 3–4). */
@@ -222,6 +300,11 @@ export function Board({ state, names, onDiscards, highlights = NO_HIGHLIGHTS, on
             );
           })}
           </g>
+
+          {/* Claimed links' pieces, above every line so crossings never hide one. */}
+          {Object.entries(links).map(([id, owner]) => (
+            <LinkToken key={id} id={id} owner={owner} rail={state?.era === 'rail'} />
+          ))}
 
           {brass.LOCATIONS.map((loc) => (
             <g key={loc.id} data-location={loc.id}>

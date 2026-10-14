@@ -451,13 +451,29 @@ button {
 
 .link-owned {
   stroke: var(--owner);
-  stroke-width: 9;
+  stroke-width: 5;
+}
+
+/* A claimed link's boat or train piece. */
+.link-token {
+  pointer-events: none;
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.4));
+}
+
+.link-token-bg {
+  fill: var(--owner);
+  stroke: #fff6dc;
+  stroke-width: 1.5;
+}
+
+.link-token-icon {
+  fill: #fff;
 }
 
 /* Dark in both themes: player colours are mid-tones, so a dark track reads on all of them. */
 .link-rail.link-rail-over {
   stroke: #1f140d;
-  stroke-width: 3.5;
+  stroke-width: 2.5;
   stroke-opacity: 0.9;
 }
 
