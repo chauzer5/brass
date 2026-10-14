@@ -1,4 +1,4 @@
-import { randomSeed, type BotInput } from '@brass/engine';
+import { brass, randomSeed, type BotInput } from '@brass/engine';
 import type { BotRequest, BotResponse } from './bot.worker.ts';
 
 let worker: Worker | null = null;
@@ -21,10 +21,13 @@ function getWorker(): Worker {
 }
 
 /** Asks the bot worker for a move. */
-export function runBot<View, Action>(input: BotInput<View, Action>): Promise<Action> {
+export function runBot(
+  input: BotInput<brass.BrassView, brass.BrassAction>,
+  difficulty: brass.BotDifficulty,
+): Promise<brass.BrassAction> {
   const id = nextId++;
-  const request: BotRequest = { id, input, seed: randomSeed() };
-  return new Promise<Action>((resolve, reject) => {
+  const request: BotRequest = { id, input, difficulty, seed: randomSeed() };
+  return new Promise<brass.BrassAction>((resolve, reject) => {
     pending.set(id, { resolve: resolve as (a: unknown) => void, reject });
     getWorker().postMessage(request);
   });

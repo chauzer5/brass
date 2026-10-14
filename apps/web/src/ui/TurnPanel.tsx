@@ -16,6 +16,7 @@ import { INDUSTRY_NAME, cardName, linkName, locationName, roman, slotName } from
 import { ACTION_LABEL } from './ActionRail.tsx';
 import { ActionIcon, IndustryIcon } from './icons.tsx';
 import { IncomeTrack } from './IncomeTrack.tsx';
+import type { RecapItem } from '../game/recap.ts';
 import { TileStats } from './PlayerMat.tsx';
 import { choosable, chosenSource, gloucesterOptions, sourceNeeds, withPicks, type Need, type ResourceKind } from '../game/sources.ts';
 
@@ -31,13 +32,15 @@ interface StepPanelProps {
   full: brass.BrassState;
   /** Names of players, for naming whose tile a source is. */
   names: readonly string[];
+  /** What the others did since this player's last turn, shown until they pick an action. */
+  recap?: readonly RecapItem[];
 }
 
 /**
  * The choices left for the action being put together, and Confirm. Actions
  * are picked from the rail and cards from the hand; this panel holds the rest.
  */
-export function StepPanel({ view, player, legal, draft, setDraft, validate, onPlay, full, names }: StepPanelProps) {
+export function StepPanel({ view, player, legal, draft, setDraft, validate, onPlay, full, names, recap = [] }: StepPanelProps) {
   const me = view.players[player]!;
   const cards = view.cards;
 
@@ -63,7 +66,26 @@ export function StepPanel({ view, player, legal, draft, setDraft, validate, onPl
   }
 
   if (!draft.kind) {
-    return <p className="hint">Choose an action from the side of the board.</p>;
+    return (
+      <>
+        {recap.length > 0 && (
+          <section className="recap tray-recap">
+            <h3>Since your last turn</h3>
+            <ol>
+              {recap.map((r, i) => (
+                <li key={i}>
+                  <span className={`dot owner-${r.player}`} aria-hidden />
+                  <span>
+                    <strong>{names[r.player]}</strong> {r.text}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
+        <p className="hint">Choose an action from the side of the board.</p>
+      </>
+    );
   }
 
   // The action with any chosen coal/iron/beer sources filled in.

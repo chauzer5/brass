@@ -1,4 +1,4 @@
-import { createRng, randomBot, type BotInput } from '@brass/engine';
+import { brass, createRng, type BotInput } from '@brass/engine';
 
 /**
  * Runs bots off the main thread so search-based bots never freeze the UI.
@@ -6,7 +6,8 @@ import { createRng, randomBot, type BotInput } from '@brass/engine';
  */
 export interface BotRequest {
   id: number;
-  input: BotInput<unknown, unknown>;
+  input: BotInput<brass.BrassView, brass.BrassAction>;
+  difficulty: brass.BotDifficulty;
   seed: number;
 }
 
@@ -16,13 +17,14 @@ export interface BotResponse {
   error?: string;
 }
 
-const bot = randomBot<unknown, unknown>();
+const bots = new Map<brass.BotDifficulty, ReturnType<typeof brass.brassBot>>();
+const botFor = (d: brass.BotDifficulty) => bots.get(d) ?? bots.set(d, brass.brassBot(d)).get(d)!;
 const port = self as unknown as Worker;
 
 port.addEventListener('message', (event: MessageEvent<BotRequest>) => {
-  const { id, input, seed } = event.data;
+  const { id, input, difficulty, seed } = event.data;
   try {
-    const response: BotResponse = { id, action: bot(input, createRng(seed)) };
+    const response: BotResponse = { id, action: botFor(difficulty)(input, createRng(seed)) };
     port.postMessage(response);
   } catch (err) {
     const response: BotResponse = { id, error: err instanceof Error ? err.message : String(err) };

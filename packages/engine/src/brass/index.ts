@@ -9,3 +9,4 @@ export * from './game.ts';
 export { RuleError, type BeerSource, type CubeSource } from './resources.ts';
 export * from './data/cards.ts';
 export * from './data/merchants.ts';
+export * from './bot.ts';

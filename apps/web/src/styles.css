@@ -648,6 +648,75 @@ button {
   box-shadow: var(--shadow);
 }
 
+/* ---- Seats on the New Game screen: human or bot, and the bot's difficulty ---- */
+
+.seat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.seat .name-row input {
+  min-width: 0;
+  flex: 1;
+}
+
+.seat-kind,
+.seat-difficulty {
+  display: inline-flex;
+  flex: none;
+  padding: 2px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--line) 45%, transparent);
+}
+
+.seat-kind button,
+.seat-difficulty button {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.seat-kind button.selected,
+.seat-difficulty button.selected {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.seat-difficulty {
+  align-self: flex-end;
+}
+
+.seat-difficulty button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.seat-difficulty small {
+  margin-left: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.bot-thinking {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tray-recap ol {
+  max-height: 120px;
+}
+
 /* ---- The ☰ menu ---- */
 
 .menu-backdrop {

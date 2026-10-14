@@ -11,17 +11,21 @@ import { PlayerMat } from './ui/PlayerMat.tsx';
 import { DiscardSheet, EraSummary, GameLogSheet, Handoff, Settings, MatSheet, NewGame, PlayerStrip } from './ui/Screens.tsx';
 import { StepPanel, pickCard, tapMatRow, tapMerchant, tapSlot } from './ui/TurnPanel.tsx';
 import { choosable, chosenSource, sourceNeeds } from './game/sources.ts';
-import { gameLog, recapSince } from './game/recap.ts';
+import { gameLog, recapSince, type RecapItem } from './game/recap.ts';
+import { runBot } from './bot/runBot.ts';
+
+/** Pause before each bot action, so people can see what's happening. */
+const BOT_PAUSE_MS = 900;
 
 export function App() {
-  const { game, start, play, undoLast, quit } = useGame();
+  const { game, start, play, playBot, undoLast, quit } = useGame();
   const [showSetup, setShowSetup] = useState(!game);
 
   if (!game || showSetup) {
     return (
       <NewGame
-        onStart={(names) => {
-          start(names);
+        onStart={(names, seats) => {
+          start(names, seats);
           setShowSetup(false);
         }}
         onResume={game && !brass.brassGame.outcome(game.match.state) ? () => setShowSetup(false) : undefined}
@@ -32,6 +36,7 @@ export function App() {
     <Table
       game={game}
       play={play}
+      playBot={playBot}
       undoLast={undoLast}
       onMenu={() => setShowSetup(true)}
       onNewGame={() => {
@@ -45,22 +50,31 @@ export function App() {
 function Table({
   game,
   play,
+  playBot,
   undoLast,
   onMenu,
   onNewGame,
 }: {
   game: Game;
   play: (player: number, action: brass.BrassAction) => string | null;
+  playBot: (player: number, action: brass.BrassAction, at: number) => void;
   undoLast: () => void;
   onMenu: () => void;
   onNewGame: () => void;
 }) {
-  const { match, names } = game;
+  const { match, names, seats } = game;
   const state = match.state;
-  const player = brass.currentPlayer(state);
+  // Whose turn it is; `player` is that player only when it's a human at the device (bots play themselves).
+  const active = brass.currentPlayer(state);
+  const isBot = (id: number) => seats[id]?.kind === 'bot';
+  const humans = seats.flatMap((s, i) => (s.kind === 'human' ? [i] : []));
+  const player = active !== null && !isBot(active) ? active : null;
+  // With one human, their hand stays on screen through the bots' turns; with several, nobody's does.
+  const soleHuman = humans.length === 1 ? humans[0]! : null;
+  const handOwner = player ?? soleHuman;
   const outcome = brass.brassGame.outcome(state);
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
-  const [revealedFor, setRevealedFor] = useState<number | null>(names.length === 1 ? player : null);
+  const [revealedFor, setRevealedFor] = useState<number | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [tucked, setTucked] = useState(false);
   const [trayTab, setTrayTab] = useState<TrayTab>('hand');
@@ -75,7 +89,7 @@ function Table({
   // A new player (or a new phase) starts with a fresh draft.
   useEffect(() => setDraft(EMPTY_DRAFT), [player, state.phase.kind, match.log.length]);
 
-  const viewer = player ?? 0;
+  const viewer = handOwner ?? 0;
   const view = useMemo(() => brass.brassGame.viewFor(state, viewer), [state, viewer]);
   const legal = useMemo(() => (player === null ? [] : brass.brassGame.legalActions(state, player)), [state, player]);
   // Coal, iron and beer the action needs, and the one whose source the map is choosing.
@@ -151,7 +165,8 @@ function Table({
     return true;
   };
 
-  const hidden = player !== null && revealedFor !== player;
+  // Pass-the-device screens are only needed between people.
+  const hidden = player !== null && humans.length > 1 && revealedFor !== player;
 
   // An era that ends while playing shows its scoring before anything else (and the game's end stays up until
   // dismissed to look at the board). Eras that ended before this game was opened aren't shown again.
@@ -167,6 +182,18 @@ function Table({
   );
   const [recent, setRecent] = useState<{ slots: Set<brass.SlotKey>; links: Set<string>; at: number } | null>(null);
   const showRecent = recent && recent.at === match.log.length && !draft.kind && !hidden;
+  // Playing alone against bots there's no handoff screen: when the turn comes back, what the bots did is
+  // listed in the tray (and glows on the map) instead.
+  const [idleRecap, setIdleRecap] = useState<RecapItem[]>([]);
+  const lastController = useRef<number | null>(null);
+  useEffect(() => {
+    if (humans.length === 1 && player !== null && lastController.current !== player) {
+      const items = recapSince(match, player);
+      setIdleRecap(items);
+      setRecent({ slots: new Set(items.flatMap((r) => r.slots)), links: new Set(items.flatMap((r) => r.links)), at: match.log.length });
+    }
+    lastController.current = player;
+  }, [player, match.log.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const shown = useMemo(
     () => (showRecent ? { ...lit, recentSlots: recent!.slots, recentLinks: recent!.links } : lit),
     [lit, showRecent, recent],
@@ -180,7 +207,7 @@ function Table({
     if (!error) setDraft(EMPTY_DRAFT);
   };
 
-  const p = player === null ? null : view.players[player]!;
+  const p = handOwner === null ? null : view.players[handOwner]!;
   const actionsThisTurn = brass.actionsThisTurn(state);
   const coalPrice = state.coalMarket > 0 ? brass.COAL_MARKET.prices[brass.COAL_MARKET.prices.length - state.coalMarket] : brass.COAL_MARKET.emptyPrice;
   const ironPrice = state.ironMarket > 0 ? brass.IRON_MARKET.prices[brass.IRON_MARKET.prices.length - state.ironMarket] : brass.IRON_MARKET.emptyPrice;
@@ -188,6 +215,8 @@ function Table({
   const usable = draft.kind ? usableCards(view.cards, hand, legal, draft.kind) : null;
   const selectedCards = new Set(draft.kind === 'scout' ? draft.scoutCards : draft.card ? [draft.card] : []);
   const showControls = player !== null && !hidden;
+  // The hand (and board) tray: shown to the human in control, or to the only human while bots play.
+  const showTray = handOwner !== null && !hidden;
   // Develop, once its card is chosen, is played by tapping industries on the mat.
   const developing = draft.kind === 'develop' && draft.card !== null;
   const developable = useMemo(() => new Set(developIndustries(view.cards, legal, draft)), [view.cards, legal, draft]);
@@ -217,6 +246,34 @@ function Table({
     const t = window.setTimeout(() => setSale(null), saleDuration(sale) + 100);
     return () => clearTimeout(t);
   }, [sale]);
+
+  // Bots take their own turns: one action at a time, after a pause so the table can follow along, and not
+  // while an animation or the end-of-era summary is showing.
+  const botTurn = active !== null && isBot(active) && !outcome && !summaryOpen && !sale;
+  useEffect(() => {
+    if (!botTurn || active === null) return;
+    const seat = seats[active]!;
+    if (seat.kind !== 'bot') return;
+    let cancelled = false;
+    const at = match.log.length;
+    const timer = window.setTimeout(() => {
+      const input = {
+        player: active,
+        view: brass.brassGame.viewFor(state, active),
+        legalActions: brass.brassGame.legalActions(state, active),
+      };
+      runBot(input, seat.difficulty)
+        .then((action) => {
+          if (!cancelled) playBot(active, action, at);
+        })
+        .catch((err) => console.error('Bot failed:', err));
+    }, BOT_PAUSE_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [botTurn, active, match.log.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
 
   // Cards new to a player's hand since they last saw it fly in from the deck: the deal, the
   // end-of-turn draw (seen when the player next takes the device), and Wild cards from scouting.
@@ -263,10 +320,10 @@ function Table({
       <PlayerStrip
         view={view}
         names={names}
-        active={player}
+        active={active}
         onSelect={(id) => {
           // Your own mat lives in the tray; anyone else's opens in a sheet.
-          if (id === player && showControls) {
+          if (id === handOwner && showTray) {
             setTrayTab('mat');
             setTucked(false);
           } else setMatFor(id);
@@ -318,7 +375,7 @@ function Table({
             onUndo={undoLast}
           />
         )}
-        {showControls && (
+        {showTray && (
           <HandTray
             cards={view.cards}
             hand={hand}
@@ -341,7 +398,7 @@ function Table({
               <>
               <div className="tray-income">
                 <h3>Income</h3>
-                <IncomeTrack players={view.players} focus={player!} />
+                <IncomeTrack players={view.players} focus={handOwner!} />
               </div>
               {developing ? (
                 <PlayerMat
@@ -365,17 +422,26 @@ function Table({
             }
           >
             {message && <p className="error">{message}</p>}
-            <StepPanel
-              view={view}
-              player={player}
-              legal={legal}
-              draft={draft}
-              setDraft={setDraft}
-              validate={(a) => brass.brassGame.validate(state, player, a)}
-              full={state}
-              names={names}
-              onPlay={submit}
-            />
+            {player !== null ? (
+              <StepPanel
+                view={view}
+                player={player}
+                legal={legal}
+                draft={draft}
+                setDraft={setDraft}
+                validate={(a) => brass.brassGame.validate(state, player, a)}
+                full={state}
+                names={names}
+                onPlay={submit}
+                recap={showRecent && humans.length === 1 ? idleRecap : []}
+              />
+            ) : (
+              active !== null && (
+                <p className="hint bot-thinking">
+                  <span className={`dot owner-${active}`} aria-hidden /> {names[active]} is playing…
+                </p>
+              )
+            )}
           </HandTray>
         )}
       </main>

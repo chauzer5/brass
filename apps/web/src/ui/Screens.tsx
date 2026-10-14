@@ -1,22 +1,54 @@
 import { brass, type Outcome } from '@brass/engine';
 import { useEffect, useRef, useState } from 'react';
+import { HUMAN, type Seat } from '../game/useGame.ts';
 import { GameCard } from './HandTray.tsx';
 import { IncomeTrack } from './IncomeTrack.tsx';
 import { PlayerMat } from './PlayerMat.tsx';
 import type { LogEntry, RecapItem } from '../game/recap.ts';
 import { useTheme, type ThemeSetting } from '../settings.ts';
 
-export function NewGame({ onStart, onResume }: { onStart: (names: string[]) => void; onResume?: (() => void) | undefined }) {
+const DIFFICULTY_LABEL: Record<brass.BotDifficulty, string> = { easy: 'Easy', normal: 'Normal', hard: 'Hard' };
+
+export function NewGame({
+  onStart,
+  onResume,
+}: {
+  onStart: (names: string[], seats: Seat[]) => void;
+  onResume?: (() => void) | undefined;
+}) {
   const [count, setCount] = useState(2);
   const [names, setNames] = useState(['Player 1', 'Player 2', 'Player 3', 'Player 4']);
+  const [seats, setSeats] = useState<Seat[]>([HUMAN, HUMAN, HUMAN, HUMAN]);
   const [showSettings, setShowSettings] = useState(false);
   if (showSettings) return <Settings onClose={() => setShowSettings(false)} />;
+
+  const setSeat = (i: number, seat: Seat) => {
+    setSeats((ss) => ss.map((s, j) => (j === i ? seat : s)));
+    // Default names follow the seat: "Player 2" becomes "Bot 2" and back, but a typed name is kept.
+    setNames((ns) =>
+      ns.map((n, j) => {
+        if (j !== i) return n;
+        if (seat.kind === 'bot' && n === `Player ${i + 1}`) return `Bot ${i + 1}`;
+        if (seat.kind === 'human' && n === `Bot ${i + 1}`) return `Player ${i + 1}`;
+        return n;
+      }),
+    );
+  };
+  const chosen = seats.slice(0, count);
+  const humans = chosen.filter((s) => s.kind === 'human').length;
+
   return (
     <div className="screen">
       <div className="screen-card">
         <img src="/icon.svg" alt="" className="menu-logo" />
         <h1 className="menu-title">Brass: Birmingham</h1>
-        <p className="muted">Pass-and-play on one device. Bot opponents are coming next.</p>
+        <p className="muted">
+          {humans === 0
+            ? 'Bots only: watch them play.'
+            : humans === 1
+              ? 'You against the bots.'
+              : 'Pass the device between players; bots take their turns on their own.'}
+        </p>
         {onResume && (
           <button className="confirm" onClick={onResume}>
             Resume saved game
@@ -31,18 +63,60 @@ export function NewGame({ onStart, onResume }: { onStart: (names: string[]) => v
           ))}
         </div>
         <div className="name-list">
-          {names.slice(0, count).map((name, i) => (
-            <label key={i} className="name-row">
-              <span className={`dot owner-${i}`} aria-hidden />
-              <input
-                value={name}
-                aria-label={`Player ${i + 1} name`}
-                onChange={(e) => setNames((ns) => ns.map((n, j) => (j === i ? e.target.value : n)))}
-              />
-            </label>
-          ))}
+          {names.slice(0, count).map((name, i) => {
+            const seat = seats[i]!;
+            return (
+              <div key={i} className="seat">
+                <div className="name-row">
+                  <span className={`dot owner-${i}`} aria-hidden />
+                  <input
+                    value={name}
+                    aria-label={`Player ${i + 1} name`}
+                    onChange={(e) => setNames((ns) => ns.map((n, j) => (j === i ? e.target.value : n)))}
+                  />
+                  <span className="seat-kind" role="radiogroup" aria-label={`Player ${i + 1}: human or bot`}>
+                    {(['human', 'bot'] as const).map((kind) => (
+                      <button
+                        key={kind}
+                        role="radio"
+                        aria-checked={seat.kind === kind}
+                        className={seat.kind === kind ? 'selected' : ''}
+                        onClick={() => setSeat(i, kind === 'human' ? HUMAN : { kind: 'bot', difficulty: 'normal' })}
+                      >
+                        {kind === 'human' ? 'Human' : 'Bot'}
+                      </button>
+                    ))}
+                  </span>
+                </div>
+                {seat.kind === 'bot' && (
+                  <div className="seat-difficulty" role="radiogroup" aria-label={`${name} difficulty`}>
+                    {(['easy', 'normal', 'hard'] as const).map((d) => {
+                      const ready = brass.AVAILABLE_DIFFICULTIES.includes(d);
+                      return (
+                        <button
+                          key={d}
+                          role="radio"
+                          aria-checked={seat.difficulty === d}
+                          className={seat.difficulty === d ? 'selected' : ''}
+                          disabled={!ready}
+                          title={ready ? undefined : 'Coming soon'}
+                          onClick={() => setSeat(i, { kind: 'bot', difficulty: d })}
+                        >
+                          {DIFFICULTY_LABEL[d]}
+                          {!ready && <small>soon</small>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
-        <button className="confirm" onClick={() => onStart(names.slice(0, count).map((n, i) => n.trim() || `Player ${i + 1}`))}>
+        <button
+          className="confirm"
+          onClick={() => onStart(names.slice(0, count).map((n, i) => n.trim() || `Player ${i + 1}`), chosen)}
+        >
           Start new game
         </button>
         <button className="secondary" onClick={() => setShowSettings(true)}>
