@@ -124,9 +124,12 @@ export function chooseBuildCard(cards: Cards, legal: readonly brass.BrassAction[
   return { ...next, industry };
 }
 
-/** Links that can be placed next: the first link, or the second rail link. */
+/**
+ * Links that can be placed next: the first link, or the second rail link. Any
+ * card can be used to network, so they're offered before a card is chosen too.
+ */
 export function networkLinks(cards: Cards, legal: readonly brass.BrassAction[], d: Draft): string[] {
-  if (d.kind !== 'network' || !d.card) return [];
+  if (d.kind !== 'network') return [];
   const moves = withCard(cards, legal, 'network', d.card).map((a) => a as Extract<brass.BrassAction, { type: 'network' }>);
   const firsts = [...new Set(moves.map((a) => a.links[0]!))];
   if (d.links.length === 0) return firsts;
@@ -140,7 +143,7 @@ export function networkLinks(cards: Cards, legal: readonly brass.BrassAction[], 
 
 /** Whether `networkLinks` is offering second links (rather than swaps for the first). */
 export function offersSecondLink(cards: Cards, legal: readonly brass.BrassAction[], d: Draft): boolean {
-  if (d.kind !== 'network' || !d.card || d.links.length !== 1) return false;
+  if (d.kind !== 'network' || d.links.length !== 1) return false;
   return withCard(cards, legal, 'network', d.card).some((a) => a.type === 'network' && a.links.length === 2 && a.links[0] === d.links[0]);
 }
 

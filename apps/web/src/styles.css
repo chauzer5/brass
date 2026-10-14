@@ -482,7 +482,7 @@ button {
 
 .slot.lit {
   stroke: var(--highlight);
-  stroke-width: 3;
+  stroke-width: calc(3px * var(--lit-k, 1));
   animation: pulse 1.2s ease-in-out infinite;
 }
 
@@ -499,7 +499,8 @@ button {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .slot.lit { animation: none; }
+  .slot.lit,
+  .link-lit { animation: none; }
 }
 
 .hit {
@@ -910,9 +911,15 @@ button {
 
 .link-lit {
   stroke: var(--highlight);
-  stroke-width: 8;
-  stroke-opacity: 0.6;
-  stroke-dasharray: 8 6;
+  stroke-width: calc(8px * var(--link-k, 1));
+  stroke-opacity: 0.95;
+  stroke-linecap: round;
+  animation: pulse-link 1.2s ease-in-out infinite;
+}
+
+/* Lines pulse less deeply than spaces: dimmed orange over the brown rail reads as brown. */
+@keyframes pulse-link {
+  50% { stroke-opacity: 0.55; }
 }
 
 .link-selected {
@@ -922,8 +929,9 @@ button {
 }
 
 .links.has-chosen .link-lit {
-  stroke-width: 6;
+  stroke-width: calc(6px * var(--link-k, 1));
   stroke-opacity: 0.3;
+  animation: none;
 }
 
 .link-hit {

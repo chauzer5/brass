@@ -91,9 +91,7 @@ export function StepPanel({ view, player, legal, draft, setDraft, validate, onPl
       </div>
 
       {draft.kind === 'build' && <BuildSteps view={view} me={me} legal={legal} draft={draft} setDraft={setDraft} />}
-      {draft.kind === 'network' && draft.card && (
-        <NetworkSteps view={view} legal={legal} draft={draft} setDraft={setDraft} />
-      )}
+      {draft.kind === 'network' && <NetworkSteps view={view} legal={legal} draft={draft} setDraft={setDraft} />}
       {draft.kind === 'develop' && draft.card && <DevelopSteps draft={draft} />}
       {draft.kind === 'loan' && <LoanSteps view={view} player={player} />}
       {draft.kind === 'sell' && draft.card && <SellSteps view={view} legal={legal} draft={draft} setDraft={setDraft} />}
@@ -124,6 +122,8 @@ export function pickCard(draft: Draft, id: brass.CardId, cards: Record<brass.Car
     return chosen.length < 3 ? { ...draft, scoutCards: [...chosen, id] } : draft;
   }
   if (draft.kind === 'build') return chooseBuildCard(cards, legal, draft, id);
+  // Any card can network, so links tapped before the card stay chosen.
+  if (draft.kind === 'network') return { ...draft, card: draft.card === id ? null : id, picks: {}, activeNeed: null };
   if (draft.card === id) return { ...EMPTY_DRAFT, kind: draft.kind };
   return { ...EMPTY_DRAFT, kind: draft.kind, card: id };
 }
@@ -371,7 +371,10 @@ function NetworkSteps({ view, legal, draft }: StepProps) {
   const options = networkLinks(view.cards, legal, draft).length;
   const [first, second] = draft.links;
   let hint: string;
-  if (!first) hint = `Tap a highlighted ${kind} line on the map (${options} available).`;
+  if (!first)
+    hint = draft.card
+      ? `Tap a highlighted ${kind} line on the map (${options} available).`
+      : `Tap a highlighted ${kind} line on the map (${options} available), or choose a card first.`;
   else if (second) hint = `Links: ${linkName(first)} and ${linkName(second)}. Tap one to take it back.`;
   else if (offersSecondLink(view.cards, legal, draft))
     hint = `Link: ${linkName(first)}. Tap another highlighted line for a second rail (£15, 2 coal, 1 beer in all), or confirm just this one.`;

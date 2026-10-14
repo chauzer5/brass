@@ -279,6 +279,28 @@ export function Board({
   const tiles = state?.tiles ?? {};
   const links = state?.links ?? {};
   const zoom = useRef<ReactZoomPanPinchRef>(null);
+  // Highlights are drawn in map units, so zoomed out they shrink to hairlines. --lit-k scales them up
+  // to keep them at least as visible on screen as they are zoomed in (links grow half as much).
+  const svgRef = useRef<SVGSVGElement>(null);
+  const zoomScale = useRef(1);
+  const fitHighlights = () => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    // The map is drawn "meet" in the SVG's box, then zoomed.
+    const pxPerUnit = (Math.min(svg.clientWidth, svg.clientHeight) / BOARD_SIZE) * zoomScale.current;
+    if (!pxPerUnit) return;
+    const k = Math.min(3, Math.max(1, 1 / pxPerUnit));
+    svg.style.setProperty('--lit-k', k.toFixed(2));
+    svg.style.setProperty('--link-k', (1 + (k - 1) / 2).toFixed(2));
+  };
+  useEffect(() => {
+    fitHighlights();
+    const svg = svgRef.current;
+    if (!svg) return;
+    const ro = new ResizeObserver(fitHighlights);
+    ro.observe(svg);
+    return () => ro.disconnect();
+  }, []);
 
   // Hold a space that isn't lit to see why: a bubble above the finger, gone on release.
   const [why, setWhy] = useState<{ text: string; x: number; y: number } | null>(null);
@@ -391,9 +413,13 @@ export function Board({
         {why.text}
       </div>
     )}
-    <TransformWrapper ref={zoom} minScale={MIN_SCALE} maxScale={6} doubleClick={{ mode: 'zoomIn' }}>
+    <TransformWrapper ref={zoom} minScale={MIN_SCALE} maxScale={6} doubleClick={{ mode: 'zoomIn' }} onTransform={(_, { scale }) => {
+        zoomScale.current = scale;
+        fitHighlights();
+      }}>
       <TransformComponent wrapperClass="board-viewport" contentClass="board-content">
         <svg
+          ref={svgRef}
           className="board-svg"
           viewBox={`0 0 ${BOARD_SIZE} ${BOARD_SIZE}`}
           // Pin the map to the top: the hand covers the bottom of the screen.
