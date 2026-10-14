@@ -86,6 +86,27 @@ export interface BrassState {
   coalMarket: number;
   ironMarket: number;
   merchants: MerchantSpace[];
+  /** What each era's end scored, for showing the breakdown (rulebook p.7). */
+  eraScores: EraScore[];
+}
+
+/** One player's end-of-era scoring. */
+export interface EraPlayerScore {
+  /** VPs from Link tiles, and how many Link tiles scored. */
+  linkVP: number;
+  links: number;
+  /** VPs from flipped Industry tiles, and how many there were. */
+  tileVP: number;
+  tiles: number;
+  /** VPs before and after this era's scoring. */
+  before: number;
+  after: number;
+}
+
+export interface EraScore {
+  era: Era;
+  /** By player id. */
+  players: EraPlayerScore[];
 }
 
 export interface BrassConfig {
@@ -171,6 +192,7 @@ export function setup({ playerCount, components }: BrassConfig, rng: Rng): Brass
     wildIndustries,
     tiles: {},
     links: {},
+    eraScores: [],
     coalMarket: COAL_MARKET.initialCubes,
     ironMarket: IRON_MARKET.initialCubes,
     merchants,

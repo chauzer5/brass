@@ -532,6 +532,122 @@ button {
   .link-recent { animation: none; }
 }
 
+/* ---- End of era / game over ---- */
+
+.era-summary {
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+}
+
+.era-summary h2 {
+  font-size: 22px;
+}
+
+.era-summary > .muted {
+  margin: 0;
+  font-size: 13px;
+}
+
+.era-table {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.era-table li {
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+}
+
+.era-table li.winner {
+  border-color: #c9962f;
+  background: color-mix(in srgb, #f2c230 14%, var(--bg));
+}
+
+.era-player {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.era-rank {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--token);
+  border: 1.5px solid var(--token-rim);
+  color: var(--stall-ink);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.winner .era-rank {
+  background: #f2c230;
+}
+
+.era-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.era-total {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.era-line {
+  display: flex;
+  gap: 12px;
+  margin: 4px 0 0 30px;
+  font-size: 13px;
+}
+
+.era-which {
+  width: 34px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.era-gain {
+  margin-left: auto;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.era-note {
+  margin: 0;
+  font-size: 12px;
+}
+
+.era-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* After looking at the final board, this brings the results back. */
+.results-button {
+  position: fixed;
+  z-index: 9;
+  left: 50%;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: auto;
+  padding: 0 22px;
+  box-shadow: var(--shadow);
+}
+
 /* ---- Handoff recap ---- */
 
 .recap h3 {

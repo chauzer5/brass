@@ -560,6 +560,18 @@ describe('full games', () => {
     expect(replay(brassGame, match.config, match.seed, match.log)).toEqual({ ok: true, value: match });
   });
 
+  it('records each era\'s scoring: link and flipped-tile VPs add up to the change in VP (p.7)', () => {
+    const { match } = playOut(3, 21);
+    const scores = match.state.eraScores;
+    expect(scores.map((e) => e.era)).toEqual(['canal', 'rail']);
+    for (const era of scores) {
+      for (const p of era.players) expect(p.after - p.before).toBe(p.linkVP + p.tileVP);
+    }
+    // The game ends with the rail era's scoring, so its totals are the final scores. (Between eras VPs can
+    // also change through Merchant bonuses and income shortfalls, so the eras' totals needn't chain.)
+    expect(scores[1]!.players.map((p) => p.after)).toEqual(match.state.players.map((p) => p.vp));
+  }, 30_000);
+
   it.each([2, 3, 4] as const)(
     'gives every %i-player era the printed number of rounds, with every player taking each turn',
     (n) => {
@@ -574,5 +586,7 @@ describe('full games', () => {
         expect(turns).toEqual(expected);
       }
     },
+    // Three full games each: allow for slow machines.
+    30_000,
   );
 });

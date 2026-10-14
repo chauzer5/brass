@@ -487,10 +487,16 @@ export function linkIconsAt(state: BrassState, location: LocationId): number {
 
 /** End of era scoring and maintenance (rulebook p.7). */
 function endEra(state: BrassState, rng: Rng): void {
+  // Kept for the end-of-era summary.
+  const score = state.players.map((p) => ({ linkVP: 0, links: 0, tileVP: 0, tiles: 0, before: p.vp, after: p.vp }));
+
   // 1. Score each Link tile, then remove it.
   for (const [id, owner] of Object.entries(state.links)) {
     const p = player(state, owner);
-    p.vp += LINK_BY_ID[id]!.ends.reduce((s, end) => s + linkIconsAt(state, end), 0);
+    const vp = LINK_BY_ID[id]!.ends.reduce((s, end) => s + linkIconsAt(state, end), 0);
+    p.vp += vp;
+    score[owner]!.linkVP += vp;
+    score[owner]!.links += 1;
   }
   for (const [id, owner] of Object.entries(state.links)) {
     player(state, owner).linksInSupply += 1;
@@ -499,8 +505,13 @@ function endEra(state: BrassState, rng: Rng): void {
 
   // 2. Score flipped Industry tiles.
   for (const tile of Object.values(state.tiles)) {
-    if (tile?.flipped) player(state, tile.owner).vp += tileDef(tile).vp;
+    if (!tile?.flipped) continue;
+    player(state, tile.owner).vp += tileDef(tile).vp;
+    score[tile.owner]!.tileVP += tileDef(tile).vp;
+    score[tile.owner]!.tiles += 1;
   }
+  for (const p of state.players) score[p.id]!.after = p.vp;
+  state.eraScores.push({ era: state.era, players: score });
 
   if (state.era === 'rail') {
     state.phase = { kind: 'gameOver' };

@@ -216,21 +216,106 @@ export function Handoff({
   );
 }
 
-export function GameOver({ outcome, names, onNewGame }: { outcome: Outcome; names: string[]; onNewGame: () => void }) {
+/**
+ * The end of an era (rulebook p.7): what each player scored from Link tiles and
+ * flipped Industry tiles. After the Rail Era this is the end of the game, with
+ * the final ranking and both eras' scoring.
+ */
+export function EraSummary({
+  view,
+  names,
+  outcome,
+  onContinue,
+  onNewGame,
+}: {
+  view: brass.BrassView;
+  names: readonly string[];
+  /** Set when the game is over. */
+  outcome: Outcome | null;
+  /** End of the Canal Era: carry on into the Rail Era. Game over: look at the final board. */
+  onContinue: () => void;
+  onNewGame: () => void;
+}) {
+  const final = outcome !== null;
+  const eras = view.eraScores;
+  const latest = eras.at(-1);
+  if (!latest) return null;
+  // Final ranking (ties broken by income, then money); otherwise by VP so far.
+  const order = final
+    ? outcome.ranking.map((r) => ({ id: r.player, rank: r.rank }))
+    : [...view.players]
+        .sort((a, b) => b.vp - a.vp)
+        .map((p, i, all) => ({ id: p.id, rank: 1 + all.findIndex((o) => o.vp === p.vp) }));
+  const tied = final && new Set(order.map((o) => view.players[o.id]!.vp)).size < order.length;
+  const shownEras = final ? eras : [latest];
+  const other = (id: number) => view.players[id]!.vp - eras.reduce((sum, e) => sum + e.players[id]!.after - e.players[id]!.before, 0);
+  const eraLabel = (era: brass.Era) => (era === 'canal' ? 'Canal Era' : 'Rail Era');
   return (
     <div className="overlay">
-      <div className="screen-card">
-        <h2>Game over</h2>
-        <ol className="ranking">
-          {outcome.ranking.map((r) => (
-            <li key={r.player}>
-              <span className={`dot owner-${r.player}`} aria-hidden /> {r.rank}. {names[r.player]} — {r.score} VP
-            </li>
-          ))}
+      <div className="screen-card era-summary">
+        <h2>{final ? `${names[order[0]!.id]} wins!` : 'End of the Canal Era'}</h2>
+        <p className="muted">
+          {final
+            ? 'Final scores, with what each era scored.'
+            : 'Link tiles and flipped Industry tiles have scored. Links come off the board, Level I tiles are removed, and everyone draws a new hand.'}
+        </p>
+        <ol className="era-table">
+          {order.map(({ id, rank }) => {
+            const p = view.players[id]!;
+            return (
+              <li key={id} className={final && rank === 1 ? 'winner' : ''}>
+                <div className="era-player">
+                  <span className="era-rank">{rank}</span>
+                  <span className={`dot owner-${id}`} aria-hidden />
+                  <span className="era-name">{names[id]}</span>
+                  <span className="era-total">{p.vp} VP</span>
+                </div>
+                {shownEras.map((e) => {
+                  const sc = e.players[id]!;
+                  return (
+                    <div key={e.era} className="era-line">
+                      {final && <span className="era-which">{e.era === 'canal' ? 'Canal' : 'Rail'}</span>}
+                      <span>
+                        Links <strong>{sc.linkVP}</strong> <span className="muted">({sc.links})</span>
+                      </span>
+                      <span>
+                        Tiles <strong>{sc.tileVP}</strong> <span className="muted">({sc.tiles})</span>
+                      </span>
+                      <span className="era-gain">+{sc.after - sc.before}</span>
+                    </div>
+                  );
+                })}
+                {/* VPs from outside era scoring: Merchant beer bonuses, less any lost to income shortfalls. */}
+                {final && other(id) !== 0 && (
+                  <div className="era-line">
+                    <span className="era-which">Other</span>
+                    <span className="muted">Merchant bonuses{other(id) < 0 ? ' and income shortfalls' : ''}</span>
+                    <span className="era-gain">
+                      {other(id) > 0 ? '+' : ''}
+                      {other(id)}
+                    </span>
+                  </div>
+                )}
+              </li>
+            );
+          })}
         </ol>
-        <button className="confirm" onClick={onNewGame}>
-          New game
-        </button>
+        {tied && <p className="muted era-note">Tied VPs are broken by income, then money.</p>}
+        {!final && <p className="muted era-note">{eraLabel('rail')}: only rail links from now on, and Canal-only tiles can no longer be built.</p>}
+        {final ? (
+          <div className="era-buttons">
+            <button className="secondary" onClick={onContinue}>
+              View the board
+            </button>
+            <button className="confirm" onClick={onNewGame}>
+              New game
+            </button>
+          </div>
+        ) : (
+          <button className="confirm" onClick={onContinue} autoFocus>
+            Start the Rail Era
+          </button>
+        )}
       </div>
     </div>
   );

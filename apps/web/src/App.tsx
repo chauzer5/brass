@@ -8,7 +8,7 @@ import { ActionRail } from './ui/ActionRail.tsx';
 import { HandTray, type Arriving, type TrayTab } from './ui/HandTray.tsx';
 import { IncomeTrack } from './ui/IncomeTrack.tsx';
 import { PlayerMat } from './ui/PlayerMat.tsx';
-import { DiscardSheet, GameOver, Handoff, MatSheet, NewGame, PlayerStrip } from './ui/Screens.tsx';
+import { DiscardSheet, EraSummary, Handoff, MatSheet, NewGame, PlayerStrip } from './ui/Screens.tsx';
 import { StepPanel, pickCard, tapMatRow, tapMerchant, tapSlot } from './ui/TurnPanel.tsx';
 import { choosable, chosenSource, sourceNeeds } from './game/sources.ts';
 import { recapSince } from './game/recap.ts';
@@ -148,6 +148,12 @@ function Table({
   };
 
   const hidden = player !== null && revealedFor !== player;
+
+  // An era that ends while playing shows its scoring before anything else (and the game's end stays up until
+  // dismissed to look at the board). Eras that ended before this game was opened aren't shown again.
+  const [seenEras, setSeenEras] = useState(view.eraScores.length);
+  const [resultsHidden, setResultsHidden] = useState(false);
+  const summaryOpen = outcome ? !resultsHidden : view.eraScores.length > seenEras;
 
   // What the others did since this player's last turn: listed on the handoff screen, then glowing on the map
   // until this player starts an action.
@@ -380,7 +386,7 @@ function Table({
         />
       )}
       {/* The next player's screen waits for a sale animation to finish, so whoever built sees it. */}
-      {hidden && player !== null && !sale && (
+      {hidden && player !== null && !sale && !summaryOpen && (
         <Handoff
           name={names[player]!}
           names={names}
@@ -395,7 +401,23 @@ function Table({
           }}
         />
       )}
-      {outcome && <GameOver outcome={outcome} names={names} onNewGame={onNewGame} />}
+      {summaryOpen && (
+        <EraSummary
+          view={view}
+          names={names}
+          outcome={outcome}
+          onContinue={() => {
+            setSeenEras(view.eraScores.length);
+            setResultsHidden(true);
+          }}
+          onNewGame={onNewGame}
+        />
+      )}
+      {outcome && !summaryOpen && (
+        <button className="results-button confirm" onClick={() => setResultsHidden(false)}>
+          Final scores
+        </button>
+      )}
     </div>
   );
 }
