@@ -7,6 +7,9 @@ import { PlayerMat } from './PlayerMat.tsx';
 import type { LogEntry, RecapItem } from '../game/recap.ts';
 import { useTheme, type ThemeSetting } from '../settings.ts';
 
+/** Bots are named after the players on the front of the Brass rulebook. */
+const BOT_NAMES = ['Bot Richard', 'Bot George', 'Bot Eleanor'];
+
 const DIFFICULTY_LABEL: Record<brass.BotDifficulty, string> = { easy: 'Easy', normal: 'Normal', hard: 'Hard' };
 
 export function NewGame({
@@ -22,18 +25,19 @@ export function NewGame({
   const [showSettings, setShowSettings] = useState(false);
   if (showSettings) return <Settings onClose={() => setShowSettings(false)} />;
 
+  // Each bot seat keeps the name it was given, the first one not taken by another bot.
+  const [botNames, setBotNames] = useState<(string | null)[]>([null, null, null, null]);
   const setSeat = (i: number, seat: Seat) => {
     setSeats((ss) => ss.map((s, j) => (j === i ? seat : s)));
-    // Default names follow the seat: "Player 2" becomes "Bot 2" and back, but a typed name is kept.
-    setNames((ns) =>
-      ns.map((n, j) => {
-        if (j !== i) return n;
-        if (seat.kind === 'bot' && n === `Player ${i + 1}`) return `Bot ${i + 1}`;
-        if (seat.kind === 'human' && n === `Bot ${i + 1}`) return `Player ${i + 1}`;
-        return n;
+    setBotNames((bs) =>
+      bs.map((b, j) => {
+        if (j !== i) return b;
+        if (seat.kind === 'human') return null;
+        return b ?? BOT_NAMES.find((n) => !bs.includes(n)) ?? BOT_NAMES[0]!;
       }),
     );
   };
+  const nameOf = (i: number) => (seats[i]!.kind === 'bot' ? botNames[i]! : names[i]!.trim() || `Player ${i + 1}`);
   const chosen = seats.slice(0, count);
   const humans = chosen.filter((s) => s.kind === 'human').length;
   // At least one player is human. Dropping seats could leave only bots: then the first seat becomes human again.
@@ -72,11 +76,15 @@ export function NewGame({
               <div key={i} className="seat">
                 <div className="name-row">
                   <span className={`dot owner-${i}`} aria-hidden />
-                  <input
-                    value={name}
-                    aria-label={`Player ${i + 1} name`}
-                    onChange={(e) => setNames((ns) => ns.map((n, j) => (j === i ? e.target.value : n)))}
-                  />
+                  {seat.kind === 'bot' ? (
+                    <span className="bot-name">{botNames[i]}</span>
+                  ) : (
+                    <input
+                      value={name}
+                      aria-label={`Player ${i + 1} name`}
+                      onChange={(e) => setNames((ns) => ns.map((n, j) => (j === i ? e.target.value : n)))}
+                    />
+                  )}
                   <span className="seat-kind" role="radiogroup" aria-label={`Player ${i + 1}: human or bot`}>
                     {(['human', 'bot'] as const).map((kind) => (
                       <button
@@ -94,7 +102,7 @@ export function NewGame({
                   </span>
                 </div>
                 {seat.kind === 'bot' && (
-                  <div className="seat-difficulty" role="radiogroup" aria-label={`${name} difficulty`}>
+                  <div className="seat-difficulty" role="radiogroup" aria-label={`${botNames[i]} difficulty`}>
                     {(['easy', 'normal', 'hard'] as const).map((d) => {
                       const ready = brass.AVAILABLE_DIFFICULTIES.includes(d);
                       return (
@@ -120,7 +128,7 @@ export function NewGame({
         </div>
         <button
           className="confirm"
-          onClick={() => onStart(names.slice(0, count).map((n, i) => n.trim() || `Player ${i + 1}`), chosen)}
+          onClick={() => onStart(chosen.map((_, i) => nameOf(i)), chosen)}
         >
           Start new game
         </button>

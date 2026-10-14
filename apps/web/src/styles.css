@@ -656,9 +656,22 @@ button {
   gap: 6px;
 }
 
-.seat .name-row input {
+.seat .name-row input,
+.seat .bot-name {
   min-width: 0;
   flex: 1;
+}
+
+/* Bots' names are fixed: shown as text where a person's name field would be. */
+.bot-name {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 0 13px;
+  font-weight: 600;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .seat-kind,
