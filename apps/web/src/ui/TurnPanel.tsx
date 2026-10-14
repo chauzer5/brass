@@ -12,11 +12,12 @@ import {
   sellOptions,
   type Draft,
 } from '../game/draft.ts';
-import { INDUSTRY_NAME, cardName, linkName, merchantName, roman, slotName } from '../game/labels.ts';
+import { INDUSTRY_NAME, cardName, linkName, locationName, roman, slotName } from '../game/labels.ts';
 import { ACTION_LABEL } from './ActionRail.tsx';
 import { ActionIcon, IndustryIcon } from './icons.tsx';
 import { IncomeTrack } from './IncomeTrack.tsx';
 import { TileStats } from './PlayerMat.tsx';
+import { choosable, chosenSource, gloucesterOptions, sourceNeeds, withPicks, type Need, type ResourceKind } from '../game/sources.ts';
 
 interface StepPanelProps {
   view: brass.BrassView;
@@ -26,13 +27,17 @@ interface StepPanelProps {
   setDraft: Dispatch<SetStateAction<Draft>>;
   validate: (action: brass.BrassAction) => string | null;
   onPlay: (action: brass.BrassAction) => void;
+  /** The full game state, for working out coal/iron/beer sources and Gloucester's bonus. */
+  full: brass.BrassState;
+  /** Names of players, for naming whose tile a source is. */
+  names: readonly string[];
 }
 
 /**
  * The choices left for the action being put together, and Confirm. Actions
  * are picked from the rail and cards from the hand; this panel holds the rest.
  */
-export function StepPanel({ view, player, legal, draft, setDraft, validate, onPlay }: StepPanelProps) {
+export function StepPanel({ view, player, legal, draft, setDraft, validate, onPlay, full, names }: StepPanelProps) {
   const me = view.players[player]!;
   const cards = view.cards;
 
@@ -61,8 +66,11 @@ export function StepPanel({ view, player, legal, draft, setDraft, validate, onPl
     return <p className="hint">Choose an action from the side of the board.</p>;
   }
 
-  const action = compose(draft);
+  // The action with any chosen coal/iron/beer sources filled in.
+  const base = compose(draft);
+  const action = base ? withPicks(full, player, base, draft.picks) : null;
   const error = action ? validate(action) : null;
+  const needs = base ? sourceNeeds(full, player, base, draft.picks) : [];
   const cardHint =
     draft.kind === 'scout'
       ? `Choose 3 cards to discard (${draft.scoutCards.length}/3)`
@@ -89,7 +97,13 @@ export function StepPanel({ view, player, legal, draft, setDraft, validate, onPl
       {draft.kind === 'loan' && <LoanSteps view={view} player={player} />}
       {draft.kind === 'sell' && draft.card && <SellSteps view={view} legal={legal} draft={draft} setDraft={setDraft} />}
 
-      {action && (
+      {choosable(needs).length > 0 && !draft.pendingSale && (
+        <SourcePicker view={view} full={full} player={player} names={names} needs={needs} draft={draft} setDraft={setDraft} />
+      )}
+      {draft.kind === 'sell' && action?.type === 'sell' && !draft.pendingSale && (
+        <GloucesterBonus view={view} full={full} player={player} action={action} needs={needs} draft={draft} setDraft={setDraft} />
+      )}
+      {action && !draft.pendingSale && (
         <div className="confirm-row">
           {error && <p className="error">{error}</p>}
           <button className="confirm" disabled={!!error} onClick={() => onPlay(action)}>
@@ -110,6 +124,22 @@ export function pickCard(draft: Draft, id: brass.CardId): Draft {
   }
   if (draft.card === id) return { ...EMPTY_DRAFT, kind: draft.kind };
   return { ...EMPTY_DRAFT, kind: draft.kind, card: id };
+}
+
+/** Of a Merchant town's spaces that buy a tile, the one to sell to: one with beer beside it, if any. */
+function pickSpace(view: brass.BrassView, spaces: readonly number[]): number {
+  return spaces.find((m) => view.merchants[m]!.beer) ?? spaces[0]!;
+}
+
+/** Selling: the tile waiting for a Merchant goes to the one tapped. */
+export function tapMerchant(draft: Draft, location: brass.LocationId, view: brass.BrassView, legal: readonly brass.BrassAction[]): Draft {
+  const pending = draft.pendingSale;
+  if (draft.kind !== 'sell' || !pending) return draft;
+  const spaces = (sellOptions(view.cards, legal, draft).get(brass.slotKey(pending.location, pending.slot)) ?? []).filter(
+    (m) => view.merchants[m]!.location === location,
+  );
+  if (spaces.length === 0) return draft;
+  return { ...draft, pendingSale: null, sales: [...draft.sales, { ...pending, merchant: pickSpace(view, spaces) }] };
 }
 
 function lowest(me: brass.PlayerView, industry: brass.Industry): string {
@@ -141,6 +171,126 @@ function LoanSteps({ view, player }: { view: brass.BrassView; player: number }) 
       </p>
       <IncomeTrack players={view.players} focus={player} preview={allowed ? brass.highestSpaceOfLevel(after) : undefined} />
     </>
+  );
+}
+
+/** A source's name: whose tile and where, or the market / the Merchant's beer. */
+function sourceName(view: brass.BrassView, names: readonly string[], player: number, kind: ResourceKind, source: string, sale?: brass.Sale): string {
+  if (source === 'market') return `${kind === 'coal' ? 'Coal' : 'Iron'} market`;
+  if (source === 'merchant') return `${sale ? locationName(view.merchants[sale.merchant]!.location) : 'Merchant'}'s beer`;
+  const tile = view.tiles[source as brass.SlotKey];
+  const { location } = brass.parseSlotKey(source as brass.SlotKey);
+  const whose = tile && tile.owner !== player ? ` (${names[tile.owner]}'s)` : '';
+  return `${locationName(location)}${whose}`;
+}
+
+const NEED_LABEL: Record<ResourceKind, string> = { coal: 'Coal', iron: 'Iron', beer: 'Beer' };
+
+/** What the map is lighting up for a need, in words: "Coal Mine or the coal market", "Brewery or the Merchant". */
+function sourceKinds(need: Need): string {
+  const tile = { coal: 'Coal Mine', iron: 'Iron Works', beer: 'Brewery' }[need.kind];
+  if (need.options.includes('market')) return `${tile} or the ${need.kind} market`;
+  if (need.options.includes('merchant')) return `${tile} or the Merchant`;
+  return tile;
+}
+
+/**
+ * Where coal, iron and beer come from, when the rules leave a choice. Each
+ * row is one cube or barrel; tap a row, then a highlighted source on the map.
+ * The rows start on the engine's automatic choice, so confirming without
+ * touching them is fine.
+ */
+function SourcePicker({
+  view,
+  full,
+  player,
+  names,
+  needs,
+  draft,
+  setDraft,
+}: {
+  view: brass.BrassView;
+  full: brass.BrassState;
+  player: number;
+  names: readonly string[];
+  needs: Need[];
+  draft: Draft;
+  setDraft: Dispatch<SetStateAction<Draft>>;
+}) {
+  void full;
+  const rows = choosable(needs);
+  const active = rows.find((n) => n.id === draft.activeNeed) ?? rows[0]!;
+  const sales = draft.kind === 'sell' ? draft.sales : [];
+  // Number repeated kinds (Coal 1, Coal 2) only when there's more than one of them.
+  const count = (kind: ResourceKind) => rows.filter((n) => n.kind === kind).length;
+  return (
+    <div className="sources">
+      {rows.map((need) => {
+        const sale = need.sale !== undefined ? sales[need.sale] : undefined;
+        const label = `${NEED_LABEL[need.kind]}${count(need.kind) > 1 ? ` ${rows.filter((n) => n.kind === need.kind).indexOf(need) + 1}` : ''}`;
+        return (
+          <button
+            key={need.id}
+            className={`source-row ${need.id === active.id ? 'active' : ''}`}
+            aria-pressed={need.id === active.id}
+            onClick={() => setDraft((d) => ({ ...d, activeNeed: need.id }))}
+          >
+            <span className={`source-dot ${need.kind}`} aria-hidden />
+            <span className="source-label">{label}</span>
+            <span className="source-from">from {sourceName(view, names, player, need.kind, chosenSource(need, draft.picks)!, sale)}</span>
+          </button>
+        );
+      })}
+      <p className="hint">Tap a highlighted {sourceKinds(active)} on the map to change where it comes from.</p>
+    </div>
+  );
+}
+
+/** Gloucester's beer bonus: develop one tile for free. Only shown when a sale there uses its beer. */
+function GloucesterBonus({
+  view,
+  full,
+  player,
+  action,
+  needs,
+  draft,
+  setDraft,
+}: {
+  view: brass.BrassView;
+  full: brass.BrassState;
+  player: number;
+  action: Extract<brass.BrassAction, { type: 'sell' }>;
+  needs: Need[];
+  draft: Draft;
+  setDraft: Dispatch<SetStateAction<Draft>>;
+}) {
+  const i = action.sales.findIndex(
+    (s, k) =>
+      view.merchants[s.merchant]!.location === 'gloucester' &&
+      needs.some((n) => n.sale === k && chosenSource(n, draft.picks) === 'merchant'),
+  );
+  if (i < 0) return null;
+  const options = gloucesterOptions(full, player, action, i);
+  const current = draft.sales[i]!.develop;
+  // The engine's default is the first industry it can develop.
+  const chosen = current === undefined ? (options[0] ?? null) : current;
+  const set = (develop: brass.Industry | null) =>
+    setDraft((d) => ({ ...d, sales: d.sales.map((s, k) => (k === i ? { ...s, develop } : s)) }));
+  if (options.length === 0) return <p className="hint">Gloucester's bonus: nothing can be developed right now.</p>;
+  return (
+    <Step title="Gloucester bonus: develop a tile for free">
+      <div className="chips">
+        {options.map((ind) => (
+          <button key={ind} className={`chip with-icon ${chosen === ind ? 'selected' : ''}`} onClick={() => set(ind)}>
+            <IndustryIcon industry={ind} size={16} />
+            {INDUSTRY_NAME[ind]}
+          </button>
+        ))}
+        <button className={`chip ${chosen === null ? 'selected' : ''}`} onClick={() => set(null)}>
+          None
+        </button>
+      </div>
+    </Step>
   );
 }
 
@@ -221,52 +371,36 @@ function NetworkSteps({ view, legal, draft }: StepProps) {
   return <p className="hint">{hint}</p>;
 }
 
-function SellSteps({ view, legal, draft, setDraft }: StepProps) {
+/** Selling is played on the map: tap a lit tile, then (if more than one buys it) the Merchant to sell it to. */
+function SellSteps({ view, legal, draft }: StepProps) {
   const options = sellOptions(view.cards, legal, draft);
-  const selected = new Map(draft.sales.map((s) => [brass.slotKey(s.location, s.slot), s]));
-  const toggle = (key: brass.SlotKey) =>
-    setDraft((d) => {
-      if (selected.has(key)) return { ...d, sales: d.sales.filter((s) => brass.slotKey(s.location, s.slot) !== key) };
-      const { location, index } = brass.parseSlotKey(key);
-      const merchants = options.get(key) ?? [];
-      const merchant = merchants.find((m) => view.merchants[m]!.beer) ?? merchants[0]!;
-      return { ...d, sales: [...d.sales, { location, slot: index, merchant }] };
-    });
+  const left = [...options.keys()].filter((k) => !draft.sales.some((s) => brass.slotKey(s.location, s.slot) === k)).length;
+  const tileName = (location: brass.LocationId, slot: number) => {
+    const tile = view.tiles[brass.slotKey(location, slot)]!;
+    return `${INDUSTRY_NAME[tile.industry]} ${roman(tile.level)} in ${locationName(location)}`;
+  };
+  if (draft.pendingSale) {
+    return <p className="hint">Tap a highlighted Merchant to sell the {tileName(draft.pendingSale.location, draft.pendingSale.slot)} to.</p>;
+  }
   return (
-    <Step title="Choose tiles to sell (or tap the board)">
-      <div className="sell-list">
-        {[...options.keys()].map((key) => {
-          const { location, index } = brass.parseSlotKey(key);
-          const sale = selected.get(key);
-          const tile = view.tiles[key]!;
-          return (
-            <div key={key} className="sell-row">
-              <button className={`chip ${sale ? 'selected' : ''}`} onClick={() => toggle(key)}>
-                {INDUSTRY_NAME[tile.industry]} {roman(tile.level)} · {slotName(location, index)}
-              </button>
-              {sale && (options.get(key)?.length ?? 0) > 1 && (
-                <div className="chips sub">
-                  {options.get(key)!.map((m) => (
-                    <button
-                      key={m}
-                      className={`chip small ${sale.merchant === m ? 'selected' : ''}`}
-                      onClick={() =>
-                        setDraft((d) => ({
-                          ...d,
-                          sales: d.sales.map((s) => (brass.slotKey(s.location, s.slot) === key ? { ...s, merchant: m } : s)),
-                        }))
-                      }
-                    >
-                      to {merchantName(view, m)}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </Step>
+    <>
+      {draft.sales.length > 0 && (
+        <ul className="sale-list">
+          {draft.sales.map((s) => (
+            <li key={brass.slotKey(s.location, s.slot)}>
+              {tileName(s.location, s.slot)} → {locationName(view.merchants[s.merchant]!.location)}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="hint">
+        {draft.sales.length === 0
+          ? `Tap a highlighted tile to sell it (${left} available).`
+          : left > 0
+            ? 'Tap another highlighted tile to sell it too, or a sold tile to take it back.'
+            : 'Tap a sold tile to take it back.'}
+      </p>
+    </>
   );
 }
 
@@ -276,11 +410,15 @@ export function tapSlot(draft: Draft, location: brass.LocationId, slot: number, 
   if (draft.kind === 'sell') {
     const key = brass.slotKey(location, slot);
     if (draft.sales.some((s) => brass.slotKey(s.location, s.slot) === key)) {
-      return { ...draft, sales: draft.sales.filter((s) => brass.slotKey(s.location, s.slot) !== key) };
+      return { ...draft, sales: draft.sales.filter((s) => brass.slotKey(s.location, s.slot) !== key), pendingSale: null };
     }
+    const pending = draft.pendingSale;
+    if (pending && pending.location === location && pending.slot === slot) return { ...draft, pendingSale: null };
     const merchants = sellOptions(view.cards, legal, draft).get(key) ?? [];
-    const merchant = merchants.find((m) => view.merchants[m]!.beer) ?? merchants[0];
-    return merchant === undefined ? draft : { ...draft, sales: [...draft.sales, { location, slot, merchant }] };
+    if (merchants.length === 0) return draft;
+    // More than one Merchant town buys it: the player taps which one next.
+    if (new Set(merchants.map((m) => view.merchants[m]!.location)).size > 1) return { ...draft, pendingSale: { location, slot } };
+    return { ...draft, pendingSale: null, sales: [...draft.sales, { location, slot, merchant: pickSpace(view, merchants) }] };
   }
   return draft;
 }

@@ -18,7 +18,13 @@ export interface Draft {
   links: string[];
   industries: brass.Industry[];
   sales: brass.Sale[];
+  /** Selling: a tapped tile waiting for the player to tap which Merchant to sell it to. */
+  pendingSale: { location: brass.LocationId; slot: number } | null;
   scoutCards: brass.CardId[];
+  /** Chosen coal/iron/beer sources, by need id (see sources.ts); the rest are automatic. */
+  picks: Record<string, string>;
+  /** The need the map is picking a source for, when there's more than one choice. */
+  activeNeed: string | null;
 }
 
 export const EMPTY_DRAFT: Draft = {
@@ -29,7 +35,10 @@ export const EMPTY_DRAFT: Draft = {
   links: [],
   industries: [],
   sales: [],
+  pendingSale: null,
   scoutCards: [],
+  picks: {},
+  activeNeed: null,
 };
 
 type Cards = Record<brass.CardId, brass.Card>;
@@ -169,6 +178,14 @@ export interface Highlights {
   links: Set<string>;
   selectedSlots: Set<brass.SlotKey>;
   selectedLinks: Set<string>;
+  /** Tiles that can supply the coal, iron or beer being chosen, and the one chosen. */
+  sources?: Set<brass.SlotKey>;
+  selectedSource?: brass.SlotKey | null;
+  /** The market, when it can supply the cube being chosen; `selected` when it's the choice. */
+  market?: { kind: 'coal' | 'iron'; selected: boolean } | null;
+  /** Merchants to tap: to sell a tile to, or for their beer; and the chosen one. */
+  merchants?: Set<brass.LocationId>;
+  selectedMerchant?: brass.LocationId | null;
 }
 
 export function highlights(state: brass.BrassView, player: number, legal: readonly brass.BrassAction[], d: Draft): Highlights {

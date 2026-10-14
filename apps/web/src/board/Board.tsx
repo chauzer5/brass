@@ -30,11 +30,17 @@ interface BoardProps {
   highlights?: Highlights | undefined;
   onSlot?: (location: brass.LocationId, slot: number) => void;
   onLink?: (id: string) => void;
+  /** Tapping the coal or iron market, when it's lit as a source. */
+  onMarket?: ((kind: 'coal' | 'iron') => void) | undefined;
+  /** Tapping a lit Merchant: to sell to it, or for its beer. */
+  onMerchant?: ((location: brass.LocationId) => void) | undefined;
   /**
    * Pan and zoom to this location. `key` re-triggers the move when the same
    * location is asked for again (e.g. a different card for the same town).
    */
   focus?: { location: brass.LocationId; key: string } | null | undefined;
+  /** Pan and zoom to fit a box of the map (in map units); `key` re-triggers it. */
+  frame?: { box: MapBox; key: string } | null | undefined;
 }
 
 /** Holding a space this long explains why it can't be built on; moving further than the slop is a pan instead. */
@@ -191,7 +197,19 @@ function Slots({
         const tile = tiles[key];
         const lit = highlights.slots.has(key);
         const selected = highlights.selectedSlots.has(key);
-        const cls = ['slot', tile ? `owner-${tile.owner}` : '', tile?.flipped ? 'flipped' : '', lit ? 'lit' : '', selected ? 'selected' : '']
+        // A tile that can supply the coal, iron or beer being chosen.
+        const source = highlights.sources?.has(key) ?? false;
+        const sourceChosen = highlights.selectedSource === key;
+        const tappable = lit || source;
+        const cls = [
+          'slot',
+          tile ? `owner-${tile.owner}` : '',
+          tile?.flipped ? 'flipped' : '',
+          lit ? 'lit' : '',
+          selected ? 'selected' : '',
+          source ? 'source' : '',
+          sourceChosen ? 'source-chosen' : '',
+        ]
           .filter(Boolean)
           .join(' ');
         const pos = slotPosition(i, slots.length);
@@ -200,13 +218,13 @@ function Slots({
             key={i}
             transform={`translate(${pos.x} ${pos.y})`}
             data-slot={i}
-            className={lit ? 'tappable' : undefined}
-            onClick={lit ? () => onSlot?.(location, i) : undefined}
-            {...(!lit && holdFor?.(location, i))}
+            className={tappable ? 'tappable' : undefined}
+            onClick={tappable ? () => onSlot?.(location, i) : undefined}
+            {...(!tappable && holdFor?.(location, i))}
           >
             <title>{tile ? `${INDUSTRY_NAME[tile.industry]} ${roman(tile.level)}` : slot.map((ind) => INDUSTRY_NAME[ind]).join(' or ')}</title>
             {/* Generous invisible hit area for fingers. */}
-            {lit && <rect x={-6} y={-6} width={SLOT + 12} height={SLOT + 12} className="hit" />}
+            {tappable && <rect x={-6} y={-6} width={SLOT + 12} height={SLOT + 12} className="hit" />}
             <rect width={SLOT} height={SLOT} rx={4} className={cls} />
             {tile ? (
               <g className={`tile-face ${tile.flipped ? 'flipped' : ''}`}>
@@ -230,6 +248,13 @@ function Slots({
                 <SlotIcons slot={slot} />
               </g>
             )}
+            {/* A lit space that already has a tile is an overbuild: mark it, since the tile hides the highlight. */}
+            {lit && tile && (
+              <g className="overbuild-mark" transform={`translate(${SLOT - 7} ${SLOT - 7})`}>
+                <circle r={7.5} />
+                <path d="M0 4 V-3.5 M-3.2 -0.3 L0 -3.5 L3.2 -0.3" />
+              </g>
+            )}
           </g>
         );
       })}
@@ -237,7 +262,20 @@ function Slots({
   );
 }
 
-export function Board({ state, names, onDiscards, sale, explainSlot, highlights = NO_HIGHLIGHTS, onSlot, onLink, focus }: BoardProps) {
+export function Board({
+  state,
+  names,
+  onDiscards,
+  sale,
+  explainSlot,
+  highlights = NO_HIGHLIGHTS,
+  onSlot,
+  onLink,
+  onMarket,
+  onMerchant,
+  focus,
+  frame,
+}: BoardProps) {
   const tiles = state?.tiles ?? {};
   const links = state?.links ?? {};
   const zoom = useRef<ReactZoomPanPinchRef>(null);
@@ -306,6 +344,10 @@ export function Board({ state, names, onDiscards, sale, explainSlot, highlights 
     ref.setTransform(x, y, scale, 350, 'easeOut');
   };
 
+  useEffect(() => {
+    if (frame) showArea(frame.box, FOCUS_SCALE);
+  }, [frame?.key]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // A sale to the market: frame the new tile and the market together, so the cubes' whole flight is in view.
   useEffect(() => {
     if (!sale) return;
@@ -370,7 +412,9 @@ export function Board({ state, names, onDiscards, sale, explainSlot, highlights 
           {/* Softens the art so links, spaces and labels stay readable on top of it. */}
           <rect width={BOARD_SIZE} height={BOARD_SIZE} className="board-wash" />
 
-          {state && <Markets coal={state.coalMarket} iron={state.ironMarket} pending={pending} />}
+          {state && (
+            <Markets coal={state.coalMarket} iron={state.ironMarket} pending={pending} lit={highlights.market ?? null} onTap={onMarket} />
+          )}
           {state && names && <TurnOrder state={state} names={names} />}
           {state && <Piles state={state} onDiscards={onDiscards} />}
 
@@ -408,7 +452,13 @@ export function Board({ state, names, onDiscards, sale, explainSlot, highlights 
           {brass.LOCATIONS.map((loc) => (
             <g key={loc.id} data-location={loc.id}>
               {loc.kind === 'merchant' ? (
-                <MerchantMarker loc={loc} spaces={state?.merchants.filter((m) => m.location === loc.id) ?? []} />
+                <MerchantMarker
+                  loc={loc}
+                  spaces={state?.merchants.filter((m) => m.location === loc.id) ?? []}
+                  lit={highlights.merchants?.has(loc.id) ?? false}
+                  chosen={highlights.selectedMerchant === loc.id}
+                  onTap={onMerchant}
+                />
               ) : (
                 <>
                   <Slots
@@ -494,7 +544,20 @@ function TradeToken({ cx, cy, industries }: { cx: number; cy: number; industries
  * token per merchant tile (the goods it buys), a barrel beside each token
  * that still has beer, and the beer bonus on a tag below.
  */
-function MerchantMarker({ loc, spaces }: { loc: brass.MerchantDef; spaces: brass.MerchantSpace[] }) {
+function MerchantMarker({
+  loc,
+  spaces,
+  lit = false,
+  chosen = false,
+  onTap,
+}: {
+  loc: brass.MerchantDef;
+  spaces: brass.MerchantSpace[];
+  /** Tappable: a Merchant to sell to, or whose beer can be used. */
+  lit?: boolean;
+  chosen?: boolean;
+  onTap?: ((location: brass.LocationId) => void) | undefined;
+}) {
   const open = spaces.some((s) => s.tile !== null);
   const n = loc.spaces;
   const width = Math.max(92, n * SPACE_WIDTH + 16);
@@ -506,7 +569,11 @@ function MerchantMarker({ loc, spaces }: { loc: brass.MerchantDef; spaces: brass
   const scallopW = width / scallops;
   const tokensY = y + 14;
   return (
-    <g className={`merchant-stall ${open ? '' : 'closed'}`}>
+    <g
+      className={`merchant-stall ${open ? '' : 'closed'} ${lit ? 'lit tappable' : ''} ${chosen ? 'chosen' : ''}`}
+      onClick={lit ? () => onTap?.(loc.id) : undefined}
+    >
+      {(lit || chosen) && <rect x={left - 7} y={top - 7} width={width + 14} height={88} rx={10} className="stall-ring" />}
       <title>
         {open
           ? `${loc.name} merchant. Selling here with its beer gives: ${BONUS_LABEL(loc.beerBonus)}`
@@ -801,6 +868,17 @@ const MARKET = { left: 852, top: 261, width: 142, rowGap: 44, firstRowY: 282, ce
 const COAL_X = [889, 913];
 const IRON_X = [945, 969];
 
+/** A rectangle of the map, in map units. */
+export interface MapBox {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+/** The coal and iron market panel's area on the map. */
+export const MARKET_BOX: MapBox = { x0: 852, y0: 261, x1: 994, y1: 640 };
+
 const marketRowY = (price: number) => MARKET.firstRowY + (8 - price) * MARKET.rowGap;
 
 /** Centre of a market space, by its index into the market's prices. */
@@ -814,9 +892,14 @@ function Markets({
   coal,
   iron,
   pending,
+  lit = null,
+  onTap,
 }: {
   coal: number;
   iron: number;
+  /** The market column that can supply the cube being chosen, and whether it's the choice. */
+  lit?: { kind: 'coal' | 'iron'; selected: boolean } | null;
+  onTap?: ((kind: 'coal' | 'iron') => void) | undefined;
   /** Spaces whose cubes are still flying in from a sale; drawn empty until they land. */
   pending?: { kind: 'coal' | 'iron'; spaces: ReadonlySet<number> } | undefined;
 }) {
@@ -866,6 +949,18 @@ function Markets({
       {spaces(brass.IRON_MARKET, iron, IRON_X, 'iron')}
       {emptyPrice(brass.COAL_MARKET, COAL_X, 'coal')}
       {emptyPrice(brass.IRON_MARKET, IRON_X, 'iron')}
+      {lit && (
+        <g className="tappable" onClick={() => onTap?.(lit.kind)}>
+          <rect
+            x={(lit.kind === 'coal' ? COAL_X : IRON_X)[0]! - 17}
+            y={rowY(8) - 17}
+            width={(lit.kind === 'coal' ? COAL_X : IRON_X)[1]! - (lit.kind === 'coal' ? COAL_X : IRON_X)[0]! + 34}
+            height={rowY(1) - rowY(8) + 50}
+            rx={7}
+            className={`market-source ${lit.selected ? 'chosen' : ''}`}
+          />
+        </g>
+      )}
       <g className="market-legend">
         <IndustryIcon industry="coal" size={22} x={(COAL_X[0]! + COAL_X[1]!) / 2 - 11} y={bottom - 6} />
         <IndustryIcon industry="iron" size={22} x={(IRON_X[0]! + IRON_X[1]!) / 2 - 11} y={bottom - 6} />

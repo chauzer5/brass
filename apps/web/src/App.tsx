@@ -1,7 +1,7 @@
 import { brass } from '@brass/engine';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Board, saleDuration, type MarketSale } from './board/Board.tsx';
-import { EMPTY_DRAFT, availableKinds, developIndustries, highlights, tapLink, usableCards, type Draft } from './game/draft.ts';
+import { Board, MARKET_BOX, saleDuration, type MarketSale } from './board/Board.tsx';
+import { EMPTY_DRAFT, availableKinds, compose, developIndustries, highlights, tapLink, usableCards, type Draft } from './game/draft.ts';
 import { explainBuild } from './game/explain.ts';
 import { canUndo, useGame, type Game } from './game/useGame.ts';
 import { ActionRail } from './ui/ActionRail.tsx';
@@ -9,7 +9,8 @@ import { HandTray, type Arriving, type TrayTab } from './ui/HandTray.tsx';
 import { IncomeTrack } from './ui/IncomeTrack.tsx';
 import { PlayerMat } from './ui/PlayerMat.tsx';
 import { DiscardSheet, GameOver, Handoff, MatSheet, NewGame, PlayerStrip } from './ui/Screens.tsx';
-import { StepPanel, pickCard, tapMatRow, tapSlot } from './ui/TurnPanel.tsx';
+import { StepPanel, pickCard, tapMatRow, tapMerchant, tapSlot } from './ui/TurnPanel.tsx';
+import { choosable, chosenSource, sourceNeeds } from './game/sources.ts';
 
 export function App() {
   const { game, start, play, undoLast, quit } = useGame();
@@ -72,7 +73,78 @@ function Table({
   const viewer = player ?? 0;
   const view = useMemo(() => brass.brassGame.viewFor(state, viewer), [state, viewer]);
   const legal = useMemo(() => (player === null ? [] : brass.brassGame.legalActions(state, player)), [state, player]);
-  const lit = useMemo(() => highlights(view, viewer, legal, draft), [view, viewer, legal, draft]);
+  // Coal, iron and beer the action needs, and the one whose source the map is choosing.
+  const base = compose(draft);
+  const baseKey = JSON.stringify(base && base.type === 'sell' ? { ...base, sales: base.sales.map(({ develop: _, ...s }) => s) } : base);
+  const needs = useMemo(
+    () => (base && player !== null && state.phase.kind === 'actions' ? sourceNeeds(state, player, base, draft.picks) : []),
+    [state, player, baseKey, draft.picks], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const choices = choosable(needs);
+  const activeNeed = draft.pendingSale ? undefined : (choices.find((n) => n.id === draft.activeNeed) ?? choices[0]);
+  // A different action underneath (another space, link or tile) starts its sources afresh.
+  useEffect(() => {
+    setDraft((d) => (Object.keys(d.picks).length > 0 || d.activeNeed ? { ...d, picks: {}, activeNeed: null } : d));
+  }, [baseKey]);
+
+  const lit = useMemo(() => {
+    const h = highlights(view, viewer, legal, draft);
+    if (draft.kind === 'sell' && draft.pendingSale) {
+      // Selling a tile: light the Merchant towns that buy it.
+      const key = brass.slotKey(draft.pendingSale.location, draft.pendingSale.slot);
+      const spaces = legal.flatMap((a) =>
+        a.type === 'sell' && a.sales.length === 1 && brass.slotKey(a.sales[0]!.location, a.sales[0]!.slot) === key ? [a.sales[0]!.merchant] : [],
+      );
+      h.merchants = new Set(spaces.map((m) => view.merchants[m]!.location));
+      h.selectedSlots.add(key);
+    } else if (activeNeed) {
+      const chosen = chosenSource(activeNeed, draft.picks);
+      h.sources = new Set(activeNeed.options.filter((o): o is brass.SlotKey => o !== 'market' && o !== 'merchant'));
+      h.selectedSource = chosen !== 'market' && chosen !== 'merchant' ? (chosen as brass.SlotKey) : null;
+      if (activeNeed.options.includes('market') && activeNeed.kind !== 'beer') h.market = { kind: activeNeed.kind, selected: chosen === 'market' };
+      const sale = activeNeed.sale !== undefined ? draft.sales[activeNeed.sale] : undefined;
+      if (sale && activeNeed.options.includes('merchant')) {
+        const location = view.merchants[sale.merchant]!.location;
+        h.merchants = new Set([location]);
+        h.selectedMerchant = chosen === 'merchant' ? location : null;
+      }
+    }
+    return h;
+  }, [view, viewer, legal, draft, activeNeed]);
+
+  // When the map is choosing a source, frame the spot being built on (or sold from, or linked) with every option.
+  const sourceFrame = useMemo(() => {
+    if (!activeNeed || !base) return null;
+    const pts = activeNeed.options
+      .filter((o) => o !== 'market' && o !== 'merchant')
+      .map((k) => brass.LOCATION_BY_ID[brass.parseSlotKey(k as brass.SlotKey).location].pos);
+    if (base.type === 'build') pts.push(brass.LOCATION_BY_ID[base.location].pos);
+    if (base.type === 'network') for (const id of base.links) for (const end of brass.LINKS.find((l) => l.id === id)!.ends) pts.push(brass.LOCATION_BY_ID[end].pos);
+    if (base.type === 'sell' && activeNeed.sale !== undefined) {
+      const sale = base.sales[activeNeed.sale]!;
+      pts.push(brass.LOCATION_BY_ID[sale.location].pos, brass.LOCATION_BY_ID[view.merchants[sale.merchant]!.location].pos);
+    }
+    if (activeNeed.options.includes('market')) pts.push({ x: MARKET_BOX.x0, y: MARKET_BOX.y0 }, { x: MARKET_BOX.x1, y: MARKET_BOX.y1 });
+    if (pts.length === 0) return null;
+    const pad = 45;
+    return {
+      key: `${activeNeed.id}|${baseKey}`,
+      box: {
+        x0: Math.min(...pts.map((p) => p.x)) - pad,
+        y0: Math.min(...pts.map((p) => p.y)) - pad,
+        x1: Math.max(...pts.map((p) => p.x)) + pad,
+        y1: Math.max(...pts.map((p) => p.y)) + pad,
+      },
+    };
+  }, [activeNeed?.id, baseKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** Picks a source for the active need, then moves on to the next choice, if any. */
+  const pickSource = (source: string) => {
+    if (!activeNeed || !activeNeed.options.includes(source)) return false;
+    const next = choices[choices.indexOf(activeNeed) + 1];
+    setDraft((d) => ({ ...d, picks: { ...d.picks, [activeNeed.id]: source }, activeNeed: next?.id ?? activeNeed.id }));
+    return true;
+  };
 
   const hidden = player !== null && revealedFor !== player;
 
@@ -189,9 +261,20 @@ function Table({
           highlights={hidden ? undefined : lit}
           onSlot={(location, slot) => {
             if (state.phase.kind === 'shortfall') submit({ type: 'removeTile', location, slot });
-            else setDraft((d) => tapSlot(d, location, slot, view, legal));
+            else {
+              // A lit source (and not also a space being built on or sold) sets where the cube or barrel comes from.
+              const key = brass.slotKey(location, slot);
+              if (!lit.slots.has(key) && lit.sources?.has(key) && pickSource(key)) return;
+              setDraft((d) => tapSlot(d, location, slot, view, legal));
+            }
+          }}
+          onMarket={() => pickSource('market')}
+          onMerchant={(location) => {
+            if (draft.pendingSale) setDraft((d) => tapMerchant(d, location, view, legal));
+            else pickSource('merchant');
           }}
           onLink={(id) => setDraft((d) => tapLink(view.cards, legal, d, id))}
+          frame={hidden ? null : sourceFrame}
           focus={buildFocus ?? peek}
         />
         {showControls && state.phase.kind === 'actions' && (
@@ -264,6 +347,8 @@ function Table({
               draft={draft}
               setDraft={setDraft}
               validate={(a) => brass.brassGame.validate(state, player, a)}
+              full={state}
+              names={names}
               onPlay={submit}
             />
           </HandTray>
