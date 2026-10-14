@@ -2,7 +2,7 @@ import { brass } from '@brass/engine';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Board, MARKET_BOX, saleDuration, type MarketSale } from './board/Board.tsx';
 import { EMPTY_DRAFT, availableKinds, compose, developIndustries, highlights, tapLink, usableCards, type Draft } from './game/draft.ts';
-import { explainBuild } from './game/explain.ts';
+import { explainBuild, explainBuildAny } from './game/explain.ts';
 import { canUndo, useGame, type Game } from './game/useGame.ts';
 import { ActionRail } from './ui/ActionRail.tsx';
 import { HandTray, type Arriving, type TrayTab } from './ui/HandTray.tsx';
@@ -204,7 +204,7 @@ function Table({
   const coalPrice = state.coalMarket > 0 ? brass.COAL_MARKET.prices[brass.COAL_MARKET.prices.length - state.coalMarket] : brass.COAL_MARKET.emptyPrice;
   const ironPrice = state.ironMarket > 0 ? brass.IRON_MARKET.prices[brass.IRON_MARKET.prices.length - state.ironMarket] : brass.IRON_MARKET.emptyPrice;
   const hand = p?.hand ?? [];
-  const usable = draft.kind ? usableCards(view.cards, hand, legal, draft.kind) : null;
+  const usable = draft.kind ? usableCards(view.cards, hand, legal, draft) : null;
   const selectedCards = new Set(draft.kind === 'scout' ? draft.scoutCards : draft.card ? [draft.card] : []);
   const showControls = player !== null && !hidden;
   // The hand (and board) tray: shown to the human in control, or to the only human while bots play.
@@ -327,8 +327,9 @@ function Table({
           names={names}
           sale={sale}
           explainSlot={
-            showControls && state.phase.kind === 'actions' && draft.kind === 'build' && draft.card
-              ? (location, slot) => explainBuild(state, player!, draft.card!, location, slot)
+            showControls && state.phase.kind === 'actions' && draft.kind === 'build'
+              ? (location, slot) =>
+                  draft.card ? explainBuild(state, player!, draft.card, location, slot) : explainBuildAny(state, player!, hand, location, slot)
               : undefined
           }
           onDiscards={() => setShowDiscards(true)}
@@ -376,7 +377,7 @@ function Table({
             selected={selectedCards}
             onPick={(id) => {
               if (!draft.kind) return;
-              const next = pickCard(draft, id);
+              const next = pickCard(draft, id, view.cards, legal);
               setDraft(next);
               // Develop is played on the mat: once the card is chosen, show it.
               if (next.kind === 'develop' && next.card) setTrayTab('mat');

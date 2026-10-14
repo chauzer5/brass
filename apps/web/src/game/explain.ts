@@ -42,3 +42,30 @@ export function explainBuild(
   if (unique.length === 1) return unique[0]![0];
   return unique.map(([reason, industry]) => `${INDUSTRY_NAME[industry]}: ${reason}`).join('\n');
 }
+
+/**
+ * Why the player can't build on a space with any card in their hand: the
+ * first reason that isn't just about a card (not in your network, no coal…),
+ * else that no card fits.
+ */
+export function explainBuildAny(
+  state: brass.BrassState,
+  player: number,
+  hand: readonly brass.CardId[],
+  location: brass.LocationId,
+  slot: number,
+): string | null {
+  if (brass.LOCATION_BY_ID[location].kind === 'merchant') return null;
+  const seen = new Set<string>();
+  const reasons: string[] = [];
+  for (const card of hand) {
+    const def = state.cards[card];
+    const key = def ? brass.cardSignature(def) : card;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const reason = explainBuild(state, player, card, location, slot);
+    if (reason === null) return null;
+    reasons.push(reason);
+  }
+  return reasons.find((r) => !aboutTheCard(r)) ?? 'None of your cards can build here.';
+}

@@ -54,19 +54,29 @@ export function availableKinds(legal: readonly brass.BrassAction[]): Set<ActionK
   return new Set(legal.map((a) => a.type).filter((t): t is ActionKind => t !== 'removeTile'));
 }
 
-/** Hand cards that can be used for an action of this kind. */
-export function usableCards(cards: Cards, hand: readonly brass.CardId[], legal: readonly brass.BrassAction[], kind: ActionKind) {
-  if (kind === 'scout') return new Set(legal.some((a) => a.type === 'scout') ? hand : []);
-  const sigs = new Set(withCard(cards, legal, kind, null).map((a) => sig(cards, (a as { card: string }).card)));
+/**
+ * Hand cards that can be used for the action being put together. Building on
+ * a space chosen before the card: the cards that can build there.
+ */
+export function usableCards(cards: Cards, hand: readonly brass.CardId[], legal: readonly brass.BrassAction[], d: Draft) {
+  if (!d.kind) return new Set<brass.CardId>();
+  if (d.kind === 'scout') return new Set(legal.some((a) => a.type === 'scout') ? hand : []);
+  let moves = withCard(cards, legal, d.kind, null);
+  if (d.kind === 'build' && d.slot) {
+    const key = brass.slotKey(d.slot.location, d.slot.slot);
+    moves = moves.filter((a) => a.type === 'build' && brass.slotKey(a.location, a.slot) === key);
+  }
+  const sigs = new Set(moves.map((a) => sig(cards, (a as { card: string }).card)));
   return new Set(hand.filter((id) => sigs.has(sig(cards, id))));
 }
 
+/** Legal builds with the chosen card, or with any card while none is chosen (the space can be picked first). */
 function buildMoves(cards: Cards, legal: readonly brass.BrassAction[], d: Draft) {
-  if (d.kind !== 'build' || !d.card) return [];
+  if (d.kind !== 'build') return [];
   return withCard(cards, legal, 'build', d.card).map((a) => a as Extract<brass.BrassAction, { type: 'build' }>);
 }
 
-/** Every space the chosen card can build on, with any industry. */
+/** Every space the chosen card (or, with none chosen yet, any card) can build on, with any industry. */
 export function buildSlots(cards: Cards, legal: readonly brass.BrassAction[], d: Draft): brass.SlotKey[] {
   return [...new Set(buildMoves(cards, legal, d).map((a) => brass.slotKey(a.location, a.slot)))];
 }
@@ -82,8 +92,9 @@ export function buildIndustriesAt(cards: Cards, legal: readonly brass.BrassActio
 }
 
 /**
- * Chooses the space to build on. If only one industry can go there it is
- * chosen too; otherwise the player picks between them next.
+ * Chooses the space to build on (tapping it again takes it back). If only one
+ * industry can go there it is chosen too; otherwise the player picks between
+ * them next.
  */
 export function chooseBuildSlot(
   cards: Cards,
@@ -92,10 +103,25 @@ export function chooseBuildSlot(
   location: brass.LocationId,
   slot: number,
 ): Draft {
+  if (d.slot?.location === location && d.slot.slot === slot) return { ...d, slot: null, industry: null, picks: {}, activeNeed: null };
   const options = buildIndustriesAt(cards, legal, d, brass.slotKey(location, slot));
   if (options.length === 0) return d;
   const industry = options.length === 1 ? options[0]! : d.industry && options.includes(d.industry) ? d.industry : null;
-  return { ...d, slot: { location, slot }, industry };
+  return { ...d, slot: { location, slot }, industry, picks: {}, activeNeed: null };
+}
+
+/**
+ * Chooses the card to build with. A space already chosen is kept if the card
+ * can build there (it always can when the space came first); tapping the
+ * chosen card again puts it back and keeps the space.
+ */
+export function chooseBuildCard(cards: Cards, legal: readonly brass.BrassAction[], d: Draft, card: brass.CardId): Draft {
+  const next: Draft = { ...d, card: d.card === card ? null : card, picks: {}, activeNeed: null };
+  if (!d.slot) return next;
+  const options = buildIndustriesAt(cards, legal, next, brass.slotKey(d.slot.location, d.slot.slot));
+  if (options.length === 0) return { ...next, slot: null, industry: null };
+  const industry = options.length === 1 ? options[0]! : d.industry && options.includes(d.industry) ? d.industry : null;
+  return { ...next, industry };
 }
 
 /** Links that can be placed next: the first link, or the second rail link. */

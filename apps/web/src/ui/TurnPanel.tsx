@@ -3,6 +3,7 @@ import type { Dispatch, ReactNode, SetStateAction } from 'react';
 import {
   EMPTY_DRAFT,
   buildIndustriesAt,
+  chooseBuildCard,
   buildSlots,
   chooseBuildSlot,
   compose,
@@ -89,7 +90,7 @@ export function StepPanel({ view, player, legal, draft, setDraft, validate, onPl
         </button>
       </div>
 
-      {draft.kind === 'build' && draft.card && <BuildSteps view={view} me={me} legal={legal} draft={draft} setDraft={setDraft} />}
+      {draft.kind === 'build' && <BuildSteps view={view} me={me} legal={legal} draft={draft} setDraft={setDraft} />}
       {draft.kind === 'network' && draft.card && (
         <NetworkSteps view={view} legal={legal} draft={draft} setDraft={setDraft} />
       )}
@@ -116,12 +117,13 @@ export function StepPanel({ view, player, legal, draft, setDraft, validate, onPl
 }
 
 /** Applies a tap on a hand card to the draft. */
-export function pickCard(draft: Draft, id: brass.CardId): Draft {
+export function pickCard(draft: Draft, id: brass.CardId, cards: Record<brass.CardId, brass.Card>, legal: readonly brass.BrassAction[]): Draft {
   if (draft.kind === 'scout') {
     const chosen = draft.scoutCards;
     if (chosen.includes(id)) return { ...draft, scoutCards: chosen.filter((c) => c !== id) };
     return chosen.length < 3 ? { ...draft, scoutCards: [...chosen, id] } : draft;
   }
+  if (draft.kind === 'build') return chooseBuildCard(cards, legal, draft, id);
   if (draft.card === id) return { ...EMPTY_DRAFT, kind: draft.kind };
   return { ...EMPTY_DRAFT, kind: draft.kind, card: id };
 }
@@ -329,7 +331,13 @@ function BuildSteps({ view, me, legal, draft, setDraft }: StepProps & { me: bras
   const tile = draft.industry ? brass.tileStats(draft.industry, me.mat[draft.industry].findIndex((n) => n > 0) + 1) : null;
   return (
     <>
-      {!draft.slot && <p className="hint">Tap a highlighted space on the map ({slots.length} available).</p>}
+      {!draft.slot && (
+        <p className="hint">
+          {draft.card
+            ? `Tap a highlighted space on the map (${slots.length} available).`
+            : `Tap a highlighted space on the map (${slots.length} available), or choose a card first.`}
+        </p>
+      )}
       {industries.length > 1 && (
         <Step title="Which industry?">
           <div className="chips">
