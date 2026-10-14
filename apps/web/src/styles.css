@@ -727,10 +727,6 @@ button {
   gap: 8px;
 }
 
-.tray-recap ol {
-  max-height: 120px;
-}
-
 /* ---- The ☰ menu ---- */
 
 .menu-backdrop {

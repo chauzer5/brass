@@ -269,17 +269,20 @@ export function Handoff({
   names,
   recap,
   onReady,
+  solo = false,
 }: {
   name: string;
   names: readonly string[];
   /** What the other players did since this player's last turn. */
   recap: readonly RecapItem[];
   onReady: () => void;
+  /** The only human at the table: nothing to hide or pass, just what the bots did. */
+  solo?: boolean;
 }) {
   return (
     <div className="overlay">
       <div className="screen-card handoff">
-        <h2>{name}'s turn</h2>
+        <h2>{solo ? 'Your turn' : `${name}'s turn`}</h2>
         {recap.length > 0 && (
           <section className="recap">
             <h3>Since your last turn</h3>
@@ -295,9 +298,9 @@ export function Handoff({
             </ol>
           </section>
         )}
-        <p className="muted">Pass the device to {name}, then tap to see your hand.</p>
+        {!solo && <p className="muted">Pass the device to {name}, then tap to see your hand.</p>}
         <button className="confirm" onClick={onReady} autoFocus>
-          I'm {name}
+          {solo ? "It's your turn" : `I'm ${name}`}
         </button>
       </div>
     </div>

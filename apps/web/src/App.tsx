@@ -182,14 +182,14 @@ function Table({
   );
   const [recent, setRecent] = useState<{ slots: Set<brass.SlotKey>; links: Set<string>; at: number } | null>(null);
   const showRecent = recent && recent.at === match.log.length && !draft.kind && !hidden;
-  // Playing alone against bots there's no handoff screen: when the turn comes back, what the bots did is
-  // listed in the tray (and glows on the map) instead.
-  const [idleRecap, setIdleRecap] = useState<RecapItem[]>([]);
+  // Playing alone against bots there's nothing to hide: when the turn comes back, what the bots did is
+  // listed on a "Your turn" screen (and glows on the map) instead.
+  const [soloRecap, setSoloRecap] = useState<RecapItem[]>([]);
   const lastController = useRef<number | null>(null);
   useEffect(() => {
     if (humans.length === 1 && player !== null && lastController.current !== player) {
       const items = recapSince(match, player);
-      setIdleRecap(items);
+      setSoloRecap(items);
       setRecent({ slots: new Set(items.flatMap((r) => r.slots)), links: new Set(items.flatMap((r) => r.links)), at: match.log.length });
     }
     lastController.current = player;
@@ -433,7 +433,6 @@ function Table({
                 full={state}
                 names={names}
                 onPlay={submit}
-                recap={showRecent && humans.length === 1 ? idleRecap : []}
               />
             ) : (
               active !== null && (
@@ -498,6 +497,9 @@ function Table({
             });
           }}
         />
+      )}
+      {soloRecap.length > 0 && player !== null && !sale && !summaryOpen && (
+        <Handoff solo name={names[player]!} names={names} recap={soloRecap} onReady={() => setSoloRecap([])} />
       )}
       {summaryOpen && (
         <EraSummary
