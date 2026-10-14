@@ -90,34 +90,34 @@ const town = (
 export const TOWNS: readonly TownDef[] = [
   // Blue
   town('leek', 'Leek', 'blue', [['cotton', 'manufacturer'], ['cotton', 'coal']], { x: 538, y: 95 }),
-  town('stoke', 'Stoke-on-Trent', 'blue', [['cotton', 'manufacturer'], ['pottery', 'iron'], ['manufacturer']], { x: 395, y: 160 }),
-  town('stone', 'Stone', 'blue', [['cotton', 'brewery'], ['manufacturer', 'coal']], { x: 312, y: 262 }),
+  town('stoke', 'Stoke-on-Trent', 'blue', [['cotton', 'manufacturer'], ['pottery', 'iron'], ['manufacturer']], { x: 397, y: 158 }),
+  town('stone', 'Stone', 'blue', [['cotton', 'brewery'], ['manufacturer', 'coal']], { x: 278, y: 249 }),
   town('uttoxeter', 'Uttoxeter', 'blue', [['manufacturer', 'brewery'], ['cotton', 'brewery']], { x: 560, y: 245 }),
   // Teal
-  town('belper', 'Belper', 'teal', [['cotton', 'manufacturer'], ['coal'], ['pottery']], { x: 725, y: 90 }),
-  town('derby', 'Derby', 'teal', [['cotton', 'brewery'], ['cotton', 'manufacturer'], ['iron']], { x: 750, y: 240 }),
+  town('belper', 'Belper', 'teal', [['cotton', 'manufacturer'], ['coal'], ['pottery']], { x: 723, y: 85 }),
+  town('derby', 'Derby', 'teal', [['cotton', 'brewery'], ['cotton', 'manufacturer'], ['iron']], { x: 768, y: 248 }),
   // Red
-  town('stafford', 'Stafford', 'red', [['manufacturer', 'brewery'], ['pottery']], { x: 400, y: 345 }),
-  town('burton', 'Burton-on-Trent', 'red', [['manufacturer', 'coal'], ['brewery']], { x: 680, y: 362 }),
-  town('cannock', 'Cannock', 'red', [['manufacturer', 'coal'], ['coal']], { x: 485, y: 440 }),
-  town('tamworth', 'Tamworth', 'red', [['cotton', 'coal'], ['cotton', 'coal']], { x: 698, y: 490 }),
-  town('walsall', 'Walsall', 'red', [['iron', 'manufacturer'], ['manufacturer', 'brewery']], { x: 535, y: 552 }),
+  town('stafford', 'Stafford', 'red', [['manufacturer', 'brewery'], ['pottery']], { x: 406, y: 330 }),
+  town('burton', 'Burton-on-Trent', 'red', [['manufacturer', 'coal'], ['brewery']], { x: 668, y: 363 }),
+  town('cannock', 'Cannock', 'red', [['manufacturer', 'coal'], ['coal']], { x: 499, y: 440 }),
+  town('tamworth', 'Tamworth', 'red', [['cotton', 'coal'], ['cotton', 'coal']], { x: 669, y: 487 }),
+  town('walsall', 'Walsall', 'red', [['iron', 'manufacturer'], ['manufacturer', 'brewery']], { x: 522, y: 564 }),
   // Yellow
-  town('coalbrookdale', 'Coalbrookdale', 'yellow', [['iron', 'brewery'], ['iron'], ['coal']], { x: 245, y: 575 }),
-  town('wolverhampton', 'Wolverhampton', 'yellow', [['manufacturer'], ['manufacturer', 'coal']], { x: 378, y: 552 }),
-  town('dudley', 'Dudley', 'yellow', [['coal'], ['iron']], { x: 420, y: 655 }),
-  town('kidderminster', 'Kidderminster', 'yellow', [['cotton', 'coal'], ['cotton']], { x: 362, y: 745 }),
-  town('worcester', 'Worcester', 'yellow', [['cotton'], ['cotton']], { x: 375, y: 875 }),
+  town('coalbrookdale', 'Coalbrookdale', 'yellow', [['iron', 'brewery'], ['iron'], ['coal']], { x: 245, y: 588 }),
+  town('wolverhampton', 'Wolverhampton', 'yellow', [['manufacturer'], ['manufacturer', 'coal']], { x: 380, y: 530 }),
+  town('dudley', 'Dudley', 'yellow', [['coal'], ['iron']], { x: 428, y: 650 }),
+  town('kidderminster', 'Kidderminster', 'yellow', [['cotton', 'coal'], ['cotton']], { x: 357, y: 765 }),
+  town('worcester', 'Worcester', 'yellow', [['cotton'], ['cotton']], { x: 377, y: 888 }),
   // Purple
-  town('nuneaton', 'Nuneaton', 'purple', [['manufacturer', 'brewery'], ['cotton', 'coal']], { x: 785, y: 585 }),
-  town('birmingham', 'Birmingham', 'purple', [['cotton', 'manufacturer'], ['manufacturer'], ['iron'], ['manufacturer']], { x: 630, y: 660 }),
-  town('coventry', 'Coventry', 'purple', [['pottery'], ['manufacturer', 'coal'], ['iron', 'manufacturer']], { x: 805, y: 685 }),
+  town('nuneaton', 'Nuneaton', 'purple', [['manufacturer', 'brewery'], ['cotton', 'coal']], { x: 798, y: 566 }),
+  town('birmingham', 'Birmingham', 'purple', [['cotton', 'manufacturer'], ['manufacturer'], ['iron'], ['manufacturer']], { x: 655, y: 655 }),
+  town('coventry', 'Coventry', 'purple', [['pottery'], ['manufacturer', 'coal'], ['iron', 'manufacturer']], { x: 805, y: 711 }),
   town('redditch', 'Redditch', 'purple', [['manufacturer', 'coal'], ['iron']], { x: 590, y: 795 }),
 ];
 
 export const FARM_BREWERIES: readonly FarmBreweryDef[] = [
   { kind: 'farmBrewery', id: 'farm-brewery-north', slots: [['brewery']], pos: { x: 305, y: 432 } },
-  { kind: 'farmBrewery', id: 'farm-brewery-south', slots: [['brewery']], pos: { x: 290, y: 828 } },
+  { kind: 'farmBrewery', id: 'farm-brewery-south', slots: [['brewery']], pos: { x: 280, y: 828 } },
 ];
 
 export const MERCHANTS: readonly MerchantDef[] = [
