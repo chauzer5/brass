@@ -1473,8 +1473,7 @@ button {
   gap: 6px;
 }
 
-.discard-cards > .game-card,
-.discard-facedown {
+.discard-cards > .game-card {
   width: 70px;
   height: 96px;
 }
@@ -1483,18 +1482,10 @@ button {
   max-width: none;
 }
 
-.discard-facedown {
-  position: relative;
-  display: grid;
-}
-
-.discard-facedown span {
-  position: absolute;
-  inset: auto 0 8px;
-  text-align: center;
-  font-size: 10px;
-  font-weight: 700;
-  color: #fff;
+.discard-note {
+  margin: 2px 0 0;
+  font-size: 11.5px;
+  color: var(--muted);
 }
 
 .game-card.back {

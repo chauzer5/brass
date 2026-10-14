@@ -385,8 +385,8 @@ function Piles({
   state: Pick<brass.BrassView, 'players' | 'deckSize'>;
   onDiscards?: (() => void) | undefined;
 }) {
-  // Every player's discards, including the face-down card each discarded at setup.
-  const discards = state.players.reduce((n, p) => n + p.discard.length + (p.hasFaceDownDiscard ? 1 : 0), 0);
+  // Face-up discards only; the face-down card from setup is noted in the discard sheet.
+  const discards = state.players.reduce((n, p) => n + p.discard.length, 0);
   const { w, h } = PILES.card;
   const width = PILES.pad * 2 + w * 2 + PILES.gap;
   const height = PILES.pad * 2 + h + PILES.labelH;

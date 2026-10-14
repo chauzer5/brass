@@ -193,7 +193,11 @@ export function GameOver({ outcome, names, onNewGame }: { outcome: Outcome; name
   );
 }
 
-/** Every player's discard pile, newest card first. Discards are face up, so anyone may look. */
+/**
+ * Every player's discard pile, newest card first. Discards are face up, so
+ * anyone may look; the face-down card each player discarded at setup is only
+ * mentioned in a note.
+ */
 export function DiscardSheet({
   view,
   names,
@@ -215,7 +219,7 @@ export function DiscardSheet({
         </div>
         {view.turnOrder.map((id) => {
           const p = view.players[id]!;
-          const count = p.discard.length + (p.hasFaceDownDiscard ? 1 : 0);
+          const count = p.discard.length;
           return (
             <section key={id} className="discard-player">
               <h3>
@@ -229,17 +233,17 @@ export function DiscardSheet({
                   {[...p.discard].reverse().map((cardId) => (
                     <GameCard key={cardId} card={view.cards[cardId]} />
                   ))}
-                  {p.hasFaceDownDiscard && (
-                    <div className="discard-facedown" title="Discarded face down at the start of the game">
-                      <GameCard card={undefined} />
-                      <span>Face down</span>
-                    </div>
-                  )}
                 </div>
               )}
             </section>
           );
         })}
+        {view.players.some((p) => p.hasFaceDownDiscard) && (
+          <p className="discard-note">
+            Each player also has 1 card discarded face down at setup. It stays hidden and is shuffled back in for the
+            Rail Era.
+          </p>
+        )}
       </div>
     </div>
   );
