@@ -122,10 +122,10 @@ export const FARM_BREWERIES: readonly FarmBreweryDef[] = [
 
 export const MERCHANTS: readonly MerchantDef[] = [
   { kind: 'merchant', id: 'shrewsbury', name: 'Shrewsbury', spaces: 1, minPlayers: 2, linkVP: 2, beerBonus: { type: 'vp', amount: 4 }, pos: { x: 100, y: 555 } },
-  { kind: 'merchant', id: 'gloucester', name: 'Gloucester', spaces: 2, minPlayers: 2, linkVP: 2, beerBonus: { type: 'develop' }, pos: { x: 525, y: 885 } },
-  { kind: 'merchant', id: 'oxford', name: 'Oxford', spaces: 2, minPlayers: 2, linkVP: 2, beerBonus: { type: 'income', spaces: 2 }, pos: { x: 745, y: 805 } },
-  { kind: 'merchant', id: 'warrington', name: 'Warrington', spaces: 2, minPlayers: 3, linkVP: 2, beerBonus: { type: 'money', amount: 5 }, pos: { x: 275, y: 85 } },
-  { kind: 'merchant', id: 'nottingham', name: 'Nottingham', spaces: 2, minPlayers: 4, linkVP: 2, beerBonus: { type: 'vp', amount: 3 }, pos: { x: 890, y: 145 } },
+  { kind: 'merchant', id: 'gloucester', name: 'Gloucester', spaces: 2, minPlayers: 2, linkVP: 2, beerBonus: { type: 'develop' }, pos: { x: 560, y: 935 } },
+  { kind: 'merchant', id: 'oxford', name: 'Oxford', spaces: 2, minPlayers: 2, linkVP: 2, beerBonus: { type: 'income', spaces: 2 }, pos: { x: 790, y: 840 } },
+  { kind: 'merchant', id: 'warrington', name: 'Warrington', spaces: 2, minPlayers: 3, linkVP: 2, beerBonus: { type: 'money', amount: 5 }, pos: { x: 220, y: 62 } },
+  { kind: 'merchant', id: 'nottingham', name: 'Nottingham', spaces: 2, minPlayers: 4, linkVP: 2, beerBonus: { type: 'vp', amount: 3 }, pos: { x: 905, y: 95 } },
 ];
 
 export const LOCATIONS: readonly LocationDef[] = [...TOWNS, ...FARM_BREWERIES, ...MERCHANTS];
