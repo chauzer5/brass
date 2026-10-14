@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { GameCard } from './HandTray.tsx';
 import { IncomeTrack } from './IncomeTrack.tsx';
 import { PlayerMat } from './PlayerMat.tsx';
-import type { RecapItem } from '../game/recap.ts';
+import type { LogEntry, RecapItem } from '../game/recap.ts';
 import { useTheme, type ThemeSetting } from '../settings.ts';
 
 export function NewGame({ onStart, onResume }: { onStart: (names: string[]) => void; onResume?: (() => void) | undefined }) {
@@ -59,13 +59,14 @@ const THEME_OPTIONS: { value: ThemeSetting; label: string }[] = [
   { value: 'dark', label: 'Dark' },
 ];
 
-export function Settings({ onClose }: { onClose: () => void }) {
+export function Settings({ onClose, inGame = false }: { onClose: () => void; inGame?: boolean }) {
   const { theme, setTheme } = useTheme();
   return (
-    <div className="screen">
-      <div className="screen-card">
+    // In a game it sits over the table; from the main menu it's a page of its own.
+    <div className={inGame ? 'overlay' : 'screen'} onClick={inGame ? onClose : undefined}>
+      <div className="screen-card" onClick={(e) => e.stopPropagation()}>
         <div className="panel-header">
-          <button className="close" onClick={onClose} aria-label="Back to menu">
+          <button className="close" onClick={onClose} aria-label={inGame ? 'Back to the game' : 'Back to menu'}>
             ‹
           </button>
           <h2>Settings</h2>
@@ -371,6 +372,59 @@ export function DiscardSheet({
             Each player also has 1 card discarded face down at setup. It stays hidden and is shuffled back in for the
             Rail Era.
           </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Everything that's happened, newest first, grouped by era and round. */
+export function GameLogSheet({
+  entries,
+  names,
+  onClose,
+}: {
+  entries: readonly LogEntry[];
+  names: readonly string[];
+  onClose: () => void;
+}) {
+  // Group consecutive entries by era and round, newest round first.
+  const groups: { title: string; items: LogEntry[] }[] = [];
+  for (const e of entries) {
+    const title = `${e.era === 'canal' ? 'Canal' : 'Rail'} Era · Round ${e.round}`;
+    const last = groups.at(-1);
+    if (last && last.title === title) last.items.push(e);
+    else groups.push({ title, items: [e] });
+  }
+  groups.reverse();
+  return (
+    <div className="overlay mat-overlay" onClick={onClose}>
+      <div className="screen-card log-sheet" role="dialog" aria-label="Game log" onClick={(e) => e.stopPropagation()}>
+        <div className="mat-sheet-header">
+          <h2>Game log</h2>
+          <span className="muted">{entries.length} actions</span>
+          <button className="close" onClick={onClose} aria-label="Close">
+            ✕
+          </button>
+        </div>
+        {groups.length === 0 ? (
+          <p className="muted">Nothing has happened yet.</p>
+        ) : (
+          groups.map((g, i) => (
+            <section key={i} className="recap log-group">
+              <h3>{g.title}</h3>
+              <ol>
+                {[...g.items].reverse().map((r, j) => (
+                  <li key={j}>
+                    <span className={`dot owner-${r.player}`} aria-hidden />
+                    <span>
+                      <strong>{names[r.player]}</strong> {r.text}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          ))
         )}
       </div>
     </div>

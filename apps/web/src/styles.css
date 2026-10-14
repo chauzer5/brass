@@ -648,6 +648,65 @@ button {
   box-shadow: var(--shadow);
 }
 
+/* ---- The ☰ menu ---- */
+
+.menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 11;
+}
+
+.game-menu {
+  position: fixed;
+  z-index: 12;
+  top: calc(env(safe-area-inset-top) + 52px);
+  left: 12px;
+  display: flex;
+  flex-direction: column;
+  min-width: 190px;
+  padding: 6px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+  animation: menu-in 0.14s ease-out;
+}
+
+@keyframes menu-in {
+  from { opacity: 0; transform: translateY(-6px); }
+}
+
+.game-menu button {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.game-menu button:hover,
+.game-menu button:focus-visible {
+  background: var(--bg);
+}
+
+/* ---- Game log ---- */
+
+.log-sheet {
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  gap: 14px;
+}
+
+.log-group ol {
+  max-height: none;
+}
+
 /* ---- Handoff recap ---- */
 
 .recap h3 {

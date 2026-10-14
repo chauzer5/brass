@@ -8,10 +8,10 @@ import { ActionRail } from './ui/ActionRail.tsx';
 import { HandTray, type Arriving, type TrayTab } from './ui/HandTray.tsx';
 import { IncomeTrack } from './ui/IncomeTrack.tsx';
 import { PlayerMat } from './ui/PlayerMat.tsx';
-import { DiscardSheet, EraSummary, Handoff, MatSheet, NewGame, PlayerStrip } from './ui/Screens.tsx';
+import { DiscardSheet, EraSummary, GameLogSheet, Handoff, Settings, MatSheet, NewGame, PlayerStrip } from './ui/Screens.tsx';
 import { StepPanel, pickCard, tapMatRow, tapMerchant, tapSlot } from './ui/TurnPanel.tsx';
 import { choosable, chosenSource, sourceNeeds } from './game/sources.ts';
-import { recapSince } from './game/recap.ts';
+import { gameLog, recapSince } from './game/recap.ts';
 
 export function App() {
   const { game, start, play, undoLast, quit } = useGame();
@@ -67,6 +67,10 @@ function Table({
   /** Another player whose mat is open in a sheet. */
   const [matFor, setMatFor] = useState<number | null>(null);
   const [showDiscards, setShowDiscards] = useState(false);
+  // The ☰ menu, and what it opens over the game.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [sheet, setSheet] = useState<'log' | 'settings' | null>(null);
+  const log = useMemo(() => (sheet === 'log' ? gameLog(match) : []), [sheet, match]);
 
   // A new player (or a new phase) starts with a fresh draft.
   useEffect(() => setDraft(EMPTY_DRAFT), [player, state.phase.kind, match.log.length]);
@@ -242,7 +246,7 @@ function Table({
   return (
     <div className="app">
       <header className="topbar">
-        <button className="brand" onClick={onMenu} aria-label="Menu">
+        <button className="brand" onClick={() => setMenuOpen((o) => !o)} aria-label="Menu" aria-expanded={menuOpen} aria-haspopup="menu">
           <img src="/icon.svg" alt="" className="brand-logo" />
           Brass ☰
         </button>
@@ -375,6 +379,34 @@ function Table({
           </HandTray>
         )}
       </main>
+      {menuOpen && (
+        <>
+          {/* Tapping anywhere else closes the menu. */}
+          <div className="menu-backdrop" onClick={() => setMenuOpen(false)} />
+          <div className="game-menu" role="menu">
+            {(
+              [
+                ['Main menu', onMenu],
+                ['Game log', () => setSheet('log')],
+                ['Settings', () => setSheet('settings')],
+              ] as const
+            ).map(([label, run]) => (
+              <button
+                key={label}
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  run();
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      {sheet === 'log' && <GameLogSheet entries={log} names={names} onClose={() => setSheet(null)} />}
+      {sheet === 'settings' && <Settings inGame onClose={() => setSheet(null)} />}
       {showDiscards && <DiscardSheet view={view} names={names} onClose={() => setShowDiscards(false)} />}
       {matFor !== null && (
         <MatSheet

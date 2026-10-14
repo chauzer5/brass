@@ -82,3 +82,24 @@ export function recapSince(match: BrassMatch, viewer: number): RecapItem[] {
   }
   return out;
 }
+
+/** One entry of the game log: who did what, and when. */
+export interface LogEntry extends RecapItem {
+  era: brass.Era;
+  round: number;
+}
+
+/** Every action so far, in words, oldest first. Replays the whole log once. */
+export function gameLog(match: BrassMatch): LogEntry[] {
+  const start = replay(brass.brassGame, match.config, match.seed, []);
+  if (!start.ok) return [];
+  let m = start.value;
+  const out: LogEntry[] = [];
+  for (const entry of match.log) {
+    const next = act(brass.brassGame, m, entry.player, entry.action);
+    if (!next.ok) break;
+    out.push({ ...describe(m.state, next.value.state, entry.player, entry.action), era: m.state.era, round: m.state.round });
+    m = next.value;
+  }
+  return out;
+}
