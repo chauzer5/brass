@@ -178,9 +178,12 @@ export function HandTray({
   // New cards fly from the deck pile on the map (or the board's top-left corner if it's out of view) into place.
   const innerCards = useRef<HTMLDivElement>(null);
   const [dealing, setDealing] = useState(false);
+  // Each batch flies in once. (Hiding the row for the Board tab zeroes its width, which re-runs this effect.)
+  const dealt = useRef<string | null>(null);
   useLayoutEffect(() => {
     const row = innerCards.current;
-    if (!arriving || !row || width === 0) return;
+    if (!arriving || !row || width === 0 || dealt.current === arriving.key) return;
+    dealt.current = arriving.key;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const deck = document.querySelector('[data-pile="deck"]')?.getBoundingClientRect();
     const area = document.querySelector('.board-area')?.getBoundingClientRect();
