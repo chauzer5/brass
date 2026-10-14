@@ -1429,6 +1429,10 @@ button {
   stroke-width: 1.5;
 }
 
+.income-arrowhead {
+  fill: var(--owner);
+}
+
 .tray-income {
   padding: 0 12px;
 }

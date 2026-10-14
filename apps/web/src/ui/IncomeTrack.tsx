@@ -82,7 +82,14 @@ export function IncomeTrack({
         })}
         {preview !== undefined && preview !== from && (
           <g className={`income-preview owner-${focus}`}>
+            {/* Defined here, inside the player's colour class, so the arrowhead picks up that colour. */}
+            <defs>
+              <marker id={`income-arrow-${focus}`} viewBox="0 0 10 10" refX="7" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10 Z" className="income-arrowhead" />
+              </marker>
+            </defs>
             <path
+              markerEnd={`url(#income-arrow-${focus})`}
               d={`M${spaceX(from) + SPACE_W / 2} ${TRACK_Y + TRACK_H + 3} Q${(spaceX(from) + spaceX(preview)) / 2 + SPACE_W / 2} ${TRACK_Y + TRACK_H + 12} ${spaceX(preview) + SPACE_W / 2} ${TRACK_Y + TRACK_H + 3}`}
               className="income-preview-arrow"
             />
