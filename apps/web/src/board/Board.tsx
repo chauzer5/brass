@@ -41,6 +41,8 @@ interface BoardProps {
   focus?: { location: brass.LocationId; key: string } | null | undefined;
   /** Pan and zoom to fit a box of the map (in map units); `key` re-triggers it. */
   frame?: { box: MapBox; key: string } | null | undefined;
+  /** Whether the action rail is over the board's right edge (the map can then be dragged out from under it). */
+  rail?: boolean;
 }
 
 /** Holding a space this long explains why it can't be built on; moving further than the slop is a pan instead. */
@@ -275,6 +277,7 @@ export function Board({
   onMerchant,
   focus,
   frame,
+  rail = true,
 }: BoardProps) {
   const tiles = state?.tiles ?? {};
   const links = state?.links ?? {};
@@ -351,7 +354,7 @@ export function Board({
     const view = wrapper.getBoundingClientRect();
     const tray = document.querySelector('.hand-tray')?.getBoundingClientRect();
     const visibleBottom = tray ? Math.min(view.bottom, tray.top) : view.bottom;
-    const availW = view.width - RAIL_WIDTH;
+    const availW = view.width - (rail ? RAIL_WIDTH : 0);
     const availH = visibleBottom - view.top;
     const boxW = Math.max(1, (box.x1 - box.x0) * unit);
     const boxH = Math.max(1, (box.y1 - box.y0) * unit);
@@ -365,6 +368,18 @@ export function Board({
     const y = clamp(availH / 2 - py * scale, content.offsetHeight, view.height);
     ref.setTransform(x, y, scale, 350, 'easeOut');
   };
+
+  // Without the rail there's no room to drag into on the right: pull the map back if it's panned past its edge.
+  useEffect(() => {
+    if (rail) return;
+    const ref = zoom.current;
+    const content = ref?.instance.contentComponent;
+    const wrapper = ref?.instance.wrapperComponent;
+    if (!ref || !content || !wrapper) return;
+    const { positionX, positionY, scale } = ref.instance.state;
+    const minX = wrapper.offsetWidth - content.offsetWidth * scale;
+    if (positionX < minX) ref.setTransform(minX, positionY, scale, 250, 'easeOut');
+  }, [rail]);
 
   useEffect(() => {
     if (frame) showArea(frame.box, FOCUS_SCALE);
@@ -417,7 +432,7 @@ export function Board({
         zoomScale.current = scale;
         fitHighlights();
       }}>
-      <TransformComponent wrapperClass="board-viewport" contentClass="board-content">
+      <TransformComponent wrapperClass={rail ? 'board-viewport' : 'board-viewport no-rail'} contentClass="board-content">
         <svg
           ref={svgRef}
           className="board-svg"

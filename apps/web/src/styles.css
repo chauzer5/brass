@@ -246,6 +246,10 @@ button {
   height: 100% !important;
 }
 
+.board-viewport.no-rail {
+  --rail-space: 0px;
+}
+
 .board-content {
   width: calc(100% + var(--rail-space)) !important;
   height: 100% !important;

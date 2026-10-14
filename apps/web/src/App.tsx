@@ -14,6 +14,9 @@ import { choosable, chosenSource, sourceNeeds } from './game/sources.ts';
 import { gameLog, recapSince, type RecapItem } from './game/recap.ts';
 import { runBot } from './bot/runBot.ts';
 
+/** Looking over a finished game: the whole map. */
+const WHOLE_MAP = { box: { x0: 0, y0: 0, x1: 1000, y1: 1000 }, key: 'whole-map' };
+
 /** Pause before each bot action, so people can see what's happening. */
 const BOT_PAUSE_MS = 900;
 
@@ -206,7 +209,8 @@ function Table({
   const hand = p?.hand ?? [];
   const usable = draft.kind ? usableCards(view.cards, hand, legal, draft) : null;
   const selectedCards = new Set(draft.kind === 'scout' ? draft.scoutCards : draft.card ? [draft.card] : []);
-  const showControls = player !== null && !hidden;
+  // Waiting on the "Your turn" screen (it holds off while a sale animation plays): no actions until it's seen.
+  const showControls = player !== null && !hidden && soloRecap.length === 0;
   // The hand (and board) tray: shown to the human in control, or to the only human while bots play.
   const showTray = handOwner !== null && !hidden;
   // Develop, once its card is chosen, is played by tapping industries on the mat.
@@ -349,7 +353,8 @@ function Table({
             else pickSource('merchant');
           }}
           onLink={(id) => setDraft((d) => tapLink(view.cards, legal, d, id))}
-          frame={hidden ? null : sourceFrame}
+          frame={hidden ? null : outcome && resultsHidden ? WHOLE_MAP : sourceFrame}
+          rail={showControls && state.phase.kind === 'actions'}
           focus={buildFocus ?? peek}
         />
         {showControls && state.phase.kind === 'actions' && (
@@ -494,7 +499,8 @@ function Table({
           outcome={outcome}
           onContinue={() => {
             setSeenEras(view.eraScores.length);
-            setResultsHidden(true);
+            // Only the game's end stays dismissed; the Canal Era's summary closing mustn't hide the final one.
+            if (outcome) setResultsHidden(true);
           }}
           onNewGame={onNewGame}
         />
