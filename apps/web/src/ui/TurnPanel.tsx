@@ -157,16 +157,7 @@ function BuildSteps({ view, me, legal, draft, setDraft }: StepProps & { me: bras
   const tile = draft.industry ? brass.tileStats(draft.industry, me.mat[draft.industry].findIndex((n) => n > 0) + 1) : null;
   return (
     <>
-      {draft.slot ? (
-        <p className="hint">
-          Building in <strong>{slotName(draft.slot.location, draft.slot.slot)}</strong>
-          {chosenKey && view.tiles[chosenKey] ? ' (overbuild)' : ''}. Tap another highlighted space to change it.
-        </p>
-      ) : (
-        <p className="hint">
-          Tap a highlighted space on the map ({slots.length} available).
-        </p>
-      )}
+      {!draft.slot && <p className="hint">Tap a highlighted space on the map ({slots.length} available).</p>}
       {industries.length > 1 && (
         <Step title="Which industry?">
           <div className="chips">
