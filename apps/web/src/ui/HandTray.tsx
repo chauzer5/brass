@@ -61,6 +61,16 @@ const townLabel = (id: brass.LocationId) => TOWN_LABEL[id] ?? brass.TOWNS.find((
 
 export type TrayTab = 'hand' | 'mat';
 
+/** Cards that just joined the hand and should fly in from the deck. `key` changes for each batch. */
+export interface Arriving {
+  ids: ReadonlySet<brass.CardId>;
+  key: string;
+}
+
+/** How cards fly in from the deck. */
+const DEAL_MS = 560;
+const DEAL_STAGGER = 110;
+
 /** One card from the hand, drawn like the physical card. */
 export function GameCard({ card }: { card: brass.Card | undefined }) {
   if (!card) return <div className="game-card back" />;
@@ -130,6 +140,7 @@ export function HandTray({
   onTabChange,
   mat,
   panelOnMat = false,
+  arriving,
   children,
 }: {
   cards: Record<brass.CardId, brass.Card>;
@@ -148,6 +159,7 @@ export function HandTray({
   mat: ReactNode;
   /** Also show the step panel above the mat (for actions played on the mat, like Develop). */
   panelOnMat?: boolean;
+  arriving?: Arriving | null | undefined;
   children?: ReactNode;
 }) {
   const rowRef = useRef<HTMLDivElement>(null);
@@ -156,10 +168,50 @@ export function HandTray({
   useLayoutEffect(() => {
     const el = rowRef.current;
     if (!el) return;
+    // Measure now, so the first paint already has the cards in place.
+    setWidth(el.getBoundingClientRect().width);
     const ro = new ResizeObserver(([entry]) => setWidth(entry!.contentRect.width));
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  // New cards fly from the deck pile on the map (or the board's top-left corner if it's out of view) into place.
+  const innerCards = useRef<HTMLDivElement>(null);
+  const [dealing, setDealing] = useState(false);
+  useLayoutEffect(() => {
+    const row = innerCards.current;
+    if (!arriving || !row || width === 0) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const deck = document.querySelector('[data-pile="deck"]')?.getBoundingClientRect();
+    const area = document.querySelector('.board-area')?.getBoundingClientRect();
+    const fromX = deck && area ? Math.min(Math.max(deck.left + deck.width / 2, area.left), area.right) : 0;
+    const fromY = deck && area ? Math.min(Math.max(deck.top + deck.height / 2, area.top), area.bottom) : 0;
+    const cards = [...row.querySelectorAll<HTMLElement>('[data-card]')].filter((el) => arriving.ids.has(el.dataset.card!));
+    if (cards.length === 0) return;
+    setDealing(true);
+    const runs = cards.map((el, i) => {
+      const r = el.getBoundingClientRect();
+      const dx = fromX - (r.left + r.width / 2);
+      const dy = fromY - (r.top + r.height / 2);
+      return el.animate(
+        [
+          { transform: `translate(${dx}px, ${dy}px) scale(0.45) rotate(-14deg)`, opacity: 0.2, zIndex: 80 },
+          { transform: `translate(${dx * 0.35}px, ${dy * 0.35 - 30}px) scale(0.9) rotate(-4deg)`, opacity: 1, zIndex: 80, offset: 0.6 },
+          { transform: 'none', opacity: 1, zIndex: 80 },
+        ],
+        { duration: DEAL_MS, delay: i * DEAL_STAGGER, easing: 'cubic-bezier(0.25, 0.7, 0.3, 1)', fill: 'backwards' },
+      );
+    });
+    let done = false;
+    Promise.allSettled(runs.map((a) => a.finished)).then(() => {
+      if (!done) setDealing(false);
+    });
+    return () => {
+      done = true;
+      runs.forEach((a) => a.cancel());
+      setDealing(false);
+    };
+  }, [arriving?.key, width > 0]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const lastTap = useRef<{ id: brass.CardId; at: number } | null>(null);
   const tapCard = (id: brass.CardId) => {
@@ -288,7 +340,7 @@ export function HandTray({
       <div
         hidden={tab !== 'hand'}
         className={`hand-row ${step < TIGHT_PEEK ? 'tight' : ''}`}
-        data-peeking={peek !== null}
+        data-peeking={peek !== null || dealing}
         ref={rowRef}
         style={
           {
@@ -299,7 +351,10 @@ export function HandTray({
       >
         <div
           className="hand-row-inner"
-          ref={innerRef}
+          ref={(el) => {
+            innerRef.current = el;
+            innerCards.current = el;
+          }}
           onPointerDown={onHandDown}
           onPointerMove={onHandMove}
           onPointerUp={endHold}
@@ -324,6 +379,7 @@ export function HandTray({
           return (
             <button
               key={id}
+              data-card={id}
               className={`hand-card ${isSelected ? 'selected' : ''} ${usable && disabled ? 'unusable' : ''} ${rowEnd ? 'row-end' : ''} ${peeked ? 'peeked' : ''}`}
               style={{ left: rowOffset(row) + col * step, top: CARD_TOP + row * ROW_STEP, zIndex: peeked ? 60 : isSelected ? 50 : i }}
               // Not `disabled`: a disabled button swallows the pointer events that start a hold.

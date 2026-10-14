@@ -323,6 +323,66 @@ button {
 .banner-yellow { fill: var(--banner-yellow); }
 .banner-purple { fill: var(--banner-purple); }
 
+/* ---- Market sale animation ---- */
+
+.sale-anim {
+  pointer-events: none;
+}
+
+/* A cube pops up on the tile, lifts, then flies to its market space. */
+.sale-cube {
+  opacity: 0;
+  animation-name: sale-cube;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.45));
+}
+
+@keyframes sale-cube {
+  0% { transform: translate(0, 0) scale(0); opacity: 0; }
+  12% { transform: translate(0, var(--lift)) scale(2); opacity: 1; animation-timing-function: ease-out; }
+  30% { transform: translate(0, var(--lift)) scale(1.7); opacity: 1; animation-timing-function: cubic-bezier(0.55, 0, 0.35, 1); }
+  98% { transform: translate(var(--dx), var(--dy)) scale(1); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(1); opacity: 0; }
+}
+
+/* On landing, the cube turns into a coin showing its price, which rises and fades. */
+.sale-coin {
+  opacity: 0;
+  animation-name: sale-coin;
+  animation-fill-mode: both;
+  animation-timing-function: ease-out;
+}
+
+@keyframes sale-coin {
+  0% { transform: translate(0, 0) scale(0.3); opacity: 0; }
+  18% { transform: translate(0, -6px) scale(1.6); opacity: 1; }
+  45% { transform: translate(0, -16px) scale(1.4); opacity: 1; }
+  100% { transform: translate(0, -50px) scale(1.3); opacity: 0; }
+}
+
+.sale-coin-face {
+  fill: #f2c230;
+  stroke: #8a5a1c;
+  stroke-width: 2;
+}
+
+.sale-coin-text {
+  fill: #3a2012;
+  font-size: 10px;
+  font-weight: 800;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sale-cube,
+  .sale-coin {
+    animation: none;
+    opacity: 0;
+  }
+}
+
 /* ---- Town name ribbons ---- */
 
 /* Rich colours in both themes, so the cream lettering always reads. */

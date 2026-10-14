@@ -1,10 +1,10 @@
 import { brass } from '@brass/engine';
-import { useEffect, useMemo, useState } from 'react';
-import { Board } from './board/Board.tsx';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Board, saleDuration, type MarketSale } from './board/Board.tsx';
 import { EMPTY_DRAFT, availableKinds, developIndustries, highlights, tapLink, usableCards, type Draft } from './game/draft.ts';
 import { canUndo, useGame, type Game } from './game/useGame.ts';
 import { ActionRail } from './ui/ActionRail.tsx';
-import { HandTray, type TrayTab } from './ui/HandTray.tsx';
+import { HandTray, type Arriving, type TrayTab } from './ui/HandTray.tsx';
 import { PlayerMat } from './ui/PlayerMat.tsx';
 import { DiscardSheet, GameOver, Handoff, MatSheet, NewGame, PlayerStrip } from './ui/Screens.tsx';
 import { StepPanel, pickCard, tapMatRow, tapSlot } from './ui/TurnPanel.tsx';
@@ -95,6 +95,47 @@ function Table({
   // Building with a town card: jump the map to that town.
   const focusCard = draft.kind === 'build' && draft.card ? view.cards[draft.card] : undefined;
   const buildFocus = focusCard?.kind === 'location' ? { location: focusCard.location, key: draft.card! } : null;
+  // A new Coal Mine or Iron Works that sold cubes to its market: animate them flying there.
+  const [sale, setSale] = useState<MarketSale | null>(null);
+  const before = useRef({ state, length: match.log.length });
+  useLayoutEffect(() => {
+    const prev = before.current;
+    before.current = { state, length: match.log.length };
+    if (match.log.length !== prev.length + 1) return;
+    const last = match.log.at(-1)!.action;
+    if (last.type !== 'build' || (last.industry !== 'coal' && last.industry !== 'iron')) return;
+    const kind = last.industry;
+    const field = kind === 'coal' ? 'coalMarket' : 'ironMarket';
+    // Building one of these only ever adds to its own market, filling the most expensive empty spaces first.
+    const sold = state[field] - prev.state[field];
+    if (sold <= 0) return;
+    const n = (kind === 'coal' ? brass.COAL_MARKET : brass.IRON_MARKET).prices.length;
+    const spaces = Array.from({ length: sold }, (_, i) => n - prev.state[field] - 1 - i);
+    setSale({ id: String(match.log.length), kind, location: last.location, slot: last.slot, spaces });
+  }, [match.log.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!sale) return;
+    const t = window.setTimeout(() => setSale(null), saleDuration(sale) + 100);
+    return () => clearTimeout(t);
+  }, [sale]);
+
+  // Cards new to a player's hand since they last saw it fly in from the deck: the deal, the
+  // end-of-turn draw (seen when the player next takes the device), and Wild cards from scouting.
+  const [arriving, setArriving] = useState<Arriving | null>(null);
+  const seenHands = useRef(new Map<number, Set<brass.CardId>>());
+  const seenLength = useRef(match.log.length);
+  useLayoutEffect(() => {
+    const undone = match.log.length < seenLength.current;
+    seenLength.current = match.log.length;
+    if (!showControls || player === null) return;
+    const seen = seenHands.current.get(player);
+    seenHands.current.set(player, new Set(hand));
+    // Undo puts cards back; they didn't come from the deck.
+    if (undone || tucked || trayTab !== 'hand') return;
+    const fresh = hand.filter((id) => !seen?.has(id));
+    if (fresh.length > 0) setArriving({ ids: new Set(fresh), key: `${player}:${match.log.length}:${fresh.join()}` });
+  }, [showControls, player, hand.join(), match.log.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Double-tapping a town card with no action chosen also shows that town.
   const [peek, setPeek] = useState<{ location: brass.LocationId; key: string } | null>(null);
   const peekAt = (id: brass.CardId) => {
@@ -136,6 +177,7 @@ function Table({
         <Board
           state={view}
           names={names}
+          sale={sale}
           onDiscards={() => setShowDiscards(true)}
           highlights={hidden ? undefined : lit}
           onSlot={(location, slot) => {
@@ -165,6 +207,7 @@ function Table({
           <HandTray
             cards={view.cards}
             hand={hand}
+            arriving={arriving}
             usable={usable}
             selected={selectedCards}
             onPick={(id) => {
@@ -222,7 +265,8 @@ function Table({
           onClose={() => setMatFor(null)}
         />
       )}
-      {hidden && player !== null && <Handoff name={names[player]!} onReady={() => setRevealedFor(player)} />}
+      {/* The next player's screen waits for a sale animation to finish, so whoever built sees it. */}
+      {hidden && player !== null && !sale && <Handoff name={names[player]!} onReady={() => setRevealedFor(player)} />}
       {outcome && <GameOver outcome={outcome} names={names} onNewGame={onNewGame} />}
     </div>
   );

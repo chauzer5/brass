@@ -1,5 +1,5 @@
 import { brass } from '@brass/engine';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { TransformComponent, TransformWrapper, type ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
 import type { Highlights } from '../game/draft.ts';
 import { INDUSTRY_NAME, roman } from '../game/labels.ts';
@@ -23,6 +23,8 @@ interface BoardProps {
   names?: readonly string[] | undefined;
   /** Tapping the discard pile. */
   onDiscards?: (() => void) | undefined;
+  /** A sale to the coal or iron market to animate. */
+  sale?: MarketSale | null | undefined;
   highlights?: Highlights | undefined;
   onSlot?: (location: brass.LocationId, slot: number) => void;
   onLink?: (id: string) => void;
@@ -35,6 +37,8 @@ interface BoardProps {
 
 /** How far to zoom in on a focused location. */
 const FOCUS_SCALE = 2.6;
+/** The map never zooms out past this (matches the TransformWrapper). */
+const MIN_SCALE = 1;
 /** Width of the action rail floating over the board's right edge. */
 const RAIL_WIDTH = 76;
 
@@ -187,6 +191,7 @@ function Slots({
           <g
             key={i}
             transform={`translate(${pos.x} ${pos.y})`}
+            data-slot={i}
             className={lit ? 'tappable' : undefined}
             onClick={lit ? () => onSlot?.(location, i) : undefined}
           >
@@ -223,34 +228,78 @@ function Slots({
   );
 }
 
-export function Board({ state, names, onDiscards, highlights = NO_HIGHLIGHTS, onSlot, onLink, focus }: BoardProps) {
+export function Board({ state, names, onDiscards, sale, highlights = NO_HIGHLIGHTS, onSlot, onLink, focus }: BoardProps) {
   const tiles = state?.tiles ?? {};
   const links = state?.links ?? {};
   const zoom = useRef<ReactZoomPanPinchRef>(null);
 
-  useEffect(() => {
+  /**
+   * Pans and zooms so a box of the map (in map units) sits in the middle of
+   * the part of the board not covered by the rail or the hand, as large as fits
+   * up to `maxScale`.
+   */
+  const showArea = (box: { x0: number; y0: number; x1: number; y1: number }, maxScale: number) => {
     const ref = zoom.current;
     const svg = ref?.instance.contentComponent?.querySelector('svg');
     const wrapper = ref?.instance.wrapperComponent;
-    if (!focus || !ref || !svg || !wrapper) return;
+    if (!ref || !svg || !wrapper) return;
     // Map units -> content pixels at scale 1 (the map is drawn "meet", pinned to the top).
     const svgW = svg.clientWidth;
     const svgH = svg.clientHeight;
     const unit = Math.min(svgW, svgH) / BOARD_SIZE;
-    const pos = brass.LOCATION_BY_ID[focus.location].pos;
-    const px = (svgW - BOARD_SIZE * unit) / 2 + pos.x * unit;
-    const py = pos.y * unit;
-    // Centre it in the part of the board not covered by the rail or the hand.
+    const offsetX = (svgW - BOARD_SIZE * unit) / 2;
     const view = wrapper.getBoundingClientRect();
     const tray = document.querySelector('.hand-tray')?.getBoundingClientRect();
     const visibleBottom = tray ? Math.min(view.bottom, tray.top) : view.bottom;
-    const cx = (view.width - RAIL_WIDTH) / 2;
-    const cy = (visibleBottom - view.top) / 2;
-    ref.setTransform(cx - px * FOCUS_SCALE, cy - py * FOCUS_SCALE, FOCUS_SCALE, 350, 'easeOut');
+    const availW = view.width - RAIL_WIDTH;
+    const availH = visibleBottom - view.top;
+    const boxW = Math.max(1, (box.x1 - box.x0) * unit);
+    const boxH = Math.max(1, (box.y1 - box.y0) * unit);
+    const scale = Math.max(MIN_SCALE, Math.min(maxScale, availW / boxW, availH / boxH));
+    const px = offsetX + ((box.x0 + box.x1) / 2) * unit;
+    const py = ((box.y0 + box.y1) / 2) * unit;
+    // Never pan past the map's edges: when the box can't fit, show as much of it as the map allows.
+    const content = ref.instance.contentComponent!;
+    const clamp = (v: number, size: number, room: number) => Math.min(0, Math.max(room - size * scale, v));
+    const x = clamp(availW / 2 - px * scale, content.offsetWidth, view.width);
+    const y = clamp(availH / 2 - py * scale, content.offsetHeight, view.height);
+    ref.setTransform(x, y, scale, 350, 'easeOut');
+  };
+
+  // A sale to the market: frame the new tile and the market together, so the cubes' whole flight is in view.
+  useEffect(() => {
+    if (!sale) return;
+    const from = slotCenter(sale.location, sale.slot);
+    const pad = 30;
+    showArea(
+      {
+        x0: Math.min(from.x, MARKET.left) - pad,
+        y0: Math.min(from.y, MARKET.top) - pad,
+        x1: Math.max(from.x, MARKET.left + MARKET.width) + pad,
+        y1: Math.max(from.y, marketRowY(1) + 40) + pad,
+      },
+      FOCUS_SCALE,
+    );
+  }, [sale?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Market spaces stay empty until their cube lands.
+  const [landed, setLanded] = useState(0);
+  useEffect(() => {
+    setLanded(0);
+    if (!sale) return;
+    const timers = sale.spaces.map((_, i) => window.setTimeout(() => setLanded(i + 1), i * SALE_STAGGER + SALE_FLY));
+    return () => timers.forEach(clearTimeout);
+  }, [sale?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const pending = sale && landed < sale.spaces.length ? { kind: sale.kind, spaces: new Set(sale.spaces.slice(landed)) } : undefined;
+
+  useEffect(() => {
+    if (!focus) return;
+    const pos = brass.LOCATION_BY_ID[focus.location].pos;
+    showArea({ x0: pos.x, y0: pos.y, x1: pos.x, y1: pos.y }, FOCUS_SCALE);
   }, [focus?.location, focus?.key]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <TransformWrapper ref={zoom} minScale={1} maxScale={6} doubleClick={{ mode: 'zoomIn' }}>
+    <TransformWrapper ref={zoom} minScale={MIN_SCALE} maxScale={6} doubleClick={{ mode: 'zoomIn' }}>
       <TransformComponent wrapperClass="board-viewport" contentClass="board-content">
         <svg
           className="board-svg"
@@ -271,7 +320,7 @@ export function Board({ state, names, onDiscards, highlights = NO_HIGHLIGHTS, on
           {/* Softens the art so links, spaces and labels stay readable on top of it. */}
           <rect width={BOARD_SIZE} height={BOARD_SIZE} className="board-wash" />
 
-          {state && <Markets coal={state.coalMarket} iron={state.ironMarket} />}
+          {state && <Markets coal={state.coalMarket} iron={state.ironMarket} pending={pending} />}
           {state && names && <TurnOrder state={state} names={names} />}
           {state && <Piles state={state} onDiscards={onDiscards} />}
 
@@ -333,6 +382,9 @@ export function Board({ state, names, onDiscards, highlights = NO_HIGHLIGHTS, on
               )}
             </g>
           ))}
+
+          {/* Above everything, so the cubes fly over towns and links on their way to the market. */}
+          {sale && <SaleAnimation key={sale.id} sale={sale} />}
         </svg>
       </TransformComponent>
     </TransformWrapper>
@@ -536,7 +588,7 @@ function Piles({
       {Array.from({ length: stack(n) }, (_, i) => (
         <rect key={i} x={x + (stack(n) - i) * 2} y={y - (stack(n) - i) * 2 + 4} width={w} height={h - 4} rx={5} className={`pile-under ${kind}`} />
       ))}
-      <rect x={x} y={y} width={w} height={h} rx={5} className={n ? `pile-card ${kind}` : 'pile-empty'} />
+      <rect x={x} y={y} width={w} height={h} rx={5} className={n ? `pile-card ${kind}` : 'pile-empty'} data-pile={kind} />
       <text x={x + w / 2} y={y + h / 2} className={`pile-count ${kind}`}>
         {n}
       </text>
@@ -624,19 +676,106 @@ function TurnOrder({
   );
 }
 
+/** Cubes a new Coal Mine or Iron Works sold to its market, for the animation. */
+export interface MarketSale {
+  /** Changes for each sale, so a repeat of the same build still animates. */
+  id: string;
+  kind: 'coal' | 'iron';
+  location: brass.LocationId;
+  slot: number;
+  /** Market spaces filled, in the order the cubes were sold (most expensive first). */
+  spaces: number[];
+}
+
+const SALE_STAGGER = 260;
+const SALE_FLY = 1150;
+const SALE_COIN = 1000;
+/** How long a sale's animation runs, start to finish. */
+export const saleDuration = (sale: MarketSale) => (sale.spaces.length - 1) * SALE_STAGGER + SALE_FLY + SALE_COIN;
+
+/** Centre of a town's industry space. */
+function slotCenter(location: brass.LocationId, slot: number) {
+  const loc = brass.LOCATION_BY_ID[location];
+  const count = loc.kind === 'merchant' ? 1 : loc.slots.length;
+  const { width, height } = slotLayout(count);
+  const p = slotPosition(slot, count);
+  return { x: loc.pos.x - width / 2 + p.x + SLOT / 2, y: loc.pos.y - height / 2 + p.y + SLOT / 2 };
+}
+
+/**
+ * Cubes pop up on the new tile, fly one by one to their market spaces, and
+ * each turns into a coin showing what it sold for.
+ */
+function SaleAnimation({ sale }: { sale: MarketSale }) {
+  const from = slotCenter(sale.location, sale.slot);
+  const c = MARKET.cell - 4;
+  return (
+    <g className="sale-anim" aria-hidden>
+      {sale.spaces.map((j, i) => {
+        const to = marketSpace(sale.kind, j);
+        const delay = i * SALE_STAGGER;
+        return (
+          <g key={`${sale.id}-${j}`}>
+            <g transform={`translate(${from.x} ${from.y})`}>
+              <g
+                className="sale-cube"
+                style={
+                  {
+                    '--dx': `${to.x - from.x}px`,
+                    '--dy': `${to.y - from.y}px`,
+                    '--lift': `${-14 - i * 4}px`,
+                    animationDelay: `${delay}ms`,
+                    animationDuration: `${SALE_FLY}ms`,
+                  } as CSSProperties
+                }
+              >
+                <rect x={-c / 2} y={-c / 2} width={c} height={c} rx={2} className={`market-cube ${sale.kind}`} />
+              </g>
+            </g>
+            <g transform={`translate(${to.x} ${to.y})`}>
+              <g className="sale-coin" style={{ animationDelay: `${delay + SALE_FLY}ms`, animationDuration: `${SALE_COIN}ms` }}>
+                <circle r={13} className="sale-coin-face" />
+                <text className="sale-coin-text">£{to.price}</text>
+              </g>
+            </g>
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
 const MARKET = { left: 852, top: 261, width: 142, rowGap: 44, firstRowY: 282, cell: 20 };
 const COAL_X = [889, 913];
 const IRON_X = [945, 969];
 
-function Markets({ coal, iron }: { coal: number; iron: number }) {
-  const rowY = (price: number) => MARKET.firstRowY + (8 - price) * MARKET.rowGap;
+const marketRowY = (price: number) => MARKET.firstRowY + (8 - price) * MARKET.rowGap;
+
+/** Centre of a market space, by its index into the market's prices. */
+function marketSpace(kind: 'coal' | 'iron', j: number) {
+  const def = kind === 'coal' ? brass.COAL_MARKET : brass.IRON_MARKET;
+  const xs = kind === 'coal' ? COAL_X : IRON_X;
+  return { x: xs[j % 2]!, y: marketRowY(def.prices[j]!), price: def.prices[j]! };
+}
+
+function Markets({
+  coal,
+  iron,
+  pending,
+}: {
+  coal: number;
+  iron: number;
+  /** Spaces whose cubes are still flying in from a sale; drawn empty until they land. */
+  pending?: { kind: 'coal' | 'iron'; spaces: ReadonlySet<number> } | undefined;
+}) {
+  const rowY = marketRowY;
   const bottom = rowY(1) + 23;
 
   const spaces = (def: brass.MarketDef, cubes: number, xs: number[], kind: 'coal' | 'iron') => {
     const n = def.prices.length;
     const nextIndex = cubes > 0 ? n - cubes : -1;
     return def.prices.map((price, j) => {
-      const filled = j >= n - cubes;
+      const filled = j >= n - cubes && !(pending?.kind === kind && pending.spaces.has(j));
       const x = xs[j % 2]! - MARKET.cell / 2;
       const y = rowY(price) - MARKET.cell / 2;
       return (
