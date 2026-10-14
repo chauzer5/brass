@@ -499,10 +499,10 @@ button {
 
 .stall-name {
   fill: var(--stall-ink);
-  font-size: 7.5px;
-  font-weight: 700;
+  /* Same lettering as the town ribbons. */
+  font: 700 8px Georgia, 'Times New Roman', serif;
   letter-spacing: 0.08em;
-  opacity: 0.75;
+  opacity: 0.85;
   text-transform: uppercase;
   text-anchor: middle;
   dominant-baseline: central;
