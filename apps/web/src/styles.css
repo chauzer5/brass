@@ -1362,14 +1362,6 @@ button {
   margin: 0 5px;
 }
 
-/* What to do next, when the step's other text is about something else (e.g. the loan's effect). */
-.step-prompt {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--ink);
-}
-
 /* ---- Income track ---- */
 
 .income-track {
