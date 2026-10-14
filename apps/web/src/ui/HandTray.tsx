@@ -170,7 +170,10 @@ export function HandTray({
     if (!el) return;
     // Measure now, so the first paint already has the cards in place.
     setWidth(el.getBoundingClientRect().width);
-    const ro = new ResizeObserver(([entry]) => setWidth(entry!.contentRect.width));
+    // Hidden (the Board tab) reads as zero width; keep the last real width so the layout is ready when it's shown again.
+    const ro = new ResizeObserver(([entry]) => {
+      if (entry!.contentRect.width > 0) setWidth(entry!.contentRect.width);
+    });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
@@ -215,6 +218,42 @@ export function HandTray({
       setDealing(false);
     };
   }, [arriving?.key, width > 0]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Switching tabs changes the tray's height (the mat is taller than the hand): grow or shrink to the
+  // new height instead of jumping, and fade the new side in.
+  const trayRef = useRef<HTMLElement>(null);
+  const trayHeight = useRef(0);
+  useLayoutEffect(() => {
+    const el = trayRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      trayHeight.current = el.offsetHeight;
+    });
+    ro.observe(el);
+    trayHeight.current = el.offsetHeight;
+    return () => ro.disconnect();
+  }, []);
+  const shownTab = useRef(tab);
+  useLayoutEffect(() => {
+    const el = trayRef.current;
+    if (!el || shownTab.current === tab) return;
+    shownTab.current = tab;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const from = trayHeight.current;
+    const to = el.offsetHeight;
+    const runs: Animation[] = [];
+    if (from > 0 && from !== to) {
+      runs.push(
+        el.animate([{ height: `${from}px`, overflow: 'hidden' }, { height: `${to}px`, overflow: 'hidden' }], {
+          duration: 220,
+          easing: 'ease',
+        }),
+      );
+    }
+    const content = el.querySelector(tab === 'mat' ? '.tray-mat' : '.hand-row');
+    if (content) runs.push(content.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220, easing: 'ease-out' }));
+    return () => runs.forEach((a) => a.cancel());
+  }, [tab]);
 
   const lastTap = useRef<{ id: brass.CardId; at: number } | null>(null);
   const tapCard = (id: brass.CardId) => {
@@ -305,6 +344,7 @@ export function HandTray({
 
   return (
     <section
+      ref={trayRef}
       className="hand-tray"
       data-tucked={tucked}
       data-dragging={drag !== null}
