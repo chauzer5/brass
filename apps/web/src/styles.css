@@ -414,6 +414,13 @@ button {
   stroke-width: 9;
 }
 
+/* Dark in both themes: player colours are mid-tones, so a dark track reads on all of them. */
+.link-rail.link-rail-over {
+  stroke: #1f140d;
+  stroke-width: 3.5;
+  stroke-opacity: 0.9;
+}
+
 .link-lit {
   stroke: var(--highlight);
   stroke-width: 8;

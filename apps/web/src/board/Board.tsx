@@ -214,6 +214,8 @@ export function Board({ state, names, onDiscards, highlights = NO_HIGHLIGHTS, on
                 {l.canal && <path d={d} className="link link-canal" />}
                 {l.rail && <path d={d} className={l.canal ? 'link link-rail link-both' : 'link link-rail'} />}
                 {owner !== undefined && <path d={d} className={`link link-owned owner-${owner}`} />}
+                {/* Keep the railway visible on a claimed line, so a canal shows whether it can become a rail later. */}
+                {owner !== undefined && l.rail && <path d={d} className="link link-rail link-rail-over" />}
                 {(lit || selected) && <path d={d} className={selected ? 'link link-selected' : 'link link-lit'} />}
                 {(lit || selected) && <path d={d} className="link link-hit" />}
               </g>
