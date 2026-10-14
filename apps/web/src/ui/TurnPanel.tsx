@@ -68,7 +68,10 @@ export function StepPanel({ view, player, legal, draft, setDraft, validate, onPl
       ? `Choose 3 cards to discard (${draft.scoutCards.length}/3)`
       : draft.card
         ? `Card: ${cardName(cards[draft.card])}`
-        : 'Choose a card from your hand';
+        : // Loan says this in its own, bolder prompt below.
+          draft.kind === 'loan'
+          ? ''
+          : 'Choose a card from your hand';
 
   return (
     <div className="panel">
@@ -86,7 +89,7 @@ export function StepPanel({ view, player, legal, draft, setDraft, validate, onPl
         <NetworkSteps view={view} legal={legal} draft={draft} setDraft={setDraft} />
       )}
       {draft.kind === 'develop' && draft.card && <DevelopSteps draft={draft} />}
-      {draft.kind === 'loan' && <LoanSteps view={view} player={player} />}
+      {draft.kind === 'loan' && <LoanSteps view={view} player={player} cardChosen={draft.card !== null} />}
       {draft.kind === 'sell' && draft.card && <SellSteps view={view} legal={legal} draft={draft} setDraft={setDraft} />}
 
       {action && (
@@ -127,13 +130,14 @@ export function tapMatRow(d: Draft, industry: brass.Industry, addable: ReadonlyS
 const signed = (n: number) => (n >= 0 ? `+${n}` : `${n}`);
 
 /** A loan's effect, with the income track showing where every player stands and where this player would land. */
-function LoanSteps({ view, player }: { view: brass.BrassView; player: number }) {
+function LoanSteps({ view, player, cardChosen }: { view: brass.BrassView; player: number; cardChosen: boolean }) {
   const me = view.players[player]!;
   const level = brass.incomeLevel(me.incomeSpace);
   const after = level - brass.LOAN_INCOME_LEVELS;
   const allowed = after >= brass.MIN_INCOME_LEVEL_FOR_LOAN;
   return (
     <>
+      {allowed && !cardChosen && <p className="step-prompt">Choose a card from your hand to discard.</p>}
       <p className="hint">
         {allowed
           ? `+£${brass.LOAN_AMOUNT} now · income ${signed(level)} → ${signed(after)} per round`
