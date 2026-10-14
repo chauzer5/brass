@@ -323,6 +323,46 @@ button {
 .banner-yellow { fill: var(--banner-yellow); }
 .banner-purple { fill: var(--banner-purple); }
 
+/* ---- Town name ribbons ---- */
+
+/* Rich colours in both themes, so the cream lettering always reads. */
+.ribbon-blue { --ribbon: #2c5aa0; }
+.ribbon-teal { --ribbon: #237a74; }
+.ribbon-red { --ribbon: #9c2f2f; }
+.ribbon-yellow { --ribbon: #8a6a12; }
+.ribbon-purple { --ribbon: #6b3f8f; }
+
+.town-banner {
+  pointer-events: none;
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.35));
+}
+
+.ribbon-band {
+  fill: var(--ribbon);
+}
+
+.ribbon-tail {
+  fill: color-mix(in srgb, var(--ribbon) 72%, #000);
+}
+
+.ribbon-fold {
+  fill: color-mix(in srgb, var(--ribbon) 45%, #000);
+}
+
+.ribbon-trim {
+  fill: none;
+  stroke: #f6e6c4;
+  stroke-opacity: 0.55;
+  stroke-width: 0.6;
+}
+
+.ribbon-text {
+  fill: #fff6dc;
+  font: 700 10.5px Georgia, 'Times New Roman', serif;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
 /* ---- Board pieces ---- */
 
 .owner-0 { --owner: var(--p0); }

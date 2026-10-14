@@ -239,13 +239,12 @@ export function Board({ state, names, onDiscards, highlights = NO_HIGHLIGHTS, on
                     onSlot={onSlot}
                   />
                   {loc.kind === 'town' && (
-                    <text
+                    <TownBanner
+                      name={loc.name}
+                      color={loc.color}
                       x={loc.pos.x}
                       y={loc.pos.y + slotLayout(loc.slots.length).height / 2 + 13}
-                      className={`location-name banner-${loc.color}`}
-                    >
-                      {loc.name}
-                    </text>
+                    />
                   )}
                 </>
               )}
@@ -380,6 +379,55 @@ function MerchantMarker({ loc, spaces }: { loc: brass.MerchantDef; spaces: brass
  * Markets fill from the most expensive space, so cubes are bought cheapest
  * first; the next cube to be bought is ringed.
  */
+const BANNER_FONT = '700 10.5px Georgia, "Times New Roman", serif';
+const BANNER_H = 15;
+const widths = new Map<string, number>();
+/** Width of a town name in the banner font, measured once per name. */
+function bannerTextWidth(name: string): number {
+  let w = widths.get(name);
+  if (w === undefined) {
+    const ctx = document.createElement('canvas').getContext('2d');
+    if (ctx) ctx.font = BANNER_FONT;
+    w = ctx ? ctx.measureText(name).width : name.length * 6;
+    widths.set(name, w);
+  }
+  return w;
+}
+
+/**
+ * A town's name on a ribbon in its region colour: a band across the middle,
+ * with forked tails folding behind each end.
+ */
+function TownBanner({ name, color, x, y }: { name: string; color: string; x: number; y: number }) {
+  const half = bannerTextWidth(name) / 2 + 7;
+  const top = y - BANNER_H / 2;
+  const tail = 9;
+  const drop = 3;
+  const l = x - half;
+  const r = x + half;
+  return (
+    <g className={`town-banner ribbon-${color}`} aria-label={name}>
+      {/* Tails, a little lower than the band, notched at the outer end. */}
+      <path
+        className="ribbon-tail"
+        d={`M${l + 4},${top + drop} H${l - tail} L${l - tail + 4},${top + drop + BANNER_H / 2} L${l - tail},${top + drop + BANNER_H} H${l + 4} Z`}
+      />
+      <path
+        className="ribbon-tail"
+        d={`M${r - 4},${top + drop} H${r + tail} L${r + tail - 4},${top + drop + BANNER_H / 2} L${r + tail},${top + drop + BANNER_H} H${r - 4} Z`}
+      />
+      {/* The folds where the band turns under into each tail. */}
+      <path className="ribbon-fold" d={`M${l},${top + BANNER_H} L${l + 4},${top + BANNER_H + drop} L${l + 4},${top + BANNER_H} Z`} />
+      <path className="ribbon-fold" d={`M${r},${top + BANNER_H} L${r - 4},${top + BANNER_H + drop} L${r - 4},${top + BANNER_H} Z`} />
+      <rect className="ribbon-band" x={l} y={top} width={r - l} height={BANNER_H} rx={1.5} />
+      <rect className="ribbon-trim" x={l + 2} y={top + 2} width={r - l - 4} height={BANNER_H - 4} rx={1} />
+      <text x={x} y={y + 0.5} className="ribbon-text">
+        {name}
+      </text>
+    </g>
+  );
+}
+
 /** The draw deck and discard piles, in the empty top-left corner of the map (as on the real board). */
 const PILES = { left: 18, top: 18, card: { w: 50, h: 70 }, gap: 12, pad: 10, labelH: 18 };
 
