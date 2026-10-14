@@ -1,5 +1,5 @@
 import { brass } from '@brass/engine';
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import { TransformComponent, TransformWrapper, type ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
 import type { Highlights } from '../game/draft.ts';
 import { INDUSTRY_NAME, roman } from '../game/labels.ts';
@@ -25,6 +25,8 @@ interface BoardProps {
   onDiscards?: (() => void) | undefined;
   /** A sale to the coal or iron market to animate. */
   sale?: MarketSale | null | undefined;
+  /** Holding a space that isn't lit asks why it can't be used; null means there's nothing to say. */
+  explainSlot?: ((location: brass.LocationId, slot: number) => string | null) | undefined;
   highlights?: Highlights | undefined;
   onSlot?: (location: brass.LocationId, slot: number) => void;
   onLink?: (id: string) => void;
@@ -34,6 +36,10 @@ interface BoardProps {
    */
   focus?: { location: brass.LocationId; key: string } | null | undefined;
 }
+
+/** Holding a space this long explains why it can't be built on; moving further than the slop is a pan instead. */
+const HOLD_MS = 400;
+const HOLD_SLOP = 10;
 
 /** How far to zoom in on a focused location. */
 const FOCUS_SCALE = 2.6;
@@ -166,6 +172,7 @@ function Slots({
   tiles,
   highlights,
   onSlot,
+  holdFor,
 }: {
   location: brass.LocationId;
   slots: readonly brass.Slot[];
@@ -174,6 +181,7 @@ function Slots({
   tiles: brass.BrassView['tiles'];
   highlights: Highlights;
   onSlot: BoardProps['onSlot'];
+  holdFor?: ((location: brass.LocationId, slot: number) => Record<string, (e: ReactPointerEvent) => void>) | undefined;
 }) {
   const { width, height } = slotLayout(slots.length);
   return (
@@ -194,6 +202,7 @@ function Slots({
             data-slot={i}
             className={lit ? 'tappable' : undefined}
             onClick={lit ? () => onSlot?.(location, i) : undefined}
+            {...(!lit && holdFor?.(location, i))}
           >
             <title>{tile ? `${INDUSTRY_NAME[tile.industry]} ${roman(tile.level)}` : slot.map((ind) => INDUSTRY_NAME[ind]).join(' or ')}</title>
             {/* Generous invisible hit area for fingers. */}
@@ -228,10 +237,41 @@ function Slots({
   );
 }
 
-export function Board({ state, names, onDiscards, sale, highlights = NO_HIGHLIGHTS, onSlot, onLink, focus }: BoardProps) {
+export function Board({ state, names, onDiscards, sale, explainSlot, highlights = NO_HIGHLIGHTS, onSlot, onLink, focus }: BoardProps) {
   const tiles = state?.tiles ?? {};
   const links = state?.links ?? {};
   const zoom = useRef<ReactZoomPanPinchRef>(null);
+
+  // Hold a space that isn't lit to see why: a bubble above the finger, gone on release.
+  const [why, setWhy] = useState<{ text: string; x: number; y: number } | null>(null);
+  const hold = useRef<{ x: number; y: number; timer: number } | null>(null);
+  const endHold = () => {
+    if (hold.current) clearTimeout(hold.current.timer);
+    hold.current = null;
+    setWhy(null);
+  };
+  const holdFor = explainSlot
+    ? (location: brass.LocationId, slot: number) => ({
+        onPointerDown: (e: ReactPointerEvent) => {
+          if (e.button !== 0) return;
+          const { clientX: x, clientY: y } = e;
+          const timer = window.setTimeout(() => {
+            const text = explainSlot(location, slot);
+            if (text) {
+              setWhy({ text, x, y });
+              navigator.vibrate?.(8);
+            }
+          }, HOLD_MS);
+          hold.current = { x, y, timer };
+        },
+        onPointerMove: (e: ReactPointerEvent) => {
+          const h = hold.current;
+          if (h && Math.hypot(e.clientX - h.x, e.clientY - h.y) > HOLD_SLOP) endHold();
+        },
+        onPointerUp: endHold,
+        onPointerCancel: endHold,
+      })
+    : undefined;
 
   /**
    * Pans and zooms so a box of the map (in map units) sits in the middle of
@@ -299,6 +339,16 @@ export function Board({ state, names, onDiscards, sale, highlights = NO_HIGHLIGH
   }, [focus?.location, focus?.key]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
+    <>
+    {why && (
+      <div
+        className="slot-why"
+        role="tooltip"
+        style={{ left: Math.min(Math.max(why.x, 128), window.innerWidth - 128), top: why.y - 28 }}
+      >
+        {why.text}
+      </div>
+    )}
     <TransformWrapper ref={zoom} minScale={MIN_SCALE} maxScale={6} doubleClick={{ mode: 'zoomIn' }}>
       <TransformComponent wrapperClass="board-viewport" contentClass="board-content">
         <svg
@@ -369,6 +419,7 @@ export function Board({ state, names, onDiscards, sale, highlights = NO_HIGHLIGH
                     tiles={tiles}
                     highlights={highlights}
                     onSlot={onSlot}
+                    holdFor={holdFor}
                   />
                   {loc.kind === 'town' && (
                     <TownBanner
@@ -388,6 +439,7 @@ export function Board({ state, names, onDiscards, sale, highlights = NO_HIGHLIGH
         </svg>
       </TransformComponent>
     </TransformWrapper>
+    </>
   );
 }
 

@@ -2,6 +2,7 @@ import { brass } from '@brass/engine';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Board, saleDuration, type MarketSale } from './board/Board.tsx';
 import { EMPTY_DRAFT, availableKinds, developIndustries, highlights, tapLink, usableCards, type Draft } from './game/draft.ts';
+import { explainBuild } from './game/explain.ts';
 import { canUndo, useGame, type Game } from './game/useGame.ts';
 import { ActionRail } from './ui/ActionRail.tsx';
 import { HandTray, type Arriving, type TrayTab } from './ui/HandTray.tsx';
@@ -178,6 +179,11 @@ function Table({
           state={view}
           names={names}
           sale={sale}
+          explainSlot={
+            showControls && state.phase.kind === 'actions' && draft.kind === 'build' && draft.card
+              ? (location, slot) => explainBuild(state, player!, draft.card!, location, slot)
+              : undefined
+          }
           onDiscards={() => setShowDiscards(true)}
           highlights={hidden ? undefined : lit}
           onSlot={(location, slot) => {
