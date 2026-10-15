@@ -161,7 +161,9 @@ export function candidateActions(state: BrassState, player: PlayerId): BrassActi
         const sales: Sale[] = [];
         for (const tile of subset) {
           const options = merchantsFor(tile);
-          const pick = options.find(({ m }) => m.beer) ?? options[0];
+          // Each barrel serves only the tile beside it: prefer one with beer that no earlier sale here has claimed.
+          const claimed = new Set(sales.map((s) => s.merchant));
+          const pick = options.find(({ m, i }) => m.beer && !claimed.has(i)) ?? options.find(({ i }) => !claimed.has(i)) ?? options[0];
           if (!pick) break;
           sales.push({ ...slotOf(tile[0]), merchant: pick.i });
         }

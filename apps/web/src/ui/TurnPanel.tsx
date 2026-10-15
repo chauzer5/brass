@@ -129,8 +129,10 @@ export function pickCard(draft: Draft, id: brass.CardId, cards: Record<brass.Car
 }
 
 /** Of a Merchant town's spaces that buy a tile, the one to sell to: one with beer beside it, if any. */
-function pickSpace(view: brass.BrassView, spaces: readonly number[]): number {
-  return spaces.find((m) => view.merchants[m]!.beer) ?? spaces[0]!;
+function pickSpace(view: brass.BrassView, spaces: readonly number[], draft: Draft): number {
+  // Each barrel serves only the tile beside it: prefer one with beer that no earlier sale in this action has claimed.
+  const claimed = new Set(draft.sales.map((s) => s.merchant));
+  return spaces.find((m) => view.merchants[m]!.beer && !claimed.has(m)) ?? spaces.find((m) => !claimed.has(m)) ?? spaces[0]!;
 }
 
 /** Selling: the tile waiting for a Merchant goes to the one tapped. */
@@ -141,7 +143,7 @@ export function tapMerchant(draft: Draft, location: brass.LocationId, view: bras
     (m) => view.merchants[m]!.location === location,
   );
   if (spaces.length === 0) return draft;
-  return { ...draft, pendingSale: null, sales: [...draft.sales, { ...pending, merchant: pickSpace(view, spaces) }] };
+  return { ...draft, pendingSale: null, sales: [...draft.sales, { ...pending, merchant: pickSpace(view, spaces, draft) }] };
 }
 
 function lowest(me: brass.PlayerView, industry: brass.Industry): string {
@@ -398,7 +400,7 @@ export function tapSlot(draft: Draft, location: brass.LocationId, slot: number, 
     if (merchants.length === 0) return draft;
     // More than one Merchant town buys it: the player taps which one next.
     if (new Set(merchants.map((m) => view.merchants[m]!.location)).size > 1) return { ...draft, pendingSale: { location, slot } };
-    return { ...draft, pendingSale: null, sales: [...draft.sales, { location, slot, merchant: pickSpace(view, merchants) }] };
+    return { ...draft, pendingSale: null, sales: [...draft.sales, { location, slot, merchant: pickSpace(view, merchants, draft) }] };
   }
   return draft;
 }

@@ -412,6 +412,35 @@ describe('sell (rulebook p.10)', () => {
     expect(s.tiles['kidderminster#1']!.flipped).toBe(true);
   });
 
+  // Gloucester has two Merchant spaces (indices 1 and 2): Shrewsbury's is index 0.
+  function twoBarrels(beer: [boolean, boolean]) {
+    const s = game();
+    s.tiles['worcester#0'] = tile(0, 'cotton', 1);
+    s.tiles['worcester#1'] = tile(0, 'cotton', 1);
+    s.links['worcester~gloucester'] = 0;
+    s.merchants[1] = { location: 'gloucester', tile: { industries: ['cotton'] }, beer: beer[0] };
+    s.merchants[2] = { location: 'gloucester', tile: { industries: ['cotton'] }, beer: beer[1] };
+    const [c] = giveHand(s, 0, [ind('coal'), ind('coal')]);
+    return { s, c: c! };
+  }
+
+  it("only drinks the barrel beside the Merchant tile it's sold to", () => {
+    const { s, c } = twoBarrels([false, true]);
+    expect(illegal(s, 0, { type: 'sell', card: c, sales: [{ location: 'worcester', slot: 0, merchant: 1 }] })).toMatch(/No beer/);
+    expect(illegal(s, 0, { type: 'sell', card: c, sales: [{ location: 'worcester', slot: 0, merchant: 2 }] })).toBeNull();
+  });
+
+  it("offers selling two tiles to one town's two Merchants, each with its own barrel", () => {
+    const { s } = twoBarrels([true, true]);
+    const both = candidateActions(s, 0).find((a) => a.type === 'sell' && a.sales.length === 2);
+    expect(both).toBeDefined();
+    expect(new Set((both as Extract<BrassAction, { type: 'sell' }>).sales.map((x) => x.merchant))).toEqual(new Set([1, 2]));
+    run(s, 0, both!);
+    expect(s.merchants[1]!.beer).toBe(false);
+    expect(s.merchants[2]!.beer).toBe(false);
+    expect(s.tiles['worcester#0']!.flipped && s.tiles['worcester#1']!.flipped).toBe(true);
+  });
+
   it('cannot sell without beer', () => {
     const { s, action } = sellable();
     s.links['kidderminster~coalbrookdale'] = 1;
