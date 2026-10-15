@@ -127,7 +127,7 @@ export const STEPS: readonly Step[] = [
     kind: 'do',
     title: 'Build a Cotton Mill',
     place: 'bottom',
-    text: 'Tap Build, then the highlighted space in Worcester (or your Worcester card first, either way). Building takes the lowest tile of that industry from your player board and costs its price: £12 for Cotton Mill I.',
+    text: 'Tap Build, then a highlighted space in Worcester (or your Worcester card first, either way). Building takes the lowest tile of that industry from your player board and costs its price: £12 for Cotton Mill I.',
     allow: (a, s) => a.type === 'build' && a.location === 'worcester' && a.industry === 'cotton' && cardIs(s, a.card, 'worcester'),
     frame: WORCESTER,
   },
@@ -179,7 +179,8 @@ export const STEPS: readonly Step[] = [
     place: 'bottom',
     text: "Selling a mill needs beer. Gloucester has a barrel of its own: using it earns its bonus too, a free Develop. Tap Sell, any card, your mill, then Confirm. Pick any industry for the bonus.",
     allow: (a) =>
-      a.type === 'sell' && a.sales.length === 1 && a.sales[0]!.location === 'worcester' && a.sales[0]!.slot === 0,
+      // Either Worcester space: the mill went on whichever you tapped.
+      a.type === 'sell' && a.sales.length === 1 && a.sales[0]!.location === 'worcester',
     frame: WORCESTER,
   },
   {
