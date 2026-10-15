@@ -354,8 +354,11 @@ export function Board({
     const view = wrapper.getBoundingClientRect();
     const tray = document.querySelector('.hand-tray')?.getBoundingClientRect();
     const visibleBottom = tray ? Math.min(view.bottom, tray.top) : view.bottom;
+    // The tutorial's coach card covers the top of the board.
+    const coach = document.querySelector('.coach')?.getBoundingClientRect();
+    const visibleTop = coach ? Math.max(view.top, coach.bottom) : view.top;
     const availW = view.width - (rail ? RAIL_WIDTH : 0);
-    const availH = visibleBottom - view.top;
+    const availH = visibleBottom - visibleTop;
     const boxW = Math.max(1, (box.x1 - box.x0) * unit);
     const boxH = Math.max(1, (box.y1 - box.y0) * unit);
     const scale = Math.max(MIN_SCALE, Math.min(maxScale, availW / boxW, availH / boxH));
@@ -365,7 +368,7 @@ export function Board({
     const content = ref.instance.contentComponent!;
     const clamp = (v: number, size: number, room: number) => Math.min(0, Math.max(room - size * scale, v));
     const x = clamp(availW / 2 - px * scale, content.offsetWidth, view.width);
-    const y = clamp(availH / 2 - py * scale, content.offsetHeight, view.height);
+    const y = clamp(visibleTop - view.top + availH / 2 - py * scale, content.offsetHeight, view.height);
     ref.setTransform(x, y, scale, 350, 'easeOut');
   };
 

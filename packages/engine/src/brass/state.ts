@@ -1,6 +1,6 @@
 import type { PlayerId } from '../kernel.ts';
 import type { Rng } from '../rng.ts';
-import type { CardSpec, Components } from './data/components.ts';
+import type { CardSpec, Components, MerchantTileSpec } from './data/components.ts';
 import { LINK_TILES_PER_PLAYER, WILD_CARDS_PER_KIND } from './data/components.ts';
 import { COAL_MARKET, HAND_SIZE, IRON_MARKET, STARTING_INCOME_SPACE, STARTING_MONEY } from './data/economy.ts';
 import { INDUSTRY_TILES } from './data/industries.ts';
@@ -112,6 +112,27 @@ export interface EraScore {
 export interface BrassConfig {
   playerCount: PlayerCount;
   components: Components;
+  /** A fixed start (for the tutorial); anything it doesn't fix is set up at random as usual. */
+  preset?: BrassPreset;
+}
+
+/** Picks a card from the deck: a Location card for a town, or the Industry card showing exactly these icons. */
+export type CardPick = { location: string } | { industries: readonly Industry[] };
+
+export interface BrassPreset {
+  /** Who goes first in the first round; the others follow in seat order. */
+  firstPlayer?: PlayerId;
+  /** Cards each player is sure to be dealt (by seat); the rest of the hand is dealt at random. */
+  hands?: readonly (readonly CardPick[])[];
+  /** The Merchant tile on each space of a Merchant town, by the industries it buys ([] for a blank tile). */
+  merchants?: Partial<Record<MerchantId, readonly (readonly Industry[])[]>>;
+}
+
+const sameIndustries = (a: readonly Industry[], b: readonly Industry[]) => a.length === b.length && a.every((i) => b.includes(i));
+
+function matches(card: Card, pick: CardPick): boolean {
+  if ('location' in pick) return card.kind === 'location' && card.location === pick.location;
+  return card.kind === 'industry' && sameIndustries(card.industries, pick.industries);
 }
 
 function freshMat(): Record<Industry, number[]> {
@@ -122,7 +143,7 @@ function freshMat(): Record<Industry, number[]> {
 }
 
 /** Board and player area setup (rulebook pp.4–5). */
-export function setup({ playerCount, components }: BrassConfig, rng: Rng): BrassState {
+export function setup({ playerCount, components, preset }: BrassConfig, rng: Rng): BrassState {
   const cards: Record<CardId, Card> = {};
   const deckIds: CardId[] = [];
   components.cards
@@ -145,9 +166,18 @@ export function setup({ playerCount, components }: BrassConfig, rng: Rng): Brass
   // Merchant tiles go face up on the spaces for this player count.
   const tiles = rng.shuffle(components.merchantTiles.filter((t) => t.minPlayers <= playerCount));
   const merchants: MerchantSpace[] = [];
+  // Tiles a preset asks for are set aside first, so the random ones never take them.
+  const wanted = new Map<string, MerchantTileSpec>();
+  for (const m of MERCHANTS) {
+    preset?.merchants?.[m.id]?.forEach((industries, s) => {
+      const i = tiles.findIndex((t) => sameIndustries(t.industries, industries));
+      if (i < 0) throw new Error(`No Merchant tile buying [${industries.join(', ')}] left for ${m.id}`);
+      wanted.set(`${m.id}#${s}`, tiles.splice(i, 1)[0]!);
+    });
+  }
   for (const m of MERCHANTS) {
     for (let s = 0; s < m.spaces; s++) {
-      const tile = m.minPlayers <= playerCount ? (tiles.pop() ?? null) : null;
+      const tile = m.minPlayers <= playerCount ? (wanted.get(`${m.id}#${s}`) ?? tiles.pop() ?? null) : null;
       if (m.minPlayers <= playerCount && !tile) {
         throw new Error(`Not enough Merchant tiles for ${playerCount} players`);
       }
@@ -161,6 +191,14 @@ export function setup({ playerCount, components }: BrassConfig, rng: Rng): Brass
   if (tiles.length > 0) throw new Error(`Too many Merchant tiles for ${playerCount} players`);
 
   const deck = rng.shuffle(deckIds);
+  // Cards a preset deals each player come out of the deck before the deal.
+  const dealt = Array.from({ length: playerCount }, (_, p) =>
+    (preset?.hands?.[p] ?? []).map((pick) => {
+      const i = deck.findIndex((id) => matches(cards[id]!, pick));
+      if (i < 0) throw new Error(`No card ${JSON.stringify(pick)} left to deal`);
+      return deck.splice(i, 1)[0]!;
+    }),
+  );
   const players: PlayerState[] = [];
   for (let id = 0; id < playerCount; id++) {
     players.push({
@@ -168,7 +206,7 @@ export function setup({ playerCount, components }: BrassConfig, rng: Rng): Brass
       money: STARTING_MONEY,
       incomeSpace: STARTING_INCOME_SPACE,
       vp: 0,
-      hand: deck.splice(0, HAND_SIZE),
+      hand: [...dealt[id]!, ...deck.splice(0, HAND_SIZE - dealt[id]!.length)],
       discard: [],
       faceDownDiscard: deck.shift() ?? null,
       spent: 0,
@@ -182,7 +220,11 @@ export function setup({ playerCount, components }: BrassConfig, rng: Rng): Brass
     cards,
     era: 'canal',
     round: 1,
-    turnOrder: rng.shuffle(players.map((p) => p.id)),
+    turnOrder: (() => {
+      const order = rng.shuffle(players.map((p) => p.id));
+      const first = preset?.firstPlayer;
+      return first === undefined ? order : [first, ...players.map((p) => p.id).filter((id) => id !== first)];
+    })(),
     turnIndex: 0,
     actionsTaken: 0,
     phase: { kind: 'actions' },

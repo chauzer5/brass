@@ -1,5 +1,6 @@
 import { act, brass, createMatch, randomSeed, replay, undo, type Match } from '@brass/engine';
 import { useCallback, useEffect, useState } from 'react';
+import { TUTORIAL_NAMES, TUTORIAL_PRESET, TUTORIAL_SEED } from '../tutorial/script.ts';
 
 export type BrassMatch = Match<brass.BrassConfig, brass.BrassState, brass.BrassAction>;
 
@@ -12,6 +13,10 @@ export interface Game {
   match: BrassMatch;
   names: string[];
   seats: Seat[];
+  /** Started from the tutorial's fixed setup (kept when the tutorial game is played on). */
+  preset?: 'tutorial';
+  /** The tutorial in progress: never saved, so it doesn't replace a saved game. */
+  tutorial?: boolean;
 }
 
 const STORAGE_KEY = 'brass:game:v1';
@@ -23,11 +28,13 @@ interface Saved {
   names: string[];
   /** Missing in saves from before bots: everyone is human. */
   seats?: Seat[];
+  preset?: 'tutorial';
 }
 
-const configFor = (playerCount: brass.PlayerCount): brass.BrassConfig => ({
+const configFor = (playerCount: brass.PlayerCount, preset?: 'tutorial'): brass.BrassConfig => ({
   playerCount,
   components: brass.BIRMINGHAM_COMPONENTS,
+  ...(preset === 'tutorial' && { preset: TUTORIAL_PRESET }),
 });
 
 /** Saves are only the seed and the action log; the match is rebuilt by replaying it. */
@@ -36,14 +43,18 @@ function load(): Game | null {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const saved = JSON.parse(raw) as Saved;
-    const result = replay(brass.brassGame, configFor(saved.playerCount), saved.seed, saved.log);
-    return result.ok ? { match: result.value, names: saved.names, seats: saved.seats ?? saved.names.map(() => HUMAN) } : null;
+    const result = replay(brass.brassGame, configFor(saved.playerCount, saved.preset), saved.seed, saved.log);
+    if (!result.ok) return null;
+    const game: Game = { match: result.value, names: saved.names, seats: saved.seats ?? saved.names.map(() => HUMAN) };
+    if (saved.preset) game.preset = saved.preset;
+    return game;
   } catch {
     return null;
   }
 }
 
 function save(game: Game | null): void {
+  if (game?.tutorial) return;
   try {
     if (!game) {
       localStorage.removeItem(STORAGE_KEY);
@@ -55,6 +66,7 @@ function save(game: Game | null): void {
       log: game.match.log,
       names: game.names,
       seats: game.seats,
+      ...(game.preset && { preset: game.preset }),
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
   } catch {
@@ -108,7 +120,24 @@ export function useGame() {
 
   const quit = useCallback(() => setGame(null), []);
 
-  return { game, start, play, playBot, undoLast, quit };
+  /** The tutorial: you against Bot Richard, from its fixed setup. Whatever game was saved stays saved. */
+  const startTutorial = useCallback(() => {
+    setGame({
+      match: createMatch(brass.brassGame, configFor(2, 'tutorial'), TUTORIAL_SEED),
+      names: [...TUTORIAL_NAMES],
+      seats: [HUMAN, { kind: 'bot', difficulty: 'normal' }],
+      preset: 'tutorial',
+      tutorial: true,
+    });
+  }, []);
+
+  /** Leaves the tutorial, back to the game that was saved before it (if any). */
+  const exitTutorial = useCallback(() => setGame(load()), []);
+
+  /** Carries on the tutorial game as an ordinary game (it replaces any saved one). */
+  const keepPlaying = useCallback(() => setGame((g) => (g ? { ...g, tutorial: false } : g)), []);
+
+  return { game, start, play, playBot, undoLast, quit, startTutorial, exitTutorial, keepPlaying };
 }
 
 /**

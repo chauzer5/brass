@@ -15,9 +15,11 @@ const DIFFICULTY_LABEL: Record<brass.BotDifficulty, string> = { easy: 'Easy', no
 export function NewGame({
   onStart,
   onResume,
+  onTutorial,
 }: {
   onStart: (names: string[], seats: Seat[]) => void;
   onResume?: (() => void) | undefined;
+  onTutorial: () => void;
 }) {
   const [count, setCount] = useState(2);
   const [names, setNames] = useState(['Player 1', 'Player 2', 'Player 3', 'Player 4']);
@@ -131,6 +133,9 @@ export function NewGame({
           onClick={() => onStart(chosen.map((_, i) => nameOf(i)), chosen)}
         >
           Start new game
+        </button>
+        <button className="secondary" onClick={onTutorial}>
+          Learn to play: tutorial
         </button>
         <button className="secondary" onClick={() => setShowSettings(true)}>
           Settings

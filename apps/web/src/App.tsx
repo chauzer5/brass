@@ -13,15 +13,18 @@ import { StepPanel, pickCard, tapMatRow, tapMerchant, tapSlot } from './ui/TurnP
 import { choosable, chosenSource, sourceNeeds } from './game/sources.ts';
 import { gameLog, recapSince, type RecapItem } from './game/recap.ts';
 import { runBot } from './bot/runBot.ts';
+import { Coach, useCoach } from './tutorial/Coach.tsx';
 
 /** Looking over a finished game: the whole map. */
 const WHOLE_MAP = { box: { x0: 0, y0: 0, x1: 1000, y1: 1000 }, key: 'whole-map' };
 
 /** Pause before each bot action, so people can see what's happening. */
 const BOT_PAUSE_MS = 900;
+/** The tutorial's fast-forward. */
+const FAST_BOT_PAUSE_MS = 120;
 
 export function App() {
-  const { game, start, play, playBot, undoLast, quit } = useGame();
+  const { game, start, play, playBot, undoLast, quit, startTutorial, exitTutorial, keepPlaying } = useGame();
   const [showSetup, setShowSetup] = useState(!game);
 
   if (!game || showSetup) {
@@ -32,6 +35,10 @@ export function App() {
           setShowSetup(false);
         }}
         onResume={game && !brass.brassGame.outcome(game.match.state) ? () => setShowSetup(false) : undefined}
+        onTutorial={() => {
+          startTutorial();
+          setShowSetup(false);
+        }}
       />
     );
   }
@@ -46,6 +53,11 @@ export function App() {
         quit();
         setShowSetup(true);
       }}
+      onExitTutorial={() => {
+        exitTutorial();
+        setShowSetup(true);
+      }}
+      onKeepPlaying={keepPlaying}
     />
   );
 }
@@ -57,6 +69,8 @@ function Table({
   undoLast,
   onMenu,
   onNewGame,
+  onExitTutorial,
+  onKeepPlaying,
 }: {
   game: Game;
   play: (player: number, action: brass.BrassAction) => string | null;
@@ -64,18 +78,29 @@ function Table({
   undoLast: () => void;
   onMenu: () => void;
   onNewGame: () => void;
+  onExitTutorial: () => void;
+  onKeepPlaying: () => void;
 }) {
   const { match, names, seats } = game;
   const state = match.state;
+  const outcome = brass.brassGame.outcome(state);
+  // An era that ends while playing shows its scoring before anything else (and the game's end stays up until
+  // dismissed to look at the board). Eras that ended before this game was opened aren't shown again.
+  const [seenEras, setSeenEras] = useState(state.eraScores.length);
+  const [resultsHidden, setResultsHidden] = useState(false);
+  const summaryOpen = outcome ? !resultsHidden : state.eraScores.length > seenEras;
+  // A new Coal Mine or Iron Works selling cubes to its market (animated; see below).
+  const [sale, setSale] = useState<MarketSale | null>(null);
+  // The tutorial's coach, when this is the tutorial.
+  const coach = useCoach({ enabled: !!game.tutorial, match, playBot, busy: sale !== null, summaryOpen });
   // Whose turn it is; `player` is that player only when it's a human at the device (bots play themselves).
   const active = brass.currentPlayer(state);
-  const isBot = (id: number) => seats[id]?.kind === 'bot';
+  const isBot = (id: number) => coach?.autoplay || seats[id]?.kind === 'bot';
   const humans = seats.flatMap((s, i) => (s.kind === 'human' ? [i] : []));
   const player = active !== null && !isBot(active) ? active : null;
   // With one human, their hand stays on screen through the bots' turns; with several, nobody's does.
   const soleHuman = humans.length === 1 ? humans[0]! : null;
   const handOwner = player ?? soleHuman;
-  const outcome = brass.brassGame.outcome(state);
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [revealedFor, setRevealedFor] = useState<number | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -94,7 +119,14 @@ function Table({
 
   const viewer = handOwner ?? 0;
   const view = useMemo(() => brass.brassGame.viewFor(state, viewer), [state, viewer]);
-  const legal = useMemo(() => (player === null ? [] : brass.brassGame.legalActions(state, player)), [state, player]);
+  const allow = coach?.allow;
+  const legal = useMemo(() => {
+    if (player === null) return [];
+    const all = brass.brassGame.legalActions(state, player);
+    // In the tutorial, only the move the step teaches (none while it's explaining).
+    if (!coach || state.phase.kind === 'shortfall') return all;
+    return allow ? all.filter((a) => allow(a, state)) : [];
+  }, [state, player, allow]); // eslint-disable-line react-hooks/exhaustive-deps
   // Coal, iron and beer the action needs, and the one whose source the map is choosing.
   const base = compose(draft);
   const baseKey = JSON.stringify(base && base.type === 'sell' ? { ...base, sales: base.sales.map(({ develop: _, ...s }) => s) } : base);
@@ -169,16 +201,11 @@ function Table({
   };
 
   // A game that hasn't started yet opens with the draw for who goes first; nothing happens until it's seen.
-  const [intro, setIntro] = useState(match.log.length === 0);
+  const [intro, setIntro] = useState(match.log.length === 0 && !game.tutorial);
 
   // Pass-the-device screens are only needed between people.
   const hidden = player !== null && humans.length > 1 && revealedFor !== player;
 
-  // An era that ends while playing shows its scoring before anything else (and the game's end stays up until
-  // dismissed to look at the board). Eras that ended before this game was opened aren't shown again.
-  const [seenEras, setSeenEras] = useState(view.eraScores.length);
-  const [resultsHidden, setResultsHidden] = useState(false);
-  const summaryOpen = outcome ? !resultsHidden : view.eraScores.length > seenEras;
 
   // What the others did since this player's last turn: listed on the handoff screen.
   const recap = useMemo(
@@ -190,7 +217,7 @@ function Table({
   const [soloRecap, setSoloRecap] = useState<RecapItem[]>([]);
   const lastController = useRef<number | null>(null);
   useEffect(() => {
-    if (humans.length === 1 && player !== null && lastController.current !== player) {
+    if (humans.length === 1 && player !== null && lastController.current !== player && !game.tutorial) {
       const items = recapSince(match, player);
       setSoloRecap(items);
     }
@@ -223,7 +250,6 @@ function Table({
   const focusCard = draft.kind === 'build' && draft.card ? view.cards[draft.card] : undefined;
   const buildFocus = focusCard?.kind === 'location' ? { location: focusCard.location, key: draft.card! } : null;
   // A new Coal Mine or Iron Works that sold cubes to its market: animate them flying there.
-  const [sale, setSale] = useState<MarketSale | null>(null);
   const before = useRef({ state, length: match.log.length });
   useLayoutEffect(() => {
     const prev = before.current;
@@ -248,11 +274,14 @@ function Table({
 
   // Bots take their own turns: one action at a time, after a pause so the table can follow along, and not
   // while an animation or the end-of-era summary is showing.
-  const botTurn = active !== null && isBot(active) && !outcome && !summaryOpen && !sale && !intro;
+  // (The tutorial's tutor plays scripted moves instead, except when fast-forwarding.)
+  const botTurn = active !== null && isBot(active) && !outcome && !summaryOpen && !sale && !intro && (!coach || coach.autoplay);
   useEffect(() => {
     if (!botTurn || active === null) return;
     const seat = seats[active]!;
-    if (seat.kind !== 'bot') return;
+    // The tutorial's fast-forward plays your seat too.
+    const difficulty = seat.kind === 'bot' ? seat.difficulty : coach?.autoplay ? 'normal' : null;
+    if (!difficulty) return;
     let cancelled = false;
     const at = match.log.length;
     const input = {
@@ -263,9 +292,9 @@ function Table({
     // The bot thinks during the pause; its move lands once both are done.
     let timer = 0;
     const pause = new Promise<void>((resolve) => {
-      timer = window.setTimeout(resolve, BOT_PAUSE_MS);
+      timer = window.setTimeout(resolve, coach?.autoplay ? FAST_BOT_PAUSE_MS : BOT_PAUSE_MS);
     });
-    Promise.all([runBot(input, seat.difficulty), pause])
+    Promise.all([runBot(input, difficulty), pause])
       .then(([action]) => {
         if (!cancelled) playBot(active, action, at);
       })
@@ -359,7 +388,7 @@ function Table({
             else pickSource('merchant');
           }}
           onLink={(id) => setDraft((d) => tapLink(view.cards, legal, d, id))}
-          frame={hidden ? null : outcome && resultsHidden ? WHOLE_MAP : sourceFrame}
+          frame={hidden ? null : outcome && resultsHidden ? WHOLE_MAP : (sourceFrame ?? coach?.frame ?? null)}
           rail={showControls && state.phase.kind === 'actions'}
           focus={buildFocus ?? peek}
         />
@@ -375,7 +404,7 @@ function Table({
                 setTrayTab('hand');
               }
             }}
-            canUndo={canUndo(match)}
+            canUndo={!coach && canUndo(match)}
             onUndo={undoLast}
           />
         )}
@@ -441,7 +470,13 @@ function Table({
             ) : (
               active !== null && (
                 <p className="hint bot-thinking">
-                  <span className={`dot owner-${active}`} aria-hidden /> {names[active]} is playing…
+                  {coach?.autoplay ? (
+                    'Fast-forwarding…'
+                  ) : (
+                    <>
+                      <span className={`dot owner-${active}`} aria-hidden /> {names[active]} is playing…
+                    </>
+                  )}
                 </p>
               )
             )}
@@ -455,7 +490,7 @@ function Table({
           <div className="game-menu" role="menu">
             {(
               [
-                ['Main menu', onMenu],
+                coach ? (['Exit tutorial', onExitTutorial] as const) : (['Main menu', onMenu] as const),
                 ['Game log', () => setSheet('log')],
                 ['Settings', () => setSheet('settings')],
               ] as const
@@ -517,6 +552,7 @@ function Table({
           Final scores
         </button>
       )}
+      {coach && <Coach coach={coach} onExit={onExitTutorial} onKeepPlaying={onKeepPlaying} />}
     </div>
   );
 }
