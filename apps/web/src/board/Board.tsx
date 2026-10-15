@@ -230,11 +230,12 @@ function TileFace({ tile }: { tile: brass.BuiltTile }) {
       {tile.flipped && (
         <g className="tile-link-vp" transform={`translate(${SLOT - 9.5} ${SLOT - 7})`}>
           <title>{`Each link to here scores ${linkVPOf(tile)} more VP at the end of the era`}</title>
-          <rect x={-8} y={-5} width={16} height={10} rx={5} />
-          <path d="M-5.6 2.4 -1.6 -1.6" className="tile-link-line" />
-          <circle cx={-5.6} cy={2.4} r={1.3} />
-          <circle cx={-1.6} cy={-1.6} r={1.3} />
-          <text x={3.4} y={0.4}>
+          {/* Icon and number balanced in the pill: equal space left and right, centred top to bottom. */}
+          <rect x={-8.5} y={-5} width={17} height={10} rx={5} />
+          <path d="M-4.7 1.7 -1.3 -1.7" className="tile-link-line" />
+          <circle cx={-4.7} cy={1.7} r={1.25} />
+          <circle cx={-1.3} cy={-1.7} r={1.25} />
+          <text x={3.6} y={0.3}>
             {linkVPOf(tile)}
           </text>
         </g>
