@@ -340,6 +340,25 @@ export function perform(state: BrassState, playerId: PlayerId, a: BrassAction, r
   }
   if (state.phase.kind !== 'actions') fail('The game is over');
 
+  performActionOnly(state, p, a);
+
+  state.actionsTaken += 1;
+  if (state.actionsTaken >= actionsThisTurn(state) || p.hand.length === 0) endTurn(state, p, rng);
+}
+
+/**
+ * Just what an action itself does (building, selling, …), without the end of
+ * the turn, round or era it may bring: for showing those steps one at a time.
+ */
+export function performAction(state: BrassState, playerId: PlayerId, a: BrassAction): void {
+  if (a.type === 'removeTile') {
+    delete state.tiles[slotKey(a.location, a.slot)];
+    return;
+  }
+  performActionOnly(state, player(state, playerId), a);
+}
+
+function performActionOnly(state: BrassState, p: PlayerState, a: BrassAction): void {
   switch (a.type) {
     case 'build':
       build(state, p, a);
@@ -365,9 +384,6 @@ export function perform(state: BrassState, playerId: PlayerId, a: BrassAction, r
     case 'removeTile':
       fail('There is no shortfall to pay');
   }
-
-  state.actionsTaken += 1;
-  if (state.actionsTaken >= actionsThisTurn(state) || p.hand.length === 0) endTurn(state, p, rng);
 }
 
 /** Refill the Hand to 8 from the Draw Deck, then pass to the next player (rulebook p.6). */

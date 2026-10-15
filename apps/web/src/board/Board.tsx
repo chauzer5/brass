@@ -2,6 +2,7 @@ import { brass } from '@brass/engine';
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import { TransformComponent, TransformWrapper, type ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
 import type { Highlights } from '../game/draft.ts';
+import type { CubeScene, EraScene, GoodsSale, Spot } from '../game/effects.ts';
 import { INDUSTRY_NAME, roman } from '../game/labels.ts';
 import { IndustryIcon } from '../ui/icons.tsx';
 
@@ -27,6 +28,10 @@ interface BoardProps {
   sale?: MarketSale | null | undefined;
   /** Tiles just sold to Merchants: animate the beer, the goods and the flip. */
   goods?: GoodsSale | null | undefined;
+  /** Coal, iron and beer just used to build or link: animate them flying there. */
+  cubes?: CubeScene | null | undefined;
+  /** An era's scoring playing out (the board shown is the one just before it). */
+  era?: EraScene | null | undefined;
   /** Holding a space that isn't lit asks why it can't be used; null means there's nothing to say. */
   explainSlot?: ((location: brass.LocationId, slot: number) => string | null) | undefined;
   highlights?: Highlights | undefined;
@@ -204,6 +209,7 @@ function Slots({
   onSlot,
   holdFor,
   flips,
+  leaving,
 }: {
   location: brass.LocationId;
   slots: readonly brass.Slot[];
@@ -214,6 +220,8 @@ function Slots({
   onSlot: BoardProps['onSlot'];
   /** Tiles turning over as they're sold: when each flip starts (ms), by space. */
   flips?: ReadonlyMap<brass.SlotKey, number> | undefined;
+  /** Tiles coming off the board at the end of the era, and when. */
+  leaving?: { tiles: ReadonlySet<brass.SlotKey>; at: number } | null | undefined;
   holdFor?: ((location: brass.LocationId, slot: number) => Record<string, (e: ReactPointerEvent) => void>) | undefined;
 }) {
   const { width, height } = slotLayout(slots.length);
@@ -245,7 +253,8 @@ function Slots({
             key={i}
             transform={`translate(${pos.x} ${pos.y})`}
             data-slot={i}
-            className={tappable ? 'tappable' : undefined}
+            className={[tappable ? 'tappable' : '', leaving?.tiles.has(key) ? 'leaving' : ''].filter(Boolean).join(' ') || undefined}
+            style={leaving?.tiles.has(key) ? { animationDelay: `${leaving.at}ms` } : undefined}
             onClick={tappable ? () => onSlot?.(location, i) : undefined}
             {...(!tappable && holdFor?.(location, i))}
           >
@@ -294,6 +303,8 @@ export function Board({
   onDiscards,
   sale,
   goods,
+  cubes,
+  era,
   explainSlot,
   highlights = NO_HIGHLIGHTS,
   onSlot,
@@ -305,9 +316,21 @@ export function Board({
   rail = true,
 }: BoardProps) {
   const tiles = state?.tiles ?? {};
-  const flips = useMemo(
-    () => (goods ? new Map(goods.sales.map((g, k) => [brass.slotKey(g.location, g.slot), goodsTiming(goods, k).flip])) : undefined),
-    [goods],
+  // Tiles turning over during an animation, and when each starts.
+  const flips = useMemo(() => {
+    const m = new Map<brass.SlotKey, number>();
+    if (goods) {
+      goods.sales.forEach((g, k) => m.set(brass.slotKey(g.location, g.slot), goodsTiming(goods, k).flip));
+      // A Brewery drained by the sale turns over as its last barrel leaves.
+      for (const key of goods.flips) m.set(key, TRAY_SETTLE_MS + BEER_FLY / 2);
+    }
+    if (cubes) for (const key of cubes.flips) m.set(key, cubesTiming(cubes).flip);
+    return m.size > 0 ? m : undefined;
+  }, [goods, cubes]);
+  // An era's links and tiles leaving the board after scoring.
+  const leaving = useMemo(
+    () => (era ? { links: new Set(era.leaving.links), tiles: new Set(era.leaving.tiles), at: eraTiming(era).leave } : null),
+    [era],
   );
   const links = state?.links ?? {};
   const zoom = useRef<ReactZoomPanPinchRef>(null);
@@ -463,6 +486,26 @@ export function Board({
     return () => clearTimeout(t);
   }, [goods?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Cubes used to build or link: frame where they come from and where they go.
+  useEffect(() => {
+    if (!cubes) return;
+    const pts = cubes.flights.flatMap((f) => [spotPoint(f.from), spotPoint(f.to)]);
+    const pad = 45;
+    const box = {
+      x0: Math.min(...pts.map((p) => p.x)) - pad,
+      y0: Math.min(...pts.map((p) => p.y)) - pad,
+      x1: Math.max(...pts.map((p) => p.x)) + pad,
+      y1: Math.max(...pts.map((p) => p.y)) + pad,
+    };
+    const t = window.setTimeout(() => showArea(box, FOCUS_SCALE), TRAY_SETTLE_MS);
+    return () => clearTimeout(t);
+  }, [cubes?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // An era's scoring: the whole map.
+  useEffect(() => {
+    if (era) showArea({ x0: 0, y0: 0, x1: BOARD_SIZE, y1: BOARD_SIZE }, 1);
+  }, [era?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Market spaces stay empty until their cube lands.
   const [landed, setLanded] = useState(0);
   useEffect(() => {
@@ -537,7 +580,13 @@ export function Board({
               >
                 {l.canal && <path d={d} className="link link-canal" />}
                 {l.rail && <path d={d} className={l.canal ? 'link link-rail link-both' : 'link link-rail'} />}
-                {owner !== undefined && <path d={d} className={`link link-owned owner-${owner}`} />}
+                {owner !== undefined && (
+                  <path
+                    d={d}
+                    className={`link link-owned owner-${owner} ${leaving?.links.has(l.id) ? 'leaving' : ''}`}
+                    style={leaving?.links.has(l.id) ? { animationDelay: `${leaving.at}ms` } : undefined}
+                  />
+                )}
                 {/* Keep the railway visible on a claimed line, so a canal shows whether it can become a rail later. */}
                 {owner !== undefined && l.rail && <path d={d} className="link link-rail link-rail-over" />}
                 {(lit || selected) && <path d={d} className={selected ? 'link link-selected' : 'link link-lit'} />}
@@ -549,7 +598,13 @@ export function Board({
 
           {/* Claimed links' pieces, above every line so crossings never hide one. */}
           {Object.entries(links).map(([id, owner]) => (
-            <LinkToken key={id} id={id} owner={owner} rail={state?.era === 'rail'} />
+            <g
+              key={id}
+              className={leaving?.links.has(id) ? 'leaving' : undefined}
+              style={leaving?.links.has(id) ? { animationDelay: `${leaving.at}ms` } : undefined}
+            >
+              <LinkToken id={id} owner={owner} rail={state?.era === 'rail'} />
+            </g>
           ))}
 
           {brass.LOCATIONS.map((loc) => (
@@ -574,6 +629,7 @@ export function Board({
                     onSlot={onSlot}
                     holdFor={holdFor}
                     flips={flips}
+                    leaving={leaving}
                   />
                   {loc.kind === 'town' && (
                     <TownBanner
@@ -591,6 +647,8 @@ export function Board({
           {/* Above everything, so the cubes fly over towns and links on their way to the market. */}
           {sale && <SaleAnimation key={sale.id} sale={sale} />}
           {goods && <GoodsAnimation key={goods.id} goods={goods} />}
+          {cubes && <CubeAnimation key={cubes.id} cubes={cubes} />}
+          {era && <EraAnimation key={era.id} era={era} />}
         </svg>
       </TransformComponent>
     </TransformWrapper>
@@ -877,11 +935,12 @@ function TurnOrder({
         Next round · spent
       </text>
       {next.map((id, i) => {
+        // Rows slide to their new place when the order changes (as money is spent, and at the round's end).
         const y = top + ORDER.headerH + i * ORDER.rowH;
-        const cy = y + ORDER.rowH / 2;
+        const cy = ORDER.rowH / 2;
         return (
-          <g key={id} className={`turn-order-row owner-${id} ${id === acting ? 'acting' : ''}`}>
-            <rect x={ORDER.left + 4} y={y + 2} width={ORDER.width - 8} height={ORDER.rowH - 4} rx={6} className="turn-order-bg" />
+          <g key={id} className={`turn-order-row owner-${id} ${id === acting ? 'acting' : ''}`} style={{ transform: `translateY(${y}px)` }}>
+            <rect x={ORDER.left + 4} y={2} width={ORDER.width - 8} height={ORDER.rowH - 4} rx={6} className="turn-order-bg" />
             <circle cx={ORDER.left + 16} cy={cy} r={10} className="market-price" />
             <text x={ORDER.left + 16} y={cy} className="market-price-label">
               {i + 1}
@@ -978,21 +1037,6 @@ function merchantSpot(location: brass.LocationId, space: number) {
   return { token: { x, y }, barrel: { x: x + TOKEN_R + 2 + 8.5, y } };
 }
 
-/** Tiles sold to Merchants in one Sell action, for the animation. */
-export interface GoodsSale {
-  /** Changes for each Sell, so the same sale again still animates. */
-  id: string;
-  sales: {
-    location: brass.LocationId;
-    slot: number;
-    industry: brass.Industry;
-    /** The Merchant it was sold to: its town, and which of its spaces. */
-    merchant: { location: brass.LocationId; space: number };
-    /** The beer it drank: from the Merchant's own barrel, or from a Brewery. */
-    beers: ({ merchant: { location: brass.LocationId; space: number } } | { brewery: { location: brass.LocationId; slot: number } })[];
-  }[];
-}
-
 /** The tray's change of height (e.g. back from the board to the hand) takes about this long. */
 const TRAY_SETTLE_MS = 300;
 const GOODS_STEP = 1300;
@@ -1066,6 +1110,100 @@ function GoodsAnimation({ goods }: { goods: GoodsSale }) {
             </g>
           </g>
         );
+      })}
+    </g>
+  );
+}
+
+/** Where a Spot is on the map. */
+function spotPoint(s: Spot): { x: number; y: number } {
+  if ('slot' in s) return slotCenter(s.slot.location, s.slot.slot);
+  if ('market' in s) return marketSpace(s.market.kind, s.market.space);
+  if ('merchant' in s) return merchantSpot(s.merchant.location, s.merchant.space).barrel;
+  return spotFor(s.link);
+}
+
+const CUBE_STAGGER = 160;
+const CUBE_FLY = 800;
+
+function cubesTiming(cubes: CubeScene) {
+  const last = TRAY_SETTLE_MS + (cubes.flights.length - 1) * CUBE_STAGGER;
+  return { flip: last + CUBE_FLY - TURN / 2 };
+}
+
+/** How long the cubes' flights take, start to finish. */
+export const cubesDuration = (cubes: CubeScene) => Math.max(cubesTiming(cubes).flip + TURN, TRAY_SETTLE_MS + (cubes.flights.length - 1) * CUBE_STAGGER + CUBE_FLY);
+
+/** Coal and iron (and beer) lifting off where they were and flying, one after another, to where they're used. */
+function CubeAnimation({ cubes }: { cubes: CubeScene }) {
+  const c = MARKET.cell - 2;
+  return (
+    <g className="sale-anim" aria-hidden>
+      {cubes.flights.map((f, i) => {
+        const from = spotPoint(f.from);
+        const to = spotPoint(f.to);
+        return (
+          <g key={i} transform={`translate(${from.x} ${from.y})`}>
+            <g
+              className="goods-fly"
+              style={
+                {
+                  '--dx': `${to.x - from.x}px`,
+                  '--dy': `${to.y - from.y}px`,
+                  animationDelay: `${TRAY_SETTLE_MS + i * CUBE_STAGGER}ms`,
+                  animationDuration: `${CUBE_FLY}ms`,
+                } as CSSProperties
+              }
+            >
+              {f.kind === 'beer' ? (
+                <>
+                  <circle r={10} className="goods-chip beer" />
+                  <IndustryIcon industry="brewery" size={13} x={-6.5} y={-6.5} />
+                </>
+              ) : (
+                <rect x={-c / 2} y={-c / 2} width={c} height={c} rx={2} className={`market-cube ${f.kind}`} />
+              )}
+            </g>
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
+const SCORE_POP = 1100;
+const LEAVE = 900;
+/** All the pop-ups fit in about this long, however many there are (at most 170ms apart). */
+const SCORE_SPREAD = 2600;
+
+/** When the era's links, then its tiles, score; and when what's cleared leaves. */
+function eraTiming(era: EraScene) {
+  const step = Math.min(170, SCORE_SPREAD / Math.max(1, era.links.length + era.tiles.length));
+  const tilesAt = 400 + era.links.length * step + 300;
+  const doneScoring = tilesAt + era.tiles.length * step + SCORE_POP;
+  return { step, links: 400, tiles: tilesAt, leave: doneScoring, end: doneScoring + (era.leaving.links.length + era.leaving.tiles.length > 0 ? LEAVE : 0) };
+}
+
+/** How long an era's scoring plays. */
+export const eraDuration = (era: EraScene) => eraTiming(era).end;
+
+/** Each link, then each flipped tile, pops up the VPs it scores, in its owner's colour. */
+function EraAnimation({ era }: { era: EraScene }) {
+  const t = eraTiming(era);
+  const pop = (key: string, at: { x: number; y: number }, owner: number, vp: number, delay: number) => (
+    <g key={key} transform={`translate(${at.x} ${at.y})`}>
+      <g className={`score-pop owner-${owner}`} style={{ animationDelay: `${delay}ms`, animationDuration: `${SCORE_POP}ms` }}>
+        <rect x={-17} y={-11} width={34} height={22} rx={11} />
+        <text>+{vp}</text>
+      </g>
+    </g>
+  );
+  return (
+    <g className="sale-anim" aria-hidden>
+      {era.links.map((l, i) => pop(`l${l.id}`, spotFor(l.id), l.owner, l.vp, t.links + i * t.step))}
+      {era.tiles.map((tile, i) => {
+        const { location, index } = brass.parseSlotKey(tile.key);
+        return pop(`t${tile.key}`, slotCenter(location, index), tile.owner, tile.vp, t.tiles + i * t.step);
       })}
     </g>
   );

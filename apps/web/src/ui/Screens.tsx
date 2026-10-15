@@ -191,10 +191,13 @@ export function PlayerStrip({
   names,
   active,
   onSelect,
+  payout,
 }: {
   view: brass.BrassView;
   names: string[];
   active: number | null;
+  /** Money each player just got (or paid) at the end of a round: it pops up over their money. */
+  payout?: { id: string; amounts: readonly number[] } | null | undefined;
   /** Tapping a player shows their mat. */
   onSelect: (id: number) => void;
 }) {
@@ -217,6 +220,11 @@ export function PlayerStrip({
             onClick={() => onSelect(id)}
           >
             <span className="player-name">{names[id]}</span>
+            {payout && payout.amounts[id] ? (
+              <span key={payout.id} className={`money-pop ${payout.amounts[id]! > 0 ? 'gain' : 'loss'}`} aria-hidden>
+                {payout.amounts[id]! > 0 ? '+' : '−'}£{Math.abs(payout.amounts[id]!)}
+              </span>
+            ) : null}
             <span className="player-stats">
               <span>£{p.money}</span>
               <span>

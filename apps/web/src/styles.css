@@ -2792,3 +2792,94 @@ g.coach-target > rect:first-of-type {
     display: none;
   }
 }
+
+/* ---- End of round, end of era ---- */
+
+.turn-order-row {
+  transition: transform 0.6s cubic-bezier(0.3, 0.8, 0.3, 1);
+}
+
+/* Income: the money collected (or paid) rises out of each player's money. */
+.player-chip {
+  position: relative;
+}
+
+/* In the chip's top-right corner, clear of the name. */
+.money-pop {
+  position: absolute;
+  right: 8px;
+  top: 6px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  animation: money-pop 1.8s ease-out both;
+}
+
+.money-pop.gain {
+  background: #f2c230;
+  color: #3a2012;
+}
+
+.money-pop.loss {
+  background: var(--danger);
+  color: #fff;
+}
+
+@keyframes money-pop {
+  0% { opacity: 0; transform: translateY(8px) scale(0.6); }
+  15% { opacity: 1; transform: translateY(0) scale(1.15); }
+  70% { opacity: 1; transform: translateY(-6px) scale(1); }
+  100% { opacity: 0; transform: translateY(-14px) scale(1); }
+}
+
+/* Era scoring: each link and flipped tile pops up its VPs in its owner's colour. */
+.score-pop {
+  opacity: 0;
+  animation-name: score-pop;
+  animation-fill-mode: both;
+  animation-timing-function: ease-out;
+}
+
+.score-pop rect {
+  fill: var(--owner);
+  stroke: #fff;
+  stroke-width: 2;
+}
+
+.score-pop text {
+  fill: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+@keyframes score-pop {
+  0% { opacity: 0; transform: translateY(4px) scale(0.3); }
+  20% { opacity: 1; transform: translateY(-4px) scale(1.5); }
+  45% { opacity: 1; transform: translateY(-8px) scale(1.25); }
+  100% { opacity: 0; transform: translateY(-26px) scale(1.15); }
+}
+
+/* After scoring, the era's links and Level I tiles fade off the board. */
+.leaving {
+  animation: leave 0.9s ease-in both;
+}
+
+/* Opacity only: these are SVG groups placed with a transform attribute, which a CSS transform would replace. */
+@keyframes leave {
+  0% { opacity: 1; }
+  30% { opacity: 1; filter: brightness(1.4); }
+  100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .turn-order-row { transition: none; }
+  .money-pop,
+  .score-pop { animation: none; opacity: 0; }
+  .leaving { animation: none; }
+}

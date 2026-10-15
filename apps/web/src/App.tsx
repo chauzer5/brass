@@ -1,6 +1,7 @@
 import { brass } from '@brass/engine';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Board, MARKET_BOX, goodsDuration, saleDuration, type GoodsSale, type MarketSale } from './board/Board.tsx';
+import { Board, MARKET_BOX, cubesDuration, eraDuration, goodsDuration, saleDuration, type MarketSale } from './board/Board.tsx';
+import { effectsOf, type CubeScene, type EraScene, type GoodsSale } from './game/effects.ts';
 import { EMPTY_DRAFT, availableKinds, compose, developIndustries, highlights, tapLink, usableCards, type Draft } from './game/draft.ts';
 import { explainBuild, explainBuildAny } from './game/explain.ts';
 import { canUndo, useGame, type Game } from './game/useGame.ts';
@@ -14,35 +15,6 @@ import { choosable, chosenSource, gloucesterBonus, sourceNeeds } from './game/so
 import { gameLog, recapSince, type RecapItem } from './game/recap.ts';
 import { runBot } from './bot/runBot.ts';
 import { Coach, useCoach } from './tutorial/Coach.tsx';
-
-/**
- * What a Sell did, for its animation: each tile sold, the Merchant space it
- * went to, and where its beer came from (the Merchant's barrel, if that one
- * was emptied, then the Breweries that lost barrels, in the order of sale).
- */
-function goodsSold(before: brass.BrassState, after: brass.BrassState, action: Extract<brass.BrassAction, { type: 'sell' }>, id: string): GoodsSale {
-  const spaceOf = (m: number) => after.merchants.slice(0, m).filter((x) => x.location === after.merchants[m]!.location).length;
-  const barrels = new Set(before.merchants.flatMap((m, i) => (m.beer && !after.merchants[i]!.beer ? [i] : [])));
-  const breweries: { location: brass.LocationId; slot: number }[] = [];
-  for (const [key, tile] of Object.entries(before.tiles) as [brass.SlotKey, brass.BuiltTile][]) {
-    if (tile.industry !== 'brewery') continue;
-    const drunk = tile.cubes - (after.tiles[key]?.cubes ?? 0);
-    const { location, index } = brass.parseSlotKey(key);
-    for (let i = 0; i < drunk; i++) breweries.push({ location, slot: index });
-  }
-  return {
-    id,
-    sales: action.sales.map((s) => {
-      const tile = before.tiles[brass.slotKey(s.location, s.slot)]!;
-      const need = brass.INDUSTRY_TILES[tile.industry][tile.level - 1]!.beer;
-      const merchant = { location: after.merchants[s.merchant]!.location, space: spaceOf(s.merchant) };
-      const beers: GoodsSale['sales'][number]['beers'] = [];
-      if (barrels.delete(s.merchant)) beers.push({ merchant });
-      while (beers.length < need && breweries.length > 0) beers.push({ brewery: breweries.shift()! });
-      return { location: s.location, slot: s.slot, industry: tile.industry, merchant, beers };
-    }),
-  };
-}
 
 /** Looking over a finished game: the whole map. */
 const WHOLE_MAP = { box: { x0: 0, y0: 0, x1: 1000, y1: 1000 }, key: 'whole-map' };
@@ -117,13 +89,19 @@ function Table({
   // dismissed to look at the board). Eras that ended before this game was opened aren't shown again.
   const [seenEras, setSeenEras] = useState(state.eraScores.length);
   const [resultsHidden, setResultsHidden] = useState(false);
-  const summaryOpen = outcome ? !resultsHidden : state.eraScores.length > seenEras;
+  // Eras whose scoring has played out on the board (it plays before the summary opens).
+  const [erasPlayed, setErasPlayed] = useState(state.eraScores.length);
+  const scoringToPlay = state.eraScores.length > erasPlayed;
+  const summaryOpen = !scoringToPlay && (outcome ? !resultsHidden : state.eraScores.length > seenEras);
   // A new Coal Mine or Iron Works selling cubes to its market (animated; see below).
   const [sale, setSale] = useState<MarketSale | null>(null);
-  // Tiles sold to Merchants (animated too).
+  // Tiles sold to Merchants, cubes used to build or link, income, and an era's scoring (animated too).
   const [goods, setGoods] = useState<GoodsSale | null>(null);
+  const [cubes, setCubes] = useState<CubeScene | null>(null);
+  const [income, setIncome] = useState<{ id: string; amounts: number[] } | null>(null);
+  const [eraScene, setEraScene] = useState<EraScene | null>(null);
   // Bots, the next player's screens and the tutorial wait for animations to finish.
-  const animating = sale !== null || goods !== null;
+  const animating = sale !== null || goods !== null || cubes !== null || scoringToPlay;
   // The tutorial's coach, when this is the tutorial.
   const coach = useCoach({ enabled: !!game.tutorial, match, playBot, busy: animating, summaryOpen });
   // Whose turn it is; `player` is that player only when it's a human at the device (bots play themselves).
@@ -313,11 +291,15 @@ function Table({
     const prev = before.current;
     before.current = { state, length: match.log.length };
     if (match.log.length !== prev.length + 1) return;
-    const last = match.log.at(-1)!.action;
-    if (last.type === 'sell') {
-      setGoods(goodsSold(prev.state, state, last, String(match.log.length)));
-      return;
-    }
+    const entry = match.log.at(-1)!;
+    const last = entry.action;
+    const id = String(match.log.length);
+    const fx = effectsOf(prev.state, state, entry.player, last, id);
+    setGoods(fx.goods);
+    setCubes(fx.cubes);
+    if (fx.income?.some((n) => n !== 0)) setIncome({ id, amounts: fx.income });
+    if (fx.era) setEraScene(fx.era);
+    else if (state.eraScores.length > erasPlayed) setErasPlayed(state.eraScores.length);
     if (last.type !== 'build' || (last.industry !== 'coal' && last.industry !== 'iron')) return;
     const kind = last.industry;
     const field = kind === 'coal' ? 'coalMarket' : 'ironMarket';
@@ -338,6 +320,29 @@ function Table({
     const t = window.setTimeout(() => setGoods(null), goodsDuration(goods) + 100);
     return () => clearTimeout(t);
   }, [goods]);
+  useEffect(() => {
+    if (!cubes) return;
+    const t = window.setTimeout(() => setCubes(null), cubesDuration(cubes) + 100);
+    return () => clearTimeout(t);
+  }, [cubes]);
+  useEffect(() => {
+    if (!income) return;
+    const t = window.setTimeout(() => setIncome(null), 1900);
+    return () => clearTimeout(t);
+  }, [income]);
+  // An era's scoring plays once the move's own animations have finished, then the summary opens.
+  const actionPlaying = sale !== null || goods !== null || cubes !== null;
+  useEffect(() => {
+    if (!eraScene || actionPlaying) return;
+    const t = window.setTimeout(() => {
+      setEraScene(null);
+      setErasPlayed(state.eraScores.length);
+    }, eraDuration(eraScene) + 300);
+    return () => clearTimeout(t);
+  }, [eraScene, actionPlaying]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The board shown while an era scores is the one just before it.
+  const eraBoard = useMemo(() => (eraScene ? brass.brassGame.viewFor(eraScene.board, viewer) : null), [eraScene, viewer]);
+  const scoringNow = eraScene !== null && !actionPlaying;
 
   // Bots take their own turns: one action at a time, after a pause so the table can follow along, and not
   // while an animation or the end-of-era summary is showing.
@@ -417,6 +422,7 @@ function Table({
       </header>
       <PlayerStrip
         view={view}
+        payout={income}
         names={names}
         active={active}
         onSelect={(id) => {
@@ -429,10 +435,12 @@ function Table({
       />
       <main className="board-area">
         <Board
-          state={view}
+          state={eraBoard ?? view}
           names={names}
           sale={sale}
           goods={goods}
+          cubes={cubes}
+          era={scoringNow ? eraScene : null}
           explainSlot={
             showControls && state.phase.kind === 'actions' && draft.kind === 'build'
               ? (location, slot) =>
@@ -625,7 +633,7 @@ function Table({
           onNewGame={onNewGame}
         />
       )}
-      {outcome && !summaryOpen && (
+      {outcome && !summaryOpen && !scoringToPlay && (
         <button className="results-button confirm" onClick={() => setResultsHidden(false)}>
           Final scores
         </button>
