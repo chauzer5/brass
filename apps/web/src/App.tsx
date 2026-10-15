@@ -1,6 +1,6 @@
 import { brass } from '@brass/engine';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Board, MARKET_BOX, saleDuration, type MarketSale } from './board/Board.tsx';
+import { Board, MARKET_BOX, goodsDuration, saleDuration, type GoodsSale, type MarketSale } from './board/Board.tsx';
 import { EMPTY_DRAFT, availableKinds, compose, developIndustries, highlights, tapLink, usableCards, type Draft } from './game/draft.ts';
 import { explainBuild, explainBuildAny } from './game/explain.ts';
 import { canUndo, useGame, type Game } from './game/useGame.ts';
@@ -10,10 +10,39 @@ import { IncomeTrack } from './ui/IncomeTrack.tsx';
 import { PlayerMat } from './ui/PlayerMat.tsx';
 import { DiscardSheet, EraSummary, FirstPlayer, GameLogSheet, Handoff, Settings, MatSheet, NewGame, PlayerStrip } from './ui/Screens.tsx';
 import { StepPanel, pickCard, tapMatRow, tapMerchant, tapSlot } from './ui/TurnPanel.tsx';
-import { choosable, chosenSource, sourceNeeds } from './game/sources.ts';
+import { choosable, chosenSource, gloucesterBonus, sourceNeeds } from './game/sources.ts';
 import { gameLog, recapSince, type RecapItem } from './game/recap.ts';
 import { runBot } from './bot/runBot.ts';
 import { Coach, useCoach } from './tutorial/Coach.tsx';
+
+/**
+ * What a Sell did, for its animation: each tile sold, the Merchant space it
+ * went to, and where its beer came from (the Merchant's barrel, if that one
+ * was emptied, then the Breweries that lost barrels, in the order of sale).
+ */
+function goodsSold(before: brass.BrassState, after: brass.BrassState, action: Extract<brass.BrassAction, { type: 'sell' }>, id: string): GoodsSale {
+  const spaceOf = (m: number) => after.merchants.slice(0, m).filter((x) => x.location === after.merchants[m]!.location).length;
+  const barrels = new Set(before.merchants.flatMap((m, i) => (m.beer && !after.merchants[i]!.beer ? [i] : [])));
+  const breweries: { location: brass.LocationId; slot: number }[] = [];
+  for (const [key, tile] of Object.entries(before.tiles) as [brass.SlotKey, brass.BuiltTile][]) {
+    if (tile.industry !== 'brewery') continue;
+    const drunk = tile.cubes - (after.tiles[key]?.cubes ?? 0);
+    const { location, index } = brass.parseSlotKey(key);
+    for (let i = 0; i < drunk; i++) breweries.push({ location, slot: index });
+  }
+  return {
+    id,
+    sales: action.sales.map((s) => {
+      const tile = before.tiles[brass.slotKey(s.location, s.slot)]!;
+      const need = brass.INDUSTRY_TILES[tile.industry][tile.level - 1]!.beer;
+      const merchant = { location: after.merchants[s.merchant]!.location, space: spaceOf(s.merchant) };
+      const beers: GoodsSale['sales'][number]['beers'] = [];
+      if (barrels.delete(s.merchant)) beers.push({ merchant });
+      while (beers.length < need && breweries.length > 0) beers.push({ brewery: breweries.shift()! });
+      return { location: s.location, slot: s.slot, industry: tile.industry, merchant, beers };
+    }),
+  };
+}
 
 /** Looking over a finished game: the whole map. */
 const WHOLE_MAP = { box: { x0: 0, y0: 0, x1: 1000, y1: 1000 }, key: 'whole-map' };
@@ -91,8 +120,12 @@ function Table({
   const summaryOpen = outcome ? !resultsHidden : state.eraScores.length > seenEras;
   // A new Coal Mine or Iron Works selling cubes to its market (animated; see below).
   const [sale, setSale] = useState<MarketSale | null>(null);
+  // Tiles sold to Merchants (animated too).
+  const [goods, setGoods] = useState<GoodsSale | null>(null);
+  // Bots, the next player's screens and the tutorial wait for animations to finish.
+  const animating = sale !== null || goods !== null;
   // The tutorial's coach, when this is the tutorial.
-  const coach = useCoach({ enabled: !!game.tutorial, match, playBot, busy: sale !== null, summaryOpen });
+  const coach = useCoach({ enabled: !!game.tutorial, match, playBot, busy: animating, summaryOpen });
   // Whose turn it is; `player` is that player only when it's a human at the device (bots play themselves).
   const active = brass.currentPlayer(state);
   const isBot = (id: number) => coach?.autoplay || seats[id]?.kind === 'bot';
@@ -238,7 +271,10 @@ function Table({
     if (player === null) return;
     const error = play(player, action);
     setMessage(error);
-    if (!error) setDraft(EMPTY_DRAFT);
+    if (error) return;
+    setDraft(EMPTY_DRAFT);
+    // Back to the hand (Develop and Gloucester's bonus switch to the board), so the map shows what happened.
+    setTrayTab('hand');
   };
 
   const p = handOwner === null ? null : view.players[handOwner]!;
@@ -254,6 +290,19 @@ function Table({
   const showTray = handOwner !== null && !hidden;
   // Develop, once its card is chosen, is played by tapping industries on the mat.
   const developing = draft.kind === 'develop' && draft.card !== null;
+  // A sale with Gloucester's beer earns a free Develop, chosen on the board too.
+  const bonus = useMemo(
+    () => (player !== null && !draft.pendingSale ? gloucesterBonus(state, player, base, needs, draft.picks) : null),
+    [state, player, baseKey, needs, draft.picks, draft.pendingSale], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const bonusOptions = useMemo(() => new Set(bonus?.options ?? []), [bonus]);
+  const setBonus = (develop: brass.Industry | null) =>
+    setDraft((d) => (bonus ? { ...d, sales: d.sales.map((s, k) => (k === bonus.sale ? { ...s, develop } : s)) } : d));
+  // When a bonus comes up, show the board to choose it on.
+  const bonusSale = bonus?.sale ?? null;
+  useEffect(() => {
+    if (bonusSale !== null && bonusOptions.size > 0) setTrayTab('mat');
+  }, [bonusSale]); // eslint-disable-line react-hooks/exhaustive-deps
   const developable = useMemo(() => new Set(developIndustries(view.cards, legal, draft)), [view.cards, legal, draft]);
   // Building with a town card: jump the map to that town.
   const focusCard = draft.kind === 'build' && draft.card ? view.cards[draft.card] : undefined;
@@ -265,6 +314,10 @@ function Table({
     before.current = { state, length: match.log.length };
     if (match.log.length !== prev.length + 1) return;
     const last = match.log.at(-1)!.action;
+    if (last.type === 'sell') {
+      setGoods(goodsSold(prev.state, state, last, String(match.log.length)));
+      return;
+    }
     if (last.type !== 'build' || (last.industry !== 'coal' && last.industry !== 'iron')) return;
     const kind = last.industry;
     const field = kind === 'coal' ? 'coalMarket' : 'ironMarket';
@@ -280,11 +333,16 @@ function Table({
     const t = window.setTimeout(() => setSale(null), saleDuration(sale) + 100);
     return () => clearTimeout(t);
   }, [sale]);
+  useEffect(() => {
+    if (!goods) return;
+    const t = window.setTimeout(() => setGoods(null), goodsDuration(goods) + 100);
+    return () => clearTimeout(t);
+  }, [goods]);
 
   // Bots take their own turns: one action at a time, after a pause so the table can follow along, and not
   // while an animation or the end-of-era summary is showing.
   // (The tutorial's tutor plays scripted moves instead, except when fast-forwarding.)
-  const botTurn = active !== null && isBot(active) && !outcome && !summaryOpen && !sale && !intro && (!coach || coach.autoplay);
+  const botTurn = active !== null && isBot(active) && !outcome && !summaryOpen && !animating && !intro && (!coach || coach.autoplay);
   useEffect(() => {
     if (!botTurn || active === null) return;
     const seat = seats[active]!;
@@ -374,6 +432,7 @@ function Table({
           state={view}
           names={names}
           sale={sale}
+          goods={goods}
           explainSlot={
             showControls && state.phase.kind === 'actions' && draft.kind === 'build'
               ? (location, slot) =>
@@ -442,7 +501,17 @@ function Table({
                 <h3>Income</h3>
                 <IncomeTrack players={view.players} focus={handOwner!} />
               </div>
-              {developing ? (
+              {bonus && bonus.options.length > 0 ? (
+                <PlayerMat
+                  player={p!}
+                  era={state.era}
+                  picks={bonus.chosen ? [bonus.chosen] : []}
+                  selectable={bonusOptions}
+                  // Tapping the chosen industry again takes the bonus back.
+                  onRow={(ind) => setBonus(ind === bonus.chosen ? null : ind)}
+                  onUnpick={() => setBonus(null)}
+                />
+              ) : developing ? (
                 <PlayerMat
                   player={p!}
                   era={state.era}
@@ -456,7 +525,7 @@ function Table({
               )}
               </>
             }
-            panelOnMat={developing}
+            panelOnMat={developing || (bonus !== null && bonus.options.length > 0)}
             header={
               <>
                 Deck {view.deckSize} · Coal £{coalPrice} · Iron £{ironPrice}
@@ -532,7 +601,7 @@ function Table({
       )}
       {/* The next player's screen waits for a sale animation to finish, so whoever built sees it. */}
       {intro && <FirstPlayer names={names} order={state.turnOrder} onDone={() => setIntro(false)} />}
-      {hidden && player !== null && !sale && !summaryOpen && !intro && (
+      {hidden && player !== null && !animating && !summaryOpen && !intro && (
         <Handoff
           name={names[player]!}
           names={names}
@@ -540,7 +609,7 @@ function Table({
           onReady={() => setRevealedFor(player)}
         />
       )}
-      {soloRecap.length > 0 && player !== null && !sale && !summaryOpen && (
+      {soloRecap.length > 0 && player !== null && !animating && !summaryOpen && (
         <Handoff solo name={names[player]!} names={names} recap={soloRecap} onReady={() => setSoloRecap([])} />
       )}
       {summaryOpen && (

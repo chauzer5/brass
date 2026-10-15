@@ -1,5 +1,5 @@
 import { brass } from '@brass/engine';
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import { TransformComponent, TransformWrapper, type ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
 import type { Highlights } from '../game/draft.ts';
 import { INDUSTRY_NAME, roman } from '../game/labels.ts';
@@ -25,6 +25,8 @@ interface BoardProps {
   onDiscards?: (() => void) | undefined;
   /** A sale to the coal or iron market to animate. */
   sale?: MarketSale | null | undefined;
+  /** Tiles just sold to Merchants: animate the beer, the goods and the flip. */
+  goods?: GoodsSale | null | undefined;
   /** Holding a space that isn't lit asks why it can't be used; null means there's nothing to say. */
   explainSlot?: ((location: brass.LocationId, slot: number) => string | null) | undefined;
   highlights?: Highlights | undefined;
@@ -172,6 +174,26 @@ function SlotIcons({ slot }: { slot: brass.Slot }) {
   );
 }
 
+/** What's printed on a built tile: its industry and level, and any cubes on it. */
+function TileFace({ tile }: { tile: brass.BuiltTile }) {
+  return (
+    <g className={`tile-face ${tile.flipped ? 'flipped' : ''}`}>
+      {/* Flipped tiles get a dark top band, like the black top half of a flipped tile. */}
+      {tile.flipped && <path d={`M0 11 V4 a4 4 0 0 1 4 -4 H${SLOT - 4} a4 4 0 0 1 4 4 V11 Z`} className="tile-flip-band" />}
+      <IndustryIcon industry={tile.industry} size={20} x={(SLOT - 20) / 2} y={3} />
+      <text x={SLOT / 2} y={SLOT - 7} className="tile-level">
+        {roman(tile.level)}
+      </text>
+      {tile.cubes > 0 && (
+        <g transform={`translate(${SLOT - 4} 4)`}>
+          <circle r={7} className={`cube cube-${tile.industry}`} />
+          <text className="cube-count">{tile.cubes}</text>
+        </g>
+      )}
+    </g>
+  );
+}
+
 function Slots({
   location,
   slots,
@@ -181,6 +203,7 @@ function Slots({
   highlights,
   onSlot,
   holdFor,
+  flips,
 }: {
   location: brass.LocationId;
   slots: readonly brass.Slot[];
@@ -189,6 +212,8 @@ function Slots({
   tiles: brass.BrassView['tiles'];
   highlights: Highlights;
   onSlot: BoardProps['onSlot'];
+  /** Tiles turning over as they're sold: when each flip starts (ms), by space. */
+  flips?: ReadonlyMap<brass.SlotKey, number> | undefined;
   holdFor?: ((location: brass.LocationId, slot: number) => Record<string, (e: ReactPointerEvent) => void>) | undefined;
 }) {
   const { width, height } = slotLayout(slots.length);
@@ -227,24 +252,23 @@ function Slots({
             <title>{tile ? `${INDUSTRY_NAME[tile.industry]} ${roman(tile.level)}` : slot.map((ind) => INDUSTRY_NAME[ind]).join(' or ')}</title>
             {/* Generous invisible hit area for fingers. */}
             {tappable && <rect x={-6} y={-6} width={SLOT + 12} height={SLOT + 12} className="hit" />}
-            <rect width={SLOT} height={SLOT} rx={4} className={cls} />
+            {tile && flips?.has(key) ? (
+              // Being sold: the unflipped face turns edge-on, then the flipped face turns back to face up.
+              <>
+                <g className="tile-turn out" style={{ animationDelay: `${flips.get(key)}ms` }}>
+                  <rect width={SLOT} height={SLOT} rx={4} className={cls.replace(' flipped', '')} />
+                  <TileFace tile={{ ...tile, flipped: false }} />
+                </g>
+                <g className="tile-turn in" style={{ animationDelay: `${flips.get(key)}ms` }}>
+                  <rect width={SLOT} height={SLOT} rx={4} className={cls} />
+                  <TileFace tile={tile} />
+                </g>
+              </>
+            ) : (
+              <rect width={SLOT} height={SLOT} rx={4} className={cls} />
+            )}
             {tile ? (
-              <g className={`tile-face ${tile.flipped ? 'flipped' : ''}`}>
-                {/* Flipped tiles get a dark top band, like the black top half of a flipped tile. */}
-                {tile.flipped && (
-                  <path d={`M0 11 V4 a4 4 0 0 1 4 -4 H${SLOT - 4} a4 4 0 0 1 4 4 V11 Z`} className="tile-flip-band" />
-                )}
-                <IndustryIcon industry={tile.industry} size={20} x={(SLOT - 20) / 2} y={3} />
-                <text x={SLOT / 2} y={SLOT - 7} className="tile-level">
-                  {roman(tile.level)}
-                </text>
-                {tile.cubes > 0 && (
-                  <g transform={`translate(${SLOT - 4} 4)`}>
-                    <circle r={7} className={`cube cube-${tile.industry}`} />
-                    <text className="cube-count">{tile.cubes}</text>
-                  </g>
-                )}
-              </g>
+              !flips?.has(key) && <TileFace tile={tile} />
             ) : (
               <g className="slot-icons">
                 <SlotIcons slot={slot} />
@@ -269,6 +293,7 @@ export function Board({
   names,
   onDiscards,
   sale,
+  goods,
   explainSlot,
   highlights = NO_HIGHLIGHTS,
   onSlot,
@@ -280,6 +305,10 @@ export function Board({
   rail = true,
 }: BoardProps) {
   const tiles = state?.tiles ?? {};
+  const flips = useMemo(
+    () => (goods ? new Map(goods.sales.map((g, k) => [brass.slotKey(g.location, g.slot), goodsTiming(goods, k).flip])) : undefined),
+    [goods],
+  );
   const links = state?.links ?? {};
   const zoom = useRef<ReactZoomPanPinchRef>(null);
   // Highlights are drawn in map units, so zoomed out they shrink to hairlines. --lit-k scales them up
@@ -361,6 +390,11 @@ export function Board({
       if (coach.top + coach.height / 2 < (view.top + visibleBottom) / 2) visibleTop = Math.max(view.top, coach.bottom);
       else visibleBottom = Math.min(visibleBottom, coach.top);
     }
+    // Too little left uncovered (a tall tray under the card): frame on the whole board instead.
+    if (visibleBottom - visibleTop < 120) {
+      visibleTop = view.top;
+      visibleBottom = view.bottom;
+    }
     const availW = view.width - (rail ? RAIL_WIDTH : 0);
     const availH = visibleBottom - visibleTop;
     const boxW = Math.max(1, (box.x1 - box.x0) * unit);
@@ -407,6 +441,27 @@ export function Board({
       FOCUS_SCALE,
     );
   }, [sale?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Selling: frame every tile sold, the Merchants it went to and wherever its beer came from.
+  useEffect(() => {
+    if (!goods) return;
+    const pts = goods.sales.flatMap((g) => [
+      slotCenter(g.location, g.slot),
+      merchantSpot(g.merchant.location, g.merchant.space).token,
+      ...g.beers.map((b) => ('merchant' in b ? merchantSpot(b.merchant.location, b.merchant.space).barrel : slotCenter(b.brewery.location, b.brewery.slot))),
+    ]);
+    const pad = 45;
+    const box = {
+      x0: Math.min(...pts.map((p) => p.x)) - pad,
+      y0: Math.min(...pts.map((p) => p.y)) - pad,
+      x1: Math.max(...pts.map((p) => p.x)) + pad,
+      y1: Math.max(...pts.map((p) => p.y)) + pad,
+    };
+    // Selling ends the action, which can resize the tray (back to the hand) and move the tutorial's card:
+    // frame once that has settled.
+    const t = window.setTimeout(() => showArea(box, FOCUS_SCALE), TRAY_SETTLE_MS);
+    return () => clearTimeout(t);
+  }, [goods?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Market spaces stay empty until their cube lands.
   const [landed, setLanded] = useState(0);
@@ -518,6 +573,7 @@ export function Board({
                     highlights={highlights}
                     onSlot={onSlot}
                     holdFor={holdFor}
+                    flips={flips}
                   />
                   {loc.kind === 'town' && (
                     <TownBanner
@@ -534,6 +590,7 @@ export function Board({
 
           {/* Above everything, so the cubes fly over towns and links on their way to the market. */}
           {sale && <SaleAnimation key={sale.id} sale={sale} />}
+          {goods && <GoodsAnimation key={goods.id} goods={goods} />}
         </svg>
       </TransformComponent>
     </TransformWrapper>
@@ -903,6 +960,108 @@ function SaleAnimation({ sale }: { sale: MarketSale }) {
               <g className="sale-coin" style={{ animationDelay: `${delay + SALE_FLY}ms`, animationDuration: `${SALE_COIN}ms` }}>
                 <circle r={13} className="sale-coin-face" />
                 <text className="sale-coin-text">£{to.price}</text>
+              </g>
+            </g>
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
+/** Where a Merchant space's trade token, and the beer barrel beside it, are drawn. */
+function merchantSpot(location: brass.LocationId, space: number) {
+  const loc = brass.LOCATION_BY_ID[location];
+  const n = loc.kind === 'merchant' ? loc.spaces : 1;
+  const x = loc.pos.x - ((n - 1) * SPACE_WIDTH) / 2 + space * SPACE_WIDTH - 8;
+  const y = loc.pos.y + 14;
+  return { token: { x, y }, barrel: { x: x + TOKEN_R + 2 + 8.5, y } };
+}
+
+/** Tiles sold to Merchants in one Sell action, for the animation. */
+export interface GoodsSale {
+  /** Changes for each Sell, so the same sale again still animates. */
+  id: string;
+  sales: {
+    location: brass.LocationId;
+    slot: number;
+    industry: brass.Industry;
+    /** The Merchant it was sold to: its town, and which of its spaces. */
+    merchant: { location: brass.LocationId; space: number };
+    /** The beer it drank: from the Merchant's own barrel, or from a Brewery. */
+    beers: ({ merchant: { location: brass.LocationId; space: number } } | { brewery: { location: brass.LocationId; slot: number } })[];
+  }[];
+}
+
+/** The tray's change of height (e.g. back from the board to the hand) takes about this long. */
+const TRAY_SETTLE_MS = 300;
+const GOODS_STEP = 1300;
+const BEER_FLY = 700;
+const GOODS_FLY = 1000;
+const TURN = 700;
+
+/** When each part of one tile's sale starts (ms from the start of the animation). */
+function goodsTiming(goods: GoodsSale, k: number) {
+  const start = TRAY_SETTLE_MS + k * GOODS_STEP;
+  const goodsAt = start + (goods.sales[k]!.beers.length > 0 ? BEER_FLY : 0);
+  return { start, goods: goodsAt, flip: goodsAt + 250 };
+}
+
+/** How long a Sell's animation runs, start to finish. */
+export const goodsDuration = (goods: GoodsSale) => {
+  const last = goodsTiming(goods, goods.sales.length - 1);
+  return Math.max(last.goods + GOODS_FLY, last.flip + TURN);
+};
+
+/**
+ * Selling, step by step for each tile: the beer it needs flies in from the
+ * Merchant's barrel or a Brewery; then a crate of its goods lifts off and
+ * flies to the Merchant who bought it, while the tile turns over.
+ */
+function GoodsAnimation({ goods }: { goods: GoodsSale }) {
+  return (
+    <g className="sale-anim" aria-hidden>
+      {goods.sales.map((g, k) => {
+        const t = goodsTiming(goods, k);
+        const tile = slotCenter(g.location, g.slot);
+        const buyer = merchantSpot(g.merchant.location, g.merchant.space).token;
+        return (
+          <g key={k}>
+            {g.beers.map((b, j) => {
+              const from = 'merchant' in b ? merchantSpot(b.merchant.location, b.merchant.space).barrel : slotCenter(b.brewery.location, b.brewery.slot);
+              return (
+                <g key={j} transform={`translate(${from.x} ${from.y})`}>
+                  <g
+                    className="goods-fly beer"
+                    style={
+                      {
+                        '--dx': `${tile.x - from.x}px`,
+                        '--dy': `${tile.y - from.y}px`,
+                        animationDelay: `${t.start + j * 120}ms`,
+                        animationDuration: `${BEER_FLY}ms`,
+                      } as CSSProperties
+                    }
+                  >
+                    <circle r={10} className="goods-chip beer" />
+                    <IndustryIcon industry="brewery" size={13} x={-6.5} y={-6.5} />
+                  </g>
+                </g>
+              );
+            })}
+            <g transform={`translate(${tile.x} ${tile.y})`}>
+              <g
+                className="goods-fly crate"
+                style={
+                  {
+                    '--dx': `${buyer.x - tile.x}px`,
+                    '--dy': `${buyer.y - tile.y}px`,
+                    animationDelay: `${t.goods}ms`,
+                    animationDuration: `${GOODS_FLY}ms`,
+                  } as CSSProperties
+                }
+              >
+                <rect x={-12} y={-12} width={24} height={24} rx={5} className="goods-chip crate" />
+                <IndustryIcon industry={g.industry} size={16} x={-8} y={-8} />
               </g>
             </g>
           </g>

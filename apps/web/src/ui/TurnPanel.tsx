@@ -18,7 +18,7 @@ import { ACTION_LABEL } from './ActionRail.tsx';
 import { ActionIcon, IndustryIcon } from './icons.tsx';
 import { IncomeTrack } from './IncomeTrack.tsx';
 import { TileStats } from './PlayerMat.tsx';
-import { choosable, chosenSource, gloucesterOptions, sourceNeeds, withPicks, type Need, type ResourceKind } from '../game/sources.ts';
+import { choosable, chosenSource, gloucesterBonus, sourceNeeds, withPicks, type Need, type ResourceKind } from '../game/sources.ts';
 
 interface StepPanelProps {
   view: brass.BrassView;
@@ -100,7 +100,7 @@ export function StepPanel({ view, player, legal, draft, setDraft, validate, onPl
         <SourcePicker view={view} full={full} player={player} names={names} needs={needs} draft={draft} setDraft={setDraft} />
       )}
       {draft.kind === 'sell' && action?.type === 'sell' && !draft.pendingSale && (
-        <GloucesterBonus view={view} full={full} player={player} action={action} needs={needs} draft={draft} setDraft={setDraft} />
+        <GloucesterBonus full={full} player={player} action={action} needs={needs} draft={draft} />
       )}
       {action && !draft.pendingSale && (
         <div className="confirm-row">
@@ -249,50 +249,17 @@ function SourcePicker({
 }
 
 /** Gloucester's beer bonus: develop one tile for free. Only shown when a sale there uses its beer. */
-function GloucesterBonus({
-  view,
-  full,
-  player,
-  action,
-  needs,
-  draft,
-  setDraft,
-}: {
-  view: brass.BrassView;
-  full: brass.BrassState;
-  player: number;
-  action: Extract<brass.BrassAction, { type: 'sell' }>;
-  needs: Need[];
-  draft: Draft;
-  setDraft: Dispatch<SetStateAction<Draft>>;
-}) {
-  const i = action.sales.findIndex(
-    (s, k) =>
-      view.merchants[s.merchant]!.location === 'gloucester' &&
-      needs.some((n) => n.sale === k && chosenSource(n, draft.picks) === 'merchant'),
-  );
-  if (i < 0) return null;
-  const options = gloucesterOptions(full, player, action, i);
-  const current = draft.sales[i]!.develop;
-  // The engine's default is the first industry it can develop.
-  const chosen = current === undefined ? (options[0] ?? null) : current;
-  const set = (develop: brass.Industry | null) =>
-    setDraft((d) => ({ ...d, sales: d.sales.map((s, k) => (k === i ? { ...s, develop } : s)) }));
-  if (options.length === 0) return <p className="hint">Gloucester's bonus: nothing can be developed right now.</p>;
+/** Gloucester's bonus is chosen on the player board (like Develop); this only says so. */
+function GloucesterBonus({ full, player, action, needs, draft }: { full: brass.BrassState; player: number; action: brass.BrassAction; needs: Need[]; draft: Draft }) {
+  const bonus = gloucesterBonus(full, player, action, needs, draft.picks);
+  if (!bonus) return null;
+  if (bonus.options.length === 0) return <p className="hint">Gloucester's bonus: nothing can be developed right now.</p>;
   return (
-    <Step title="Gloucester bonus: develop a tile for free">
-      <div className="chips">
-        {options.map((ind) => (
-          <button key={ind} className={`chip with-icon ${chosen === ind ? 'selected' : ''}`} onClick={() => set(ind)}>
-            <IndustryIcon industry={ind} size={16} />
-            {INDUSTRY_NAME[ind]}
-          </button>
-        ))}
-        <button className={`chip ${chosen === null ? 'selected' : ''}`} onClick={() => set(null)}>
-          None
-        </button>
-      </div>
-    </Step>
+    <p className="hint">
+      {bonus.chosen
+        ? `Gloucester's bonus: a free Develop of ${INDUSTRY_NAME[bonus.chosen]}. Tap your board to change it.`
+        : "Gloucester's bonus: tap your board for a free Develop."}
+    </p>
   );
 }
 

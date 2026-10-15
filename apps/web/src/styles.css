@@ -2714,3 +2714,81 @@ g.coach-target > rect:first-of-type {
 @keyframes coach-stroke {
   50% { stroke-opacity: 0.3; }
 }
+
+/* ---- Selling to a Merchant ---- */
+
+/* Beer flies to the tile; then a crate of goods lifts off it and flies to the Merchant. */
+.goods-fly {
+  opacity: 0;
+  animation-name: goods-fly;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.45));
+}
+
+@keyframes goods-fly {
+  0% { transform: translate(0, 0) scale(0); opacity: 0; }
+  14% { transform: translate(0, -12px) scale(1.6); opacity: 1; animation-timing-function: cubic-bezier(0.55, 0, 0.35, 1); }
+  86% { transform: translate(var(--dx), var(--dy)) scale(1.1); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(0.4); opacity: 0; }
+}
+
+.goods-chip.crate {
+  fill: var(--token);
+  stroke: var(--token-rim);
+  stroke-width: 2;
+}
+
+.goods-chip.beer {
+  fill: #f2c230;
+  stroke: var(--beer);
+  stroke-width: 2;
+}
+
+.goods-fly.beer .industry-icon,
+.goods-fly.beer svg {
+  color: #3a2012;
+}
+
+/* A sold tile turns over: the unflipped face goes edge-on, then the flipped face comes round. */
+.tile-turn {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation-duration: 700ms;
+  animation-fill-mode: both;
+}
+
+.tile-turn.out {
+  animation-name: tile-turn-out;
+}
+
+.tile-turn.in {
+  animation-name: tile-turn-in;
+}
+
+@keyframes tile-turn-out {
+  0% { transform: scale(1, 1); opacity: 1; animation-timing-function: ease-in; }
+  15% { transform: scale(1.15, 1.15); opacity: 1; animation-timing-function: ease-in; }
+  50% { transform: scale(0, 1.15); opacity: 1; }
+  50.01%, 100% { transform: scale(0, 1); opacity: 0; }
+}
+
+@keyframes tile-turn-in {
+  0%, 50% { transform: scale(0, 1.15); opacity: 0; animation-timing-function: ease-out; }
+  50.01% { opacity: 1; }
+  85% { transform: scale(1.15, 1.15); opacity: 1; }
+  100% { transform: scale(1, 1); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .goods-fly {
+    animation: none;
+    opacity: 0;
+  }
+  .tile-turn {
+    animation: none;
+  }
+  .tile-turn.out {
+    display: none;
+  }
+}

@@ -137,3 +137,35 @@ export function gloucesterOptions(state: brass.BrassState, player: number, a: Ex
       brass.brassGame.validate(state, player, { ...a, sales: a.sales.map((s, i) => (i === sale ? { ...s, develop: industry } : s)) }) === null,
   );
 }
+
+/** A Gloucester bonus the sale being put together earns: which sale, what it could develop, and what's chosen. */
+export interface GloucesterBonus {
+  sale: number;
+  options: brass.Industry[];
+  /** null: no tile developed. */
+  chosen: brass.Industry | null;
+}
+
+/**
+ * The first sale in `action` that uses Gloucester's own beer (so earns its
+ * free Develop), with the industries it could develop. Unchosen, it's the
+ * engine's default: the first that can be developed.
+ */
+export function gloucesterBonus(
+  state: brass.BrassState,
+  player: number,
+  action: Action | null,
+  needs: readonly Need[],
+  picks: Picks,
+): GloucesterBonus | null {
+  if (action?.type !== 'sell') return null;
+  const sale = action.sales.findIndex(
+    (s, k) =>
+      state.merchants[s.merchant]!.location === 'gloucester' &&
+      needs.some((n) => n.sale === k && chosenSource(n, picks) === 'merchant'),
+  );
+  if (sale < 0) return null;
+  const options = gloucesterOptions(state, player, action, sale);
+  const current = action.sales[sale]!.develop;
+  return { sale, options, chosen: current === undefined ? (options[0] ?? null) : current };
+}

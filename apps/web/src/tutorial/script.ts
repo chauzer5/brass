@@ -177,7 +177,7 @@ export const STEPS: readonly Step[] = [
     kind: 'do',
     title: 'Sell your cotton',
     place: 'bottom',
-    text: "Selling a mill needs beer. Gloucester has a barrel of its own: using it earns its bonus too, a free Develop. Tap Sell, any card, your mill, then Confirm. Pick any industry for the bonus.",
+    text: "Selling a mill needs beer. Gloucester has a barrel of its own: using it earns its bonus too, a free Develop. Tap Sell, any card and your mill. Then pick any industry on your board for the bonus, and Confirm.",
     allow: (a) =>
       // Either Worcester space: the mill went on whichever you tapped.
       a.type === 'sell' && a.sales.length === 1 && a.sales[0]!.location === 'worcester',
