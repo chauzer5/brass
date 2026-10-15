@@ -428,6 +428,7 @@ function Table({
       <PlayerStrip
         view={view}
         payout={income}
+        seats={seats}
         names={names}
         active={active}
         onSelect={(id) => {

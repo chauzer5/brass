@@ -227,12 +227,15 @@ export function PlayerStrip({
   active,
   onSelect,
   payout,
+  seats,
 }: {
   view: brass.BrassView;
   names: string[];
   active: number | null;
   /** Money each player just got (or paid) at the end of a round: it pops up over their money. */
   payout?: { id: string; amounts: readonly number[] } | null | undefined;
+  /** Who plays each seat: bots get their difficulty shown after their name. */
+  seats?: readonly Seat[] | undefined;
   /** Tapping a player shows their mat. */
   onSelect: (id: number) => void;
 }) {
@@ -254,7 +257,15 @@ export function PlayerStrip({
             aria-label={`${names[id]}: £${p.money}, income ${income}, ${p.vp} VP. Show board`}
             onClick={() => onSelect(id)}
           >
-            <span className="player-name">{names[id]}</span>
+            <span className="player-name">
+              {names[id]}
+              {seats?.[id]?.kind === 'bot' && (
+                <span className="bot-level" title={`${DIFFICULTY_LABEL[seats[id].difficulty]} bot`}>
+                  {' '}
+                  ({DIFFICULTY_LABEL[seats[id].difficulty][0]})
+                </span>
+              )}
+            </span>
             {payout && payout.amounts[id] ? (
               <span key={payout.id} className={`money-pop ${payout.amounts[id]! > 0 ? 'gain' : 'loss'}`} aria-hidden>
                 {payout.amounts[id]! > 0 ? '+' : '−'}£{Math.abs(payout.amounts[id]!)}
