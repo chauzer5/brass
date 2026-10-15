@@ -17,7 +17,7 @@ export default defineConfig({
       // The manifest lives in public/ and is linked from index.html.
       manifest: false,
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,webp,webmanifest}'],
+        globPatterns: ['**/*.{js,mjs,css,html,svg,png,webp,webmanifest}'],
         navigateFallback: '/index.html',
         cleanupOutdatedCaches: true,
         // The rulebook is big, so it isn't downloaded up front: once opened, it's kept for offline reading.

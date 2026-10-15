@@ -9,6 +9,7 @@ import { ActionRail } from './ui/ActionRail.tsx';
 import { HandTray, type Arriving, type TrayTab } from './ui/HandTray.tsx';
 import { IncomeTrack } from './ui/IncomeTrack.tsx';
 import { PlayerMat } from './ui/PlayerMat.tsx';
+import { Rulebook } from './ui/Rulebook.tsx';
 import { DiscardSheet, EraSummary, FirstPlayer, GameLogSheet, Handoff, Settings, MatSheet, NewGame, PlayerStrip } from './ui/Screens.tsx';
 import { StepPanel, pickCard, tapMatRow, tapMerchant, tapSlot } from './ui/TurnPanel.tsx';
 import { choosable, chosenSource, gloucesterBonus, sourceNeeds } from './game/sources.ts';
@@ -122,7 +123,7 @@ function Table({
   const [showDiscards, setShowDiscards] = useState(false);
   // The ☰ menu, and what it opens over the game.
   const [menuOpen, setMenuOpen] = useState(false);
-  const [sheet, setSheet] = useState<'log' | 'settings' | null>(null);
+  const [sheet, setSheet] = useState<'log' | 'settings' | 'rulebook' | null>(null);
   const log = useMemo(() => (sheet === 'log' ? gameLog(match) : []), [sheet, match]);
 
   // Each tutorial step that asks for a move starts on the hand, with the tray open.
@@ -578,7 +579,7 @@ function Table({
               [
                 coach ? (['Exit tutorial', onExitTutorial] as const) : (['Main menu', onMenu] as const),
                 ['Game log', () => setSheet('log')],
-                ...(__RULEBOOK__ ? ([['Rulebook', () => window.open(__RULEBOOK__!, '_blank', 'noopener')]] as const) : []),
+                ...(__RULEBOOK__ ? ([['Rulebook', () => setSheet('rulebook')]] as const) : []),
                 ['Settings', () => setSheet('settings')],
               ] as const
             ).map(([label, run]) => (
@@ -598,6 +599,7 @@ function Table({
       )}
       {sheet === 'log' && <GameLogSheet entries={log} names={names} onClose={() => setSheet(null)} />}
       {sheet === 'settings' && <Settings inGame onClose={() => setSheet(null)} />}
+      {sheet === 'rulebook' && __RULEBOOK__ && <Rulebook url={__RULEBOOK__} onClose={() => setSheet(null)} />}
       {showDiscards && <DiscardSheet view={view} names={names} onClose={() => setShowDiscards(false)} />}
       {matFor !== null && (
         <MatSheet

@@ -4,6 +4,7 @@ import { HUMAN, type Seat } from '../game/useGame.ts';
 import { GameCard } from './HandTray.tsx';
 import { IncomeTrack } from './IncomeTrack.tsx';
 import { PlayerMat } from './PlayerMat.tsx';
+import { Rulebook } from './Rulebook.tsx';
 import type { LogEntry, RecapItem } from '../game/recap.ts';
 import { useTheme, type ThemeSetting } from '../settings.ts';
 
@@ -25,8 +26,9 @@ export function NewGame({
   onResume?: (() => void) | undefined;
   onTutorial: () => void;
 }) {
-  const [page, setPage] = useState<'menu' | 'setup' | 'settings'>('menu');
+  const [page, setPage] = useState<'menu' | 'setup' | 'settings' | 'rulebook'>('menu');
   if (page === 'settings') return <Settings onClose={() => setPage('menu')} />;
+  if (page === 'rulebook' && __RULEBOOK__) return <Rulebook url={__RULEBOOK__} onClose={() => setPage('menu')} />;
   if (page === 'setup') return <MatchSetup onStart={onStart} onBack={() => setPage('menu')} replacesSave={!!onResume} />;
   return (
     <div className="screen">
@@ -45,9 +47,9 @@ export function NewGame({
           Learn to play
         </button>
         {__RULEBOOK__ && (
-          <a className="secondary button-link" href={__RULEBOOK__} target="_blank" rel="noopener">
+          <button className="secondary" onClick={() => setPage('rulebook')}>
             Rulebook
-          </a>
+          </button>
         )}
         <button className="secondary" onClick={() => setPage('settings')}>
           Settings
