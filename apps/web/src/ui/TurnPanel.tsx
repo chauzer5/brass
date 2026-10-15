@@ -94,7 +94,7 @@ export function StepPanel({ view, player, legal, draft, setDraft, validate, onPl
       {draft.kind === 'network' && <NetworkSteps view={view} legal={legal} draft={draft} setDraft={setDraft} />}
       {draft.kind === 'develop' && draft.card && <DevelopSteps draft={draft} />}
       {draft.kind === 'loan' && <LoanSteps view={view} player={player} />}
-      {draft.kind === 'sell' && draft.card && <SellSteps view={view} legal={legal} draft={draft} setDraft={setDraft} />}
+      {draft.kind === 'sell' && <SellSteps view={view} legal={legal} draft={draft} setDraft={setDraft} />}
 
       {choosable(needs).length > 0 && !draft.pendingSale && (
         <SourcePicker view={view} full={full} player={player} names={names} needs={needs} draft={draft} setDraft={setDraft} />
@@ -122,8 +122,8 @@ export function pickCard(draft: Draft, id: brass.CardId, cards: Record<brass.Car
     return chosen.length < 3 ? { ...draft, scoutCards: [...chosen, id] } : draft;
   }
   if (draft.kind === 'build') return chooseBuildCard(cards, legal, draft, id);
-  // Any card can network, so links tapped before the card stay chosen.
-  if (draft.kind === 'network') return { ...draft, card: draft.card === id ? null : id, picks: {}, activeNeed: null };
+  // Any card can network or sell, so links or tiles tapped before the card stay chosen.
+  if (draft.kind === 'network' || draft.kind === 'sell') return { ...draft, card: draft.card === id ? null : id, picks: {}, activeNeed: null };
   if (draft.card === id) return { ...EMPTY_DRAFT, kind: draft.kind };
   return { ...EMPTY_DRAFT, kind: draft.kind, card: id };
 }
@@ -373,7 +373,9 @@ function SellSteps({ view, legal, draft }: StepProps) {
       )}
       <p className="hint">
         {draft.sales.length === 0
-          ? `Tap a highlighted tile to sell it (${left} available).`
+          ? draft.card
+            ? `Tap a highlighted tile to sell it (${left} available).`
+            : `Tap a highlighted tile to sell it (${left} available), or choose a card first.`
           : left > 0
             ? 'Tap another highlighted tile to sell it too, or a sold tile to take it back.'
             : 'Tap a sold tile to take it back.'}

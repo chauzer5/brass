@@ -168,10 +168,13 @@ export function developIndustries(cards: Cards, legal: readonly brass.BrassActio
   return brass.INDUSTRIES.filter((i) => set.has(i));
 }
 
-/** Tiles that can be sold, with the Merchants each can be sold to. */
+/**
+ * Tiles that can be sold, with the Merchants each can be sold to. Any card
+ * can sell, so they're offered before a card is chosen too.
+ */
 export function sellOptions(cards: Cards, legal: readonly brass.BrassAction[], d: Draft): Map<brass.SlotKey, number[]> {
   const out = new Map<brass.SlotKey, number[]>();
-  if (d.kind !== 'sell' || !d.card) return out;
+  if (d.kind !== 'sell') return out;
   for (const a of withCard(cards, legal, 'sell', d.card)) {
     const sale = (a as Extract<brass.BrassAction, { type: 'sell' }>).sales;
     if (sale.length !== 1) continue;
