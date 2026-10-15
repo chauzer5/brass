@@ -179,6 +179,26 @@ function SlotIcons({ slot }: { slot: brass.Slot }) {
   );
 }
 
+/**
+ * An unflipped tile's back, shown large while it's held: above the finger and off to the side, so the
+ * thumb doesn't cover it.
+ */
+function TilePeek({ tile, x, y }: { tile: brass.BuiltTile; x: number; y: number }) {
+  const size = 96;
+  // To the left of the finger when it's on the right half of the screen, else to the right.
+  const left = x > window.innerWidth / 2 ? x - size - 36 : x + 36;
+  const top = Math.max(8, y - size - 40);
+  return (
+    <div className="tile-peek-card" style={{ left: Math.min(Math.max(8, left), window.innerWidth - size - 8), top, width: size }} aria-hidden>
+      <svg viewBox={`-2 -2 ${SLOT + 4} ${SLOT + 4}`} width={size} height={size}>
+        <rect width={SLOT} height={SLOT} rx={4} className={`slot owner-${tile.owner} flipped`} />
+        <TileFace tile={{ ...tile, flipped: true, cubes: 0 }} />
+      </svg>
+      <span>Once flipped</span>
+    </div>
+  );
+}
+
 const linkVPOf = (tile: brass.BuiltTile) => brass.INDUSTRY_TILES[tile.industry][tile.level - 1]!.linkVP;
 const vpOf = (tile: brass.BuiltTile) => brass.INDUSTRY_TILES[tile.industry][tile.level - 1]!.vp;
 
@@ -240,7 +260,6 @@ function Slots({
   holdFor,
   flips,
   leaving,
-  peek,
 }: {
   location: brass.LocationId;
   slots: readonly brass.Slot[];
@@ -254,8 +273,6 @@ function Slots({
   /** Tiles coming off the board at the end of the era, and when. */
   leaving?: { tiles: ReadonlySet<brass.SlotKey>; at: number } | null | undefined;
   holdFor?: ((location: brass.LocationId, slot: number, tappable: boolean) => Record<string, (e: ReactPointerEvent) => void> | undefined) | undefined;
-  /** An unflipped tile being held: shown flipped, to see what it will score. */
-  peek?: brass.SlotKey | null | undefined;
 }) {
   const { width, height } = slotLayout(slots.length);
   return (
@@ -306,17 +323,11 @@ function Slots({
                   <TileFace tile={tile} />
                 </g>
               </>
-            ) : tile && peek === key ? (
-              // Held: its back, turned over for as long as it's held.
-              <g className="tile-peek">
-                <rect width={SLOT} height={SLOT} rx={4} className={`${cls} flipped`} />
-                <TileFace tile={{ ...tile, flipped: true, cubes: 0 }} />
-              </g>
             ) : (
               <rect width={SLOT} height={SLOT} rx={4} className={cls} />
             )}
             {tile ? (
-              !flips?.has(key) && peek !== key && <TileFace tile={tile} />
+              !flips?.has(key) && <TileFace tile={tile} />
             ) : (
               <g className="slot-icons">
                 <SlotIcons slot={slot} />
@@ -399,7 +410,7 @@ export function Board({
   // Holding a space: one that isn't lit while building says why (a bubble above the finger); an unflipped
   // tile turns over to show its back (what it will score). Both go on release.
   const [why, setWhy] = useState<{ text: string; x: number; y: number } | null>(null);
-  const [peek, setPeek] = useState<brass.SlotKey | null>(null);
+  const [peek, setPeek] = useState<{ tile: brass.BuiltTile; x: number; y: number } | null>(null);
   const hold = useRef<{ x: number; y: number; timer: number } | null>(null);
   // A hold that showed something isn't also a tap.
   const held = useRef(false);
@@ -425,7 +436,7 @@ export function Board({
         const timer = window.setTimeout(() => {
           const text = canExplain ? explainSlot!(location, slot) : null;
           if (text) setWhy({ text, x, y });
-          else if (canPeek) setPeek(key);
+          else if (canPeek) setPeek({ tile: tile!, x, y });
           else return;
           held.current = true;
           navigator.vibrate?.(8);
@@ -583,6 +594,7 @@ export function Board({
 
   return (
     <>
+    {peek && <TilePeek {...peek} />}
     {why && (
       <div
         className="slot-why"
@@ -689,7 +701,6 @@ export function Board({
                     holdFor={holdFor}
                     flips={flips}
                     leaving={leaving}
-                    peek={peek}
                   />
                   {loc.kind === 'town' && (
                     <TownBanner

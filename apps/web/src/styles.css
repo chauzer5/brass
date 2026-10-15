@@ -3044,20 +3044,24 @@ g.coach-target > rect:first-of-type {
   dominant-baseline: central;
 }
 
-/* Holding an unflipped tile turns it over to show its back. */
-.tile-peek {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: tile-peek 0.25s ease-out both;
-  filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.45));
+/* Holding an unflipped tile shows its back, large, beside the finger. */
+.tile-peek-card {
+  position: fixed;
+  z-index: 20;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 8px 8px 6px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  box-sizing: content-box;
 }
 
-@keyframes tile-peek {
-  0% { transform: scale(0, 1.12); }
-  70% { transform: scale(1.18, 1.18); }
-  100% { transform: scale(1.12, 1.12); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .tile-peek { animation: none; transform: scale(1.12); }
+.tile-peek-card span {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
 }
