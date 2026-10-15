@@ -135,7 +135,7 @@ export function NewGame({
           Start new game
         </button>
         <button className="secondary" onClick={onTutorial}>
-          Learn to play: tutorial
+          Learn to play
         </button>
         <button className="secondary" onClick={() => setShowSettings(true)}>
           Settings
