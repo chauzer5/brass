@@ -3023,3 +3023,23 @@ g.coach-target > rect:first-of-type {
   text-anchor: middle;
   dominant-baseline: central;
 }
+
+/* A flipped tile: its level in the dark band, its VPs in a hexagon in the bottom-left corner. */
+.tile-level-band {
+  font-size: 7px;
+  text-anchor: start;
+}
+
+.tile-vp path {
+  fill: rgba(20, 14, 10, 0.85);
+  stroke: #fff;
+  stroke-width: 0.8;
+}
+
+.tile-vp text {
+  fill: #fff;
+  font-size: 8px;
+  font-weight: 800;
+  text-anchor: middle;
+  dominant-baseline: central;
+}

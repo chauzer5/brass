@@ -180,18 +180,33 @@ function SlotIcons({ slot }: { slot: brass.Slot }) {
 }
 
 const linkVPOf = (tile: brass.BuiltTile) => brass.INDUSTRY_TILES[tile.industry][tile.level - 1]!.linkVP;
+const vpOf = (tile: brass.BuiltTile) => brass.INDUSTRY_TILES[tile.industry][tile.level - 1]!.vp;
 
-/** What's printed on a built tile: its industry and level, its link icons once flipped, and any cubes on it. */
+/** What's printed on a built tile: its industry and level, its VPs and link icons once flipped, and any cubes on it. */
 function TileFace({ tile }: { tile: brass.BuiltTile }) {
   return (
     <g className={`tile-face ${tile.flipped ? 'flipped' : ''}`}>
       {/* Flipped tiles get a dark top band, like the black top half of a flipped tile. */}
       {tile.flipped && <path d={`M0 11 V4 a4 4 0 0 1 4 -4 H${SLOT - 4} a4 4 0 0 1 4 4 V11 Z`} className="tile-flip-band" />}
       <IndustryIcon industry={tile.industry} size={20} x={(SLOT - 20) / 2} y={3} />
-      {/* Flipped, the level moves aside for the link icons printed on that side. */}
-      <text x={tile.flipped ? SLOT / 2 - 7 : SLOT / 2} y={SLOT - 7} className="tile-level">
-        {roman(tile.level)}
-      </text>
+      {/* Flipped, the level moves up into the dark band, leaving the bottom corners for what the tile scores. */}
+      {tile.flipped ? (
+        <text x={4.5} y={5.8} className="tile-level tile-level-band">
+          {roman(tile.level)}
+        </text>
+      ) : (
+        <text x={SLOT / 2} y={SLOT - 7} className="tile-level">
+          {roman(tile.level)}
+        </text>
+      )}
+      {tile.flipped && (
+        // The VPs it scores at the end of the era, in a hexagon like the printed tile's.
+        <g className="tile-vp" transform={`translate(7.5 ${SLOT - 7})`}>
+          <title>{`Scores ${vpOf(tile)} VP at the end of the era`}</title>
+          <path d="M-4 -6.2 H4 L7.2 0 L4 6.2 H-4 L-7.2 0 Z" />
+          <text y={0.4}>{vpOf(tile)}</text>
+        </g>
+      )}
       {tile.flipped && (
         <g className="tile-link-vp" transform={`translate(${SLOT - 9.5} ${SLOT - 7})`}>
           <title>{`Each link to here scores ${linkVPOf(tile)} more VP at the end of the era`}</title>
