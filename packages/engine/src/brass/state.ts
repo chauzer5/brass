@@ -214,3 +214,30 @@ export function currentPlayer(state: BrassState): PlayerId | null {
 export function actionsThisTurn(state: BrassState): number {
   return state.era === 'canal' && state.round === 1 ? 1 : 2;
 }
+
+/**
+ * A copy of the state that actions can change freely without touching the
+ * original: like `structuredClone`, but sharing what no action ever changes
+ * (the card definitions, merchants' tiles, past eras' scores), which makes it
+ * many times faster. Bots and move checks copy the state thousands of times
+ * per decision.
+ */
+export function cloneState(s: BrassState): BrassState {
+  const mat = (m: Record<Industry, number[]>) =>
+    Object.fromEntries(Object.entries(m).map(([k, v]) => [k, [...v]])) as Record<Industry, number[]>;
+  const tiles: BrassState['tiles'] = {};
+  for (const key in s.tiles) tiles[key as SlotKey] = { ...s.tiles[key as SlotKey]! };
+  return {
+    ...s,
+    turnOrder: [...s.turnOrder],
+    phase: s.phase.kind === 'shortfall' ? { kind: 'shortfall', queue: s.phase.queue.map((q) => ({ ...q })) } : { ...s.phase },
+    players: s.players.map((p) => ({ ...p, hand: [...p.hand], discard: [...p.discard], mat: mat(p.mat) })),
+    deck: [...s.deck],
+    wildLocations: [...s.wildLocations],
+    wildIndustries: [...s.wildIndustries],
+    tiles,
+    links: { ...s.links },
+    merchants: s.merchants.map((m) => ({ ...m })),
+    eraScores: [...s.eraScores],
+  };
+}

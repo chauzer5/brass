@@ -7,6 +7,7 @@ import { LINKS, LOCATIONS } from './data/map.ts';
 import { hasTilesOnBoard, isConnected, network } from './graph.ts';
 import { RuleError } from './resources.ts';
 import {
+  cloneState,
   currentPlayer,
   parseSlotKey,
   setup,
@@ -60,7 +61,7 @@ function viewFor(state: BrassState, you: PlayerId | null): BrassView {
 
 function validate(state: BrassState, player: PlayerId, action: BrassAction): string | null {
   try {
-    perform(structuredClone(state), player, action, createRng(0));
+    perform(cloneState(state), player, action, createRng(0));
     return null;
   } catch (err) {
     if (err instanceof RuleError) return err.message;

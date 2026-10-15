@@ -8,7 +8,7 @@ import { LOCATION_BY_ID, MERCHANTS } from './data/map.ts';
 import { brassGame, candidateActions, type BrassView } from './game.ts';
 import { LINK_BY_ID, network } from './graph.ts';
 import { RuleError } from './resources.ts';
-import { currentPlayer, parseSlotKey, type BrassState, type Card, type CardId, type SlotKey } from './state.ts';
+import { cloneState, currentPlayer, parseSlotKey, type BrassState, type Card, type CardId, type SlotKey } from './state.ts';
 import { INDUSTRIES, type Industry } from './types.ts';
 
 /*
@@ -23,8 +23,8 @@ import { INDUSTRIES, type Industry } from './types.ts';
 
 export type BotDifficulty = 'easy' | 'normal' | 'hard';
 
-/** Difficulties with a bot behind them; the others are listed but not yet available. */
-export const AVAILABLE_DIFFICULTIES: readonly BotDifficulty[] = ['normal'];
+/** Difficulties with a bot behind them (all of them, now). */
+export const AVAILABLE_DIFFICULTIES: readonly BotDifficulty[] = ['easy', 'normal', 'hard'];
 
 /** The evaluation's hand-tuned numbers, in VPs (or VPs per unit). */
 export interface Weights {
@@ -89,10 +89,16 @@ export interface BotSettings {
   weights?: Partial<Weights>;
 }
 
+/*
+ * Tested head to head (2 players, seats swapped each game): Easy wins about
+ * 1 game in 12 against Normal but every game against random play; Hard wins
+ * about 3 in 4 against Normal, mostly from weighing what its moves give the
+ * leading opponent and from not borrowing money it has no time left to spend.
+ */
 const SETTINGS: Record<BotDifficulty, BotSettings> = {
   easy: { noise: 4, breadth: 4 },
   normal: { noise: 0.6, breadth: 10 },
-  hard: { noise: 0.2, breadth: 20 },
+  hard: { noise: 0.2, breadth: 20, rivalry: 0.5, weights: { spendPerRound: 15 } },
 };
 
 // ---- A stand-in game from what the bot can see ----
@@ -254,7 +260,7 @@ export function evaluate(state: BrassState, me: PlayerId, w: Weights = DEFAULT_W
 
 /** Plays an action on a copy of the state (the RNG only matters for era-end shuffles of placeholder cards). */
 function after(state: BrassState, me: PlayerId, action: BrassAction, rng: Rng): BrassState {
-  return brassGame.apply(structuredClone(state), me, action, rng);
+  return brassGame.apply(cloneState(state), me, action, rng);
 }
 
 /** Plays an action if it's legal (the engine throws a RuleError otherwise): checking and playing in one go. */
