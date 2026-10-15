@@ -353,10 +353,14 @@ export function Board({
     const offsetX = (svgW - BOARD_SIZE * unit) / 2;
     const view = wrapper.getBoundingClientRect();
     const tray = document.querySelector('.hand-tray')?.getBoundingClientRect();
-    const visibleBottom = tray ? Math.min(view.bottom, tray.top) : view.bottom;
-    // The tutorial's coach card covers the top of the board.
+    let visibleBottom = tray ? Math.min(view.bottom, tray.top) : view.bottom;
+    // The tutorial's coach card covers the top or the bottom of the board: frame what's left.
+    let visibleTop = view.top;
     const coach = document.querySelector('.coach')?.getBoundingClientRect();
-    const visibleTop = coach ? Math.max(view.top, coach.bottom) : view.top;
+    if (coach) {
+      if (coach.top + coach.height / 2 < (view.top + visibleBottom) / 2) visibleTop = Math.max(view.top, coach.bottom);
+      else visibleBottom = Math.min(visibleBottom, coach.top);
+    }
     const availW = view.width - (rail ? RAIL_WIDTH : 0);
     const availH = visibleBottom - visibleTop;
     const boxW = Math.max(1, (box.x1 - box.x0) * unit);

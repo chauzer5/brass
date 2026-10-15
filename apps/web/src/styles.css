@@ -2593,6 +2593,17 @@ button {
   animation: coach-in 0.25s ease-out;
 }
 
+/* Under the players' strip; in the middle of the board; or just above the hand. */
+.coach.place-middle {
+  top: calc((env(safe-area-inset-top) + 112px + 100dvh - var(--tray-h, 0px)) / 2);
+  translate: 0 -50%;
+}
+
+.coach.place-bottom {
+  top: auto;
+  bottom: calc(var(--tray-h, 0px) + 8px);
+}
+
 .coach-head {
   display: flex;
   align-items: center;

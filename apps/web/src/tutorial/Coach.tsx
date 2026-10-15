@@ -124,24 +124,45 @@ export function Coach({
     return () => els.forEach((el) => el.classList.remove('coach-target'));
   }, [point, index]);
 
-  // Overlays (like the era's scoring) leave room for the card above them.
+  // The card sits above the hand when it's at the bottom: track where the hand's tray starts.
+  useLayoutEffect(() => {
+    const root = document.documentElement.style;
+    const tray = document.querySelector('.hand-tray');
+    const set = () => {
+      const top = tray?.getBoundingClientRect().top ?? window.innerHeight;
+      root.setProperty('--tray-h', `${Math.max(0, window.innerHeight - top)}px`);
+    };
+    set();
+    const ro = new ResizeObserver(set);
+    if (tray) ro.observe(tray);
+    window.addEventListener('resize', set);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', set);
+      root.removeProperty('--tray-h');
+    };
+  }, []);
+
+  // Overlays (like the era's scoring) leave room for the card above them, when it's at the top.
   const card = useRef<HTMLDivElement>(null);
+  const top = step.place === 'top';
   useLayoutEffect(() => {
     const el = card.current;
-    if (!el) return;
-    const set = () => document.documentElement.style.setProperty('--coach-h', `${el.offsetHeight + 12}px`);
+    const root = document.documentElement.style;
+    if (!el || !top) return;
+    const set = () => root.setProperty('--coach-h', `${el.offsetHeight + 12}px`);
     set();
     const ro = new ResizeObserver(set);
     ro.observe(el);
     return () => {
       ro.disconnect();
-      document.documentElement.style.removeProperty('--coach-h');
+      root.removeProperty('--coach-h');
     };
-  }, []);
+  }, [top]);
 
   const total = STEPS.length;
   return (
-    <div ref={card} className={`coach ${folded ? 'folded' : ''}`} role="dialog" aria-label="Tutorial" aria-live="polite">
+    <div ref={card} className={`coach place-${step.place} ${folded ? 'folded' : ''}`} role="dialog" aria-label="Tutorial" aria-live="polite">
       <div className="coach-head">
         <span className="coach-count">
           {index + 1}/{total}

@@ -114,6 +114,15 @@ function Table({
   const [sheet, setSheet] = useState<'log' | 'settings' | null>(null);
   const log = useMemo(() => (sheet === 'log' ? gameLog(match) : []), [sheet, match]);
 
+  // Each tutorial step that asks for a move starts on the hand, with the tray open.
+  const coachIndex = coach?.index;
+  const coachDo = coach?.step.kind === 'do';
+  useEffect(() => {
+    if (!coachDo) return;
+    setTrayTab('hand');
+    setTucked(false);
+  }, [coachIndex, coachDo]);
+
   // A new player (or a new phase) starts with a fresh draft.
   useEffect(() => setDraft(EMPTY_DRAFT), [player, state.phase.kind, match.log.length]);
 
