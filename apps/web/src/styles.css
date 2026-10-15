@@ -3066,7 +3066,7 @@ g.coach-target > rect:first-of-type {
   color: var(--muted);
 }
 
-/* A bot's difficulty after its name: (E), (N) or (H). */
+/* A bot's difficulty after its name: (E), (M) or (H). */
 .bot-level {
   color: var(--muted);
   font-weight: 600;
