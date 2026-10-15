@@ -26,7 +26,7 @@ const BOT_PAUSE_MS = 900;
 const FAST_BOT_PAUSE_MS = 120;
 
 export function App() {
-  const { game, start, play, playBot, undoLast, quit, startTutorial, exitTutorial, keepPlaying } = useGame();
+  const { game, start, play, playBot, undoLast, quit, startTutorial, exitTutorial, keepPlaying, introDone } = useGame();
   const [showSetup, setShowSetup] = useState(!game);
 
   if (!game || showSetup) {
@@ -60,6 +60,7 @@ export function App() {
         setShowSetup(true);
       }}
       onKeepPlaying={keepPlaying}
+      onIntroDone={introDone}
     />
   );
 }
@@ -73,6 +74,7 @@ function Table({
   onNewGame,
   onExitTutorial,
   onKeepPlaying,
+  onIntroDone,
 }: {
   game: Game;
   play: (player: number, action: brass.BrassAction) => string | null;
@@ -82,6 +84,7 @@ function Table({
   onNewGame: () => void;
   onExitTutorial: () => void;
   onKeepPlaying: () => void;
+  onIntroDone: () => void;
 }) {
   const { match, names, seats } = game;
   const state = match.state;
@@ -222,7 +225,8 @@ function Table({
   };
 
   // A game that hasn't started yet opens with the draw for who goes first; nothing happens until it's seen.
-  const [intro, setIntro] = useState(match.log.length === 0 && !game.tutorial);
+  // Shown once per game: leaving for the menu and coming back doesn't spin it again.
+  const intro = !game.introSeen && match.log.length === 0 && !game.tutorial;
 
   // Pass-the-device screens are only needed between people.
   const hidden = player !== null && humans.length > 1 && revealedFor !== player;
@@ -611,7 +615,7 @@ function Table({
         />
       )}
       {/* The next player's screen waits for a sale animation to finish, so whoever built sees it. */}
-      {intro && <FirstPlayer names={names} order={state.turnOrder} onDone={() => setIntro(false)} />}
+      {intro && <FirstPlayer names={names} order={state.turnOrder} onDone={onIntroDone} />}
       {hidden && player !== null && !animating && !summaryOpen && !intro && (
         <Handoff
           name={names[player]!}

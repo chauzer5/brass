@@ -17,6 +17,8 @@ export interface Game {
   preset?: 'tutorial';
   /** The tutorial in progress: never saved, so it doesn't replace a saved game. */
   tutorial?: boolean;
+  /** The draw for who goes first has been shown (saved, so it's shown once per game). */
+  introSeen?: boolean;
 }
 
 const STORAGE_KEY = 'brass:game:v1';
@@ -29,6 +31,7 @@ interface Saved {
   /** Missing in saves from before bots: everyone is human. */
   seats?: Seat[];
   preset?: 'tutorial';
+  introSeen?: boolean;
 }
 
 const configFor = (playerCount: brass.PlayerCount, preset?: 'tutorial'): brass.BrassConfig => ({
@@ -47,6 +50,8 @@ function load(): Game | null {
     if (!result.ok) return null;
     const game: Game = { match: result.value, names: saved.names, seats: saved.seats ?? saved.names.map(() => HUMAN) };
     if (saved.preset) game.preset = saved.preset;
+    // Saves from before this flag: only a game nobody has moved in yet still shows the draw.
+    game.introSeen = saved.introSeen ?? saved.log.length > 0;
     return game;
   } catch {
     return null;
@@ -67,6 +72,7 @@ function save(game: Game | null): void {
       names: game.names,
       seats: game.seats,
       ...(game.preset && { preset: game.preset }),
+      ...(game.introSeen && { introSeen: true }),
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
   } catch {
@@ -137,7 +143,10 @@ export function useGame() {
   /** Carries on the tutorial game as an ordinary game (it replaces any saved one). */
   const keepPlaying = useCallback(() => setGame((g) => (g ? { ...g, tutorial: false } : g)), []);
 
-  return { game, start, play, playBot, undoLast, quit, startTutorial, exitTutorial, keepPlaying };
+  /** The draw for who goes first has been seen: it isn't shown again for this game. */
+  const introDone = useCallback(() => setGame((g) => (g ? { ...g, introSeen: true } : g)), []);
+
+  return { game, start, play, playBot, undoLast, quit, startTutorial, exitTutorial, keepPlaying, introDone };
 }
 
 /**
