@@ -252,18 +252,21 @@ function Table({
     if (seat.kind !== 'bot') return;
     let cancelled = false;
     const at = match.log.length;
-    const timer = window.setTimeout(() => {
-      const input = {
-        player: active,
-        view: brass.brassGame.viewFor(state, active),
-        legalActions: brass.brassGame.legalActions(state, active),
-      };
-      runBot(input, seat.difficulty)
-        .then((action) => {
-          if (!cancelled) playBot(active, action, at);
-        })
-        .catch((err) => console.error('Bot failed:', err));
-    }, BOT_PAUSE_MS);
+    const input = {
+      player: active,
+      view: brass.brassGame.viewFor(state, active),
+      legalActions: brass.brassGame.legalActions(state, active),
+    };
+    // The bot thinks during the pause; its move lands once both are done.
+    let timer = 0;
+    const pause = new Promise<void>((resolve) => {
+      timer = window.setTimeout(resolve, BOT_PAUSE_MS);
+    });
+    Promise.all([runBot(input, seat.difficulty), pause])
+      .then(([action]) => {
+        if (!cancelled) playBot(active, action, at);
+      })
+      .catch((err) => console.error('Bot failed:', err));
     return () => {
       cancelled = true;
       clearTimeout(timer);

@@ -49,6 +49,11 @@ export interface Weights {
   nextTile: number;
   /** A Wild card in hand. */
   wild: number;
+  /**
+   * Money the bot could still spend: about this much per round left (0: no
+   * limit). Money beyond it counts a quarter, so a late loan isn't free VPs.
+   */
+  spendPerRound: number;
 }
 
 export const DEFAULT_WEIGHTS: Weights = {
@@ -65,6 +70,7 @@ export const DEFAULT_WEIGHTS: Weights = {
   merchantReach: 0.8,
   nextTile: 0.08,
   wild: 0.6,
+  spendPerRound: 0,
 };
 
 export interface BotSettings {
@@ -175,7 +181,8 @@ export function evaluate(state: BrassState, me: PlayerId, w: Weights = DEFAULT_W
   // charged now.
   const income = incomeLevel(p.incomeSpace);
   v += income * Math.max(0, rounds - 1) * moneyWeight * (income < 0 ? w.negativeIncome : 1);
-  v += p.money * moneyWeight;
+  const cap = w.spendPerRound > 0 ? w.spendPerRound * rounds : Infinity;
+  v += (Math.min(p.money, cap) + Math.max(0, p.money - cap) * 0.25) * moneyWeight;
   if (income < 0 && p.money + income < 0) v -= (-(p.money + income)) * 0.8 + 2;
 
   // Is there anything on the board that beer can be sold with? (Beer and breweries are only worth it then.)
