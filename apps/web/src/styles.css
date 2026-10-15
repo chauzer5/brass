@@ -2893,3 +2893,13 @@ g.coach-target > rect:first-of-type {
   .score-pop { animation: none; opacity: 0; }
   .leaving { animation: none; }
 }
+
+.main-menu {
+  gap: 12px;
+}
+
+.setup-note {
+  margin: -4px 0 0;
+  text-align: center;
+  font-size: 13px;
+}

@@ -12,6 +12,10 @@ const BOT_NAMES = ['Bot Richard', 'Bot George', 'Bot Eleanor'];
 
 const DIFFICULTY_LABEL: Record<brass.BotDifficulty, string> = { easy: 'Easy', normal: 'Normal', hard: 'Hard' };
 
+/**
+ * The main menu: carry on, start a game, learn, read the rules, settings.
+ * Setting up a new game is a page of its own.
+ */
 export function NewGame({
   onStart,
   onResume,
@@ -21,12 +25,52 @@ export function NewGame({
   onResume?: (() => void) | undefined;
   onTutorial: () => void;
 }) {
+  const [page, setPage] = useState<'menu' | 'setup' | 'settings'>('menu');
+  if (page === 'settings') return <Settings onClose={() => setPage('menu')} />;
+  if (page === 'setup') return <MatchSetup onStart={onStart} onBack={() => setPage('menu')} replacesSave={!!onResume} />;
+  return (
+    <div className="screen">
+      <div className="screen-card main-menu">
+        <img src="/icon.svg" alt="" className="menu-logo" />
+        <h1 className="menu-title">Brass: Birmingham</h1>
+        {onResume && (
+          <button className="confirm" onClick={onResume}>
+            Resume saved game
+          </button>
+        )}
+        <button className={onResume ? 'secondary' : 'confirm'} onClick={() => setPage('setup')}>
+          New game
+        </button>
+        <button className="secondary" onClick={onTutorial}>
+          Learn to play
+        </button>
+        {__RULEBOOK__ && (
+          <a className="secondary button-link" href={__RULEBOOK__} target="_blank" rel="noopener">
+            Rulebook
+          </a>
+        )}
+        <button className="secondary" onClick={() => setPage('settings')}>
+          Settings
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Setting up a game: how many players, and who (or which bot) plays each seat. */
+function MatchSetup({
+  onStart,
+  onBack,
+  replacesSave,
+}: {
+  onStart: (names: string[], seats: Seat[]) => void;
+  onBack: () => void;
+  /** Starting replaces the game that's saved. */
+  replacesSave: boolean;
+}) {
   const [count, setCount] = useState(2);
   const [names, setNames] = useState(['Player 1', 'Player 2', 'Player 3', 'Player 4']);
   const [seats, setSeats] = useState<Seat[]>([HUMAN, HUMAN, HUMAN, HUMAN]);
-  const [showSettings, setShowSettings] = useState(false);
-  if (showSettings) return <Settings onClose={() => setShowSettings(false)} />;
-
   // Each bot seat keeps the name it was given, the first one not taken by another bot.
   const [botNames, setBotNames] = useState<(string | null)[]>([null, null, null, null]);
   const setSeat = (i: number, seat: Seat) => {
@@ -51,18 +95,15 @@ export function NewGame({
   return (
     <div className="screen">
       <div className="screen-card">
-        <img src="/icon.svg" alt="" className="menu-logo" />
-        <h1 className="menu-title">Brass: Birmingham</h1>
-        <p className="muted">
-          {humans === 1
-              ? 'You against the bots.'
-              : 'Pass the device between players; bots take their turns on their own.'}
-        </p>
-        {onResume && (
-          <button className="confirm" onClick={onResume}>
-            Resume saved game
+        <div className="panel-header">
+          <button className="close" onClick={onBack} aria-label="Back to menu">
+            ‹
           </button>
-        )}
+          <h2>New game</h2>
+        </div>
+        <p className="muted">
+          {humans === 1 ? 'You against the bots.' : 'Pass the device between players; bots take their turns on their own.'}
+        </p>
         <h3>Players</h3>
         <div className="segmented" role="radiogroup" aria-label="Number of players">
           {[2, 3, 4].map((n) => (
@@ -128,23 +169,10 @@ export function NewGame({
             );
           })}
         </div>
-        <button
-          className="confirm"
-          onClick={() => onStart(chosen.map((_, i) => nameOf(i)), chosen)}
-        >
-          Start new game
+        <button className="confirm" onClick={() => onStart(chosen.map((_, i) => nameOf(i)), chosen)}>
+          Start game
         </button>
-        <button className="secondary" onClick={onTutorial}>
-          Learn to play
-        </button>
-        {__RULEBOOK__ && (
-          <a className="secondary button-link" href={__RULEBOOK__} target="_blank" rel="noopener">
-            Rulebook
-          </a>
-        )}
-        <button className="secondary" onClick={() => setShowSettings(true)}>
-          Settings
-        </button>
+        {replacesSave && <p className="muted setup-note">Starting replaces your saved game.</p>}
       </div>
     </div>
   );
