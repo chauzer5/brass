@@ -54,6 +54,11 @@ export interface Weights {
    * limit). Money beyond it counts a quarter, so a late loan isn't free VPs.
    */
   spendPerRound: number;
+  /**
+   * Extra worth of the first £20 in hand while there are rounds left to use it: with no money, no action
+   * but a Loan or a Pass is possible, so being broke costs far more than the pounds themselves.
+   */
+  liquidity: number;
 }
 
 export const DEFAULT_WEIGHTS: Weights = {
@@ -71,6 +76,7 @@ export const DEFAULT_WEIGHTS: Weights = {
   nextTile: 0.08,
   wild: 0.6,
   spendPerRound: 0,
+  liquidity: 0,
 };
 
 export interface BotSettings {
@@ -189,6 +195,7 @@ export function evaluate(state: BrassState, me: PlayerId, w: Weights = DEFAULT_W
   v += income * Math.max(0, rounds - 1) * moneyWeight * (income < 0 ? w.negativeIncome : 1);
   const cap = w.spendPerRound > 0 ? w.spendPerRound * rounds : Infinity;
   v += (Math.min(p.money, cap) + Math.max(0, p.money - cap) * 0.25) * moneyWeight;
+  if (rounds > 2) v += Math.min(p.money, 20) * w.liquidity;
   if (income < 0 && p.money + income < 0) v -= (-(p.money + income)) * 0.8 + 2;
 
   // Is there anything on the board that beer can be sold with? (Beer and breweries are only worth it then.)
@@ -296,14 +303,20 @@ function scorer(me: PlayerId, w: Weights, rivalry: number): Score {
 }
 
 /** The best follow-up: the bot's second action this turn, if it still has one. */
-function bestFollowUp(state: BrassState, me: PlayerId, rng: Rng, score: Score): number {
-  if (currentPlayer(state) !== me || state.phase.kind !== 'actions') return score(state);
+function bestFollowUp(state: BrassState, me: PlayerId, rng: Rng, score: Score): { score: number; action: BrassAction | null } {
+  if (currentPlayer(state) !== me || state.phase.kind !== 'actions') return { score: score(state), action: null };
   let best = -Infinity;
+  let bestAction: BrassAction | null = null;
   for (const a of candidates(state, me)) {
     const s = tryAfter(state, me, a, rng);
-    if (s) best = Math.max(best, score(s) - (MILD_PENALTY[a.type] ?? 0));
+    if (!s) continue;
+    const v = score(s) - (MILD_PENALTY[a.type] ?? 0);
+    if (v > best) {
+      best = v;
+      bestAction = a;
+    }
   }
-  return best === -Infinity ? score(state) : best;
+  return best === -Infinity ? { score: score(state), action: null } : { score: best, action: bestAction };
 }
 
 /** Scouting draws Wild cards; passing does nothing. Both are fine, but shouldn't win ties against doing something. */
@@ -327,13 +340,28 @@ export function brassBot(difficulty: BotDifficulty | BotSettings = 'normal'): Bo
     });
     first.sort((a, b) => b.score - a.score);
     // Two steps for the most promising: the best second action of the turn after each.
-    const searched = first.slice(0, breadth).map((f) => ({
-      ...f,
-      score: bestFollowUp(f.state, player, sim, score) - (MILD_PENALTY[f.action.type] ?? 0) + (rng.next() * 2 - 1) * noise,
-    }));
+    const search = (f: (typeof first)[number]) => {
+      const follow = bestFollowUp(f.state, player, sim, score);
+      return { ...f, follow: follow.action, score: follow.score - (MILD_PENALTY[f.action.type] ?? 0) + (rng.next() * 2 - 1) * noise };
+    };
+    const searched = first.slice(0, breadth).map(search);
+    // A good move found only as the second action (after a pass, say) is searched as a first action too, so
+    // a short list of first moves doesn't make "pass, then the good move" look like the best plan.
+    const seen = new Set(searched.map((f) => JSON.stringify(f.action)));
+    for (const f of [...searched]) {
+      if (!f.follow) continue;
+      const key = JSON.stringify(f.follow);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const firstMove = first.find((x) => JSON.stringify(x.action) === key);
+      if (firstMove) searched.push(search(firstMove));
+    }
     searched.sort((a, b) => b.score - a.score);
-    // Now and then (easier bots), a decent move instead of the best one.
-    if (slip > 0 && rng.next() < slip) return searched[rng.int(Math.min(slack, searched.length))]!.action;
+    // Now and then (easier bots), a decent move instead of the best one: a mistake, never an idle pass.
+    if (slip > 0 && rng.next() < slip) {
+      const decent = searched.slice(0, slack).filter((f) => f.action.type !== 'pass');
+      if (decent.length > 0) return decent[rng.int(decent.length)]!.action;
+    }
     return searched[0]!.action;
   };
 }
