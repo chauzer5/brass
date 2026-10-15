@@ -578,6 +578,7 @@ function Table({
               [
                 coach ? (['Exit tutorial', onExitTutorial] as const) : (['Main menu', onMenu] as const),
                 ['Game log', () => setSheet('log')],
+                ...(__RULEBOOK__ ? ([['Rulebook', () => window.open(__RULEBOOK__!, '_blank', 'noopener')]] as const) : []),
                 ['Settings', () => setSheet('settings')],
               ] as const
             ).map(([label, run]) => (

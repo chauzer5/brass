@@ -1708,6 +1708,16 @@ button {
   cursor: pointer;
 }
 
+/* A link that looks like the secondary button next to it (the Rulebook). */
+.button-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+  font-size: inherit;
+  text-decoration: none;
+}
+
 .chip.with-icon {
   display: inline-flex;
   align-items: center;

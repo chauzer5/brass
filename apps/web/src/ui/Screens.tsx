@@ -137,6 +137,11 @@ export function NewGame({
         <button className="secondary" onClick={onTutorial}>
           Learn to play
         </button>
+        {__RULEBOOK__ && (
+          <a className="secondary button-link" href={__RULEBOOK__} target="_blank" rel="noopener">
+            Rulebook
+          </a>
+        )}
         <button className="secondary" onClick={() => setShowSettings(true)}>
           Settings
         </button>

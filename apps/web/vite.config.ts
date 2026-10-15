@@ -1,6 +1,11 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { existsSync } from 'node:fs';
+
+/** The rulebook PDF, if one has been added to public/: the menus only offer it then. */
+const RULEBOOK = 'rulebook.pdf';
+const hasRulebook = existsSync(new URL(`./public/${RULEBOOK}`, import.meta.url));
 
 export default defineConfig({
   plugins: [
@@ -15,9 +20,19 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,webp,webmanifest}'],
         navigateFallback: '/index.html',
         cleanupOutdatedCaches: true,
+        // The rulebook is big, so it isn't downloaded up front: once opened, it's kept for offline reading.
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname === `/${RULEBOOK}`,
+            handler: 'CacheFirst',
+            options: { cacheName: 'rulebook', expiration: { maxEntries: 1 } },
+          },
+        ],
+        navigateFallbackDenylist: [/\.pdf$/],
       },
     }),
   ],
+  define: { __RULEBOOK__: JSON.stringify(hasRulebook ? `/${RULEBOOK}` : null) },
   server: { host: true },
   worker: { format: 'es' },
 });
