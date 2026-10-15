@@ -100,6 +100,7 @@ const spare = (s: brass.BrassState, card: string) => {
 };
 
 const WORCESTER: Frame = { x0: 300, y0: 820, x1: 640, y1: 1000 };
+const MARKETS: Frame = { x0: 780, y0: 240, x1: 1000, y1: 660 };
 const COALBROOKDALE: Frame = { x0: 60, y0: 480, x1: 480, y1: 640 };
 
 export const STEPS: readonly Step[] = [
@@ -214,6 +215,22 @@ export const STEPS: readonly Step[] = [
       (a) => a.type === 'build' && a.location === 'wolverhampton' && a.industry === 'coal',
     ],
     frame: COALBROOKDALE,
+  },
+  {
+    kind: 'info',
+    title: 'The coal and iron markets',
+    place: 'bottom',
+    text: "Richard's coal landed in this market. Building often needs coal or iron. Coal comes free from the nearest Coal Mine connected to you (anyone's); if there isn't one, you buy it here, as long as you're connected to a Merchant. Iron comes free from any Iron Works, or from here.",
+    point: '.markets',
+    frame: MARKETS,
+  },
+  {
+    kind: 'info',
+    title: 'Market prices',
+    place: 'bottom',
+    text: 'You always buy the cheapest cube, so prices rise as the market empties. Once empty, coal costs £8 and iron £6. New mines and works sell into the most expensive empty spaces, and are paid those prices.',
+    point: '.markets',
+    frame: MARKETS,
   },
   {
     kind: 'do',
