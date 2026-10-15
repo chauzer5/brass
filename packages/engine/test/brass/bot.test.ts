@@ -39,7 +39,7 @@ describe('the bot', () => {
   });
 
   it('builds rather than passing at the start of the game', () => {
-    const match = createMatch(brassGame, { playerCount: 2, components: TEST_COMPONENTS }, 13);
+    const match: BrassMatch = createMatch(brassGame, { playerCount: 2, components: TEST_COMPONENTS }, 13);
     const { action } = botMove(match);
     expect(action.type).not.toBe('pass');
   });

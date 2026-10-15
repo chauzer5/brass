@@ -26,14 +26,64 @@ export type BotDifficulty = 'easy' | 'normal' | 'hard';
 /** Difficulties with a bot behind them; the others are listed but not yet available. */
 export const AVAILABLE_DIFFICULTIES: readonly BotDifficulty[] = ['normal'];
 
-interface Settings {
+/** The evaluation's hand-tuned numbers, in VPs (or VPs per unit). */
+export interface Weights {
+  /** A £1 is worth this many VPs; less in the last rounds, when there's little left to spend it on. */
+  money: number;
+  moneyLate: number;
+  /** Negative income is weighed this many times over: when the money runs out it costs tiles or VPs. */
+  negativeIncome: number;
+  /** Chance an unflipped tile flips before the era ends: a sellable tile with / without a buyer in reach… */
+  flipSellable: number;
+  flipSellableNoBuyer: number;
+  /** …a brewery (when there's something to sell with its beer), and a coal mine or iron works. */
+  flipBrewery: number;
+  flipCubes: number;
+  /** Each link icon at a link's ends, and a little for owning the link at all. */
+  linkIcon: number;
+  linkBase: number;
+  /** Places in the network, and Merchants reachable through anyone's links. */
+  reach: number;
+  merchantReach: number;
+  /** The next tile of each industry: its VPs and link icons. */
+  nextTile: number;
+  /** A Wild card in hand. */
+  wild: number;
+}
+
+export const DEFAULT_WEIGHTS: Weights = {
+  money: 0.12,
+  moneyLate: 0.04,
+  negativeIncome: 2,
+  flipSellable: 0.6,
+  flipSellableNoBuyer: 0.25,
+  flipBrewery: 0.45,
+  flipCubes: 0.55,
+  linkIcon: 0.9,
+  linkBase: 0.3,
+  reach: 0.25,
+  merchantReach: 0.8,
+  nextTile: 0.08,
+  wild: 0.6,
+};
+
+export interface BotSettings {
   /** Random spread added to each first action's score, in VPs. */
   noise: number;
   /** How many of the best first actions get their follow-up action searched. */
   breadth: number;
+  /** Chance of playing a reasonable but not best move: a random one of the `slack` best. */
+  slip?: number;
+  slack?: number;
+  /**
+   * How much the opponents' positions count against the bot's own: 0 plays
+   * only for itself; 1 weighs the strongest opponent's gain as its own loss.
+   */
+  rivalry?: number;
+  weights?: Partial<Weights>;
 }
 
-const SETTINGS: Record<BotDifficulty, Settings> = {
+const SETTINGS: Record<BotDifficulty, BotSettings> = {
   easy: { noise: 4, breadth: 4 },
   normal: { noise: 0.6, breadth: 10 },
   hard: { noise: 0.2, breadth: 20 },
@@ -112,19 +162,19 @@ function linkGroups(state: BrassState): (location: string) => string {
  * nearly fully; unflipped tiles count by how likely they are to flip; income
  * counts for the rounds it will still pay; money counts a little.
  */
-export function evaluate(state: BrassState, me: PlayerId): number {
+export function evaluate(state: BrassState, me: PlayerId, w: Weights = DEFAULT_WEIGHTS): number {
   const p = state.players[me]!;
   const rounds = roundsLeft(state);
   const late = state.era === 'rail' && rounds <= 2;
   // Money is worth less as the game runs out of chances to spend it.
-  const moneyWeight = late ? 0.04 : 0.12;
+  const moneyWeight = late ? w.moneyLate : w.money;
   let v = p.vp;
 
   // Income: paid every remaining round. Negative income is worse than it looks: when the money runs out
   // it costs tiles (or VPs), so it's weighed double, and a shortfall coming at the end of this round is
   // charged now.
   const income = incomeLevel(p.incomeSpace);
-  v += income * Math.max(0, rounds - 1) * moneyWeight * (income < 0 ? 2 : 1);
+  v += income * Math.max(0, rounds - 1) * moneyWeight * (income < 0 ? w.negativeIncome : 1);
   v += p.money * moneyWeight;
   if (income < 0 && p.money + income < 0) v -= (-(p.money + income)) * 0.8 + 2;
 
@@ -154,13 +204,13 @@ export function evaluate(state: BrassState, me: PlayerId): number {
     if (SELLABLE.includes(tile.industry)) {
       const { location } = parseSlotKey(key);
       const buyer = state.merchants.some((m) => m.tile?.industries.includes(tile.industry) && group(m.location) === group(location));
-      flip = buyer ? 0.6 : 0.25;
+      flip = buyer ? w.flipSellable : w.flipSellableNoBuyer;
     } else if (tile.industry === 'brewery') {
       // Breweries flip when their beer is drunk by sales: only likely if someone has tiles to sell.
-      flip = sellables.length === 0 ? 0.12 : tile.cubes <= 1 ? 0.45 : 0.3;
+      flip = sellables.length === 0 ? 0.12 : tile.cubes <= 1 ? w.flipBrewery : w.flipBrewery * 0.67;
     } else {
       // Coal and iron flip when their cubes are used: likelier with fewer left.
-      flip = tile.cubes <= 1 ? 0.55 : 0.35;
+      flip = tile.cubes <= 1 ? w.flipCubes : w.flipCubes * 0.64;
     }
     if (late) flip *= 0.5;
     v += (def.vp * scorings + def.income * Math.max(0, rounds - 2) * moneyWeight) * flip;
@@ -170,11 +220,11 @@ export function evaluate(state: BrassState, me: PlayerId): number {
   // Links: score at the end of the era for the icons at both ends (which may still grow).
   for (const [id, owner] of Object.entries(state.links)) {
     if (owner !== me) continue;
-    v += LINK_BY_ID[id]!.ends.reduce((s, end) => s + linkIcons(state, end), 0) * 0.9 + 0.3;
+    v += LINK_BY_ID[id]!.ends.reduce((s, end) => s + linkIcons(state, end), 0) * w.linkIcon + w.linkBase;
   }
 
   // Reach: more places to build, and Merchants to sell to.
-  v += net.size * 0.25 + merchantsInReach * 0.8;
+  v += net.size * w.reach + merchantsInReach * w.merchantReach;
 
   // The tiles left to build: the next of each industry, if it can still be built this era.
   for (const industry of INDUSTRIES) {
@@ -185,11 +235,11 @@ export function evaluate(state: BrassState, me: PlayerId): number {
       v -= 1.5;
       continue;
     }
-    v += (def.vp + def.linkVP) * 0.08;
+    v += (def.vp + def.linkVP) * w.nextTile;
   }
 
   // Wild cards make every build possible.
-  v += p.hand.filter((id) => state.cards[id]?.kind === 'wildLocation' || state.cards[id]?.kind === 'wildIndustry').length * 0.6;
+  v += p.hand.filter((id) => state.cards[id]?.kind === 'wildLocation' || state.cards[id]?.kind === 'wildIndustry').length * w.wild;
   return v;
 }
 
@@ -221,40 +271,56 @@ function candidates(state: BrassState, me: PlayerId): BrassAction[] {
   });
 }
 
+/** A position's worth to `me`: its own value, less (by `rivalry`) the best opponent's. */
+type Score = (state: BrassState) => number;
+function scorer(me: PlayerId, w: Weights, rivalry: number): Score {
+  if (rivalry === 0) return (state) => evaluate(state, me, w);
+  return (state) => {
+    let rival = -Infinity;
+    for (let p = 0; p < state.players.length; p++) if (p !== me) rival = Math.max(rival, evaluate(state, p, w));
+    return evaluate(state, me, w) - rivalry * rival;
+  };
+}
+
 /** The best follow-up: the bot's second action this turn, if it still has one. */
-function bestFollowUp(state: BrassState, me: PlayerId, rng: Rng): number {
-  if (currentPlayer(state) !== me || state.phase.kind !== 'actions') return evaluate(state, me);
+function bestFollowUp(state: BrassState, me: PlayerId, rng: Rng, score: Score): number {
+  if (currentPlayer(state) !== me || state.phase.kind !== 'actions') return score(state);
   let best = -Infinity;
   for (const a of candidates(state, me)) {
     const s = tryAfter(state, me, a, rng);
-    if (s) best = Math.max(best, evaluate(s, me) - (MILD_PENALTY[a.type] ?? 0));
+    if (s) best = Math.max(best, score(s) - (MILD_PENALTY[a.type] ?? 0));
   }
-  return best === -Infinity ? evaluate(state, me) : best;
+  return best === -Infinity ? score(state) : best;
 }
 
 /** Scouting draws Wild cards; passing does nothing. Both are fine, but shouldn't win ties against doing something. */
 const MILD_PENALTY: Partial<Record<BrassAction['type'], number>> = { pass: 1.5, scout: 0.4 };
 
-/** The Brass bot at a given difficulty. */
-export function brassBot(difficulty: BotDifficulty = 'normal'): Bot<BrassView, BrassAction> {
-  const { noise, breadth } = SETTINGS[difficulty];
+/** The Brass bot at a given difficulty (or with custom settings, for tuning). */
+export function brassBot(difficulty: BotDifficulty | BotSettings = 'normal'): Bot<BrassView, BrassAction> {
+  const settings = typeof difficulty === 'string' ? SETTINGS[difficulty] : difficulty;
+  const { noise, breadth, slip = 0, slack = 1, rivalry = 0 } = settings;
+  const weights = { ...DEFAULT_WEIGHTS, ...settings.weights };
   return ({ player, view, legalActions }: BotInput<BrassView, BrassAction>, rng: Rng): BrassAction => {
     if (legalActions.length === 0) throw new Error('The bot was asked to act with no legal actions');
     if (legalActions.length === 1) return legalActions[0]!;
     const state = determinize(view);
     const sim = createRng(rng.int(2 ** 31));
+    const score = scorer(player, weights, rivalry);
     // One step: how good is the position right after each action?
     const first = legalActions.map((action) => {
       const s = after(state, player, action, sim);
-      return { action, state: s, score: evaluate(s, player) - (MILD_PENALTY[action.type] ?? 0) };
+      return { action, state: s, score: score(s) - (MILD_PENALTY[action.type] ?? 0) };
     });
     first.sort((a, b) => b.score - a.score);
     // Two steps for the most promising: the best second action of the turn after each.
     const searched = first.slice(0, breadth).map((f) => ({
       ...f,
-      score: bestFollowUp(f.state, player, sim) - (MILD_PENALTY[f.action.type] ?? 0) + (rng.next() * 2 - 1) * noise,
+      score: bestFollowUp(f.state, player, sim, score) - (MILD_PENALTY[f.action.type] ?? 0) + (rng.next() * 2 - 1) * noise,
     }));
     searched.sort((a, b) => b.score - a.score);
+    // Now and then (easier bots), a decent move instead of the best one.
+    if (slip > 0 && rng.next() < slip) return searched[rng.int(Math.min(slack, searched.length))]!.action;
     return searched[0]!.action;
   };
 }
