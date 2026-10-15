@@ -3000,3 +3000,26 @@ g.coach-target > rect:first-of-type {
   font-weight: 700;
   line-height: 1;
 }
+
+/* A flipped tile's link icons, in its bottom-right corner (as printed on the flipped side). */
+.tile-link-vp rect {
+  fill: rgba(20, 14, 10, 0.78);
+}
+
+.tile-link-vp circle {
+  fill: #fff;
+}
+
+.tile-link-line {
+  stroke: #fff;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+}
+
+.tile-link-vp text {
+  fill: #fff;
+  font-size: 8px;
+  font-weight: 800;
+  text-anchor: middle;
+  dominant-baseline: central;
+}

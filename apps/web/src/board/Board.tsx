@@ -179,16 +179,31 @@ function SlotIcons({ slot }: { slot: brass.Slot }) {
   );
 }
 
-/** What's printed on a built tile: its industry and level, and any cubes on it. */
+const linkVPOf = (tile: brass.BuiltTile) => brass.INDUSTRY_TILES[tile.industry][tile.level - 1]!.linkVP;
+
+/** What's printed on a built tile: its industry and level, its link icons once flipped, and any cubes on it. */
 function TileFace({ tile }: { tile: brass.BuiltTile }) {
   return (
     <g className={`tile-face ${tile.flipped ? 'flipped' : ''}`}>
       {/* Flipped tiles get a dark top band, like the black top half of a flipped tile. */}
       {tile.flipped && <path d={`M0 11 V4 a4 4 0 0 1 4 -4 H${SLOT - 4} a4 4 0 0 1 4 4 V11 Z`} className="tile-flip-band" />}
       <IndustryIcon industry={tile.industry} size={20} x={(SLOT - 20) / 2} y={3} />
-      <text x={SLOT / 2} y={SLOT - 7} className="tile-level">
+      {/* Flipped, the level moves aside for the link icons printed on that side. */}
+      <text x={tile.flipped ? SLOT / 2 - 7 : SLOT / 2} y={SLOT - 7} className="tile-level">
         {roman(tile.level)}
       </text>
+      {tile.flipped && (
+        <g className="tile-link-vp" transform={`translate(${SLOT - 9.5} ${SLOT - 7})`}>
+          <title>{`Each link to here scores ${linkVPOf(tile)} more VP at the end of the era`}</title>
+          <rect x={-8} y={-5} width={16} height={10} rx={5} />
+          <path d="M-5.6 2.4 -1.6 -1.6" className="tile-link-line" />
+          <circle cx={-5.6} cy={2.4} r={1.3} />
+          <circle cx={-1.6} cy={-1.6} r={1.3} />
+          <text x={3.4} y={0.4}>
+            {linkVPOf(tile)}
+          </text>
+        </g>
+      )}
       {tile.cubes > 0 && (
         <g transform={`translate(${SLOT - 4} 4)`}>
           <circle r={7} className={`cube cube-${tile.industry}`} />
