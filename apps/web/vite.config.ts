@@ -1,11 +1,15 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 
-/** The rulebook PDF, if one has been added to public/: the menus only offer it then. */
-const RULEBOOK = 'rulebook.pdf';
-const hasRulebook = existsSync(new URL(`./public/${RULEBOOK}`, import.meta.url));
+/**
+ * The rulebook's pages, as images in public/rulebook/ (page-1.jpg, …): drawn
+ * from the PDF ahead of time, since phones' PDF rendering mangles its
+ * transparency. The menus only offer the rulebook when they're there.
+ */
+const rulebookDir = new URL('./public/rulebook/', import.meta.url);
+const rulebookPages = existsSync(rulebookDir) ? readdirSync(rulebookDir).filter((f) => /^page-\d+\.jpg$/.test(f)).length : 0;
 
 export default defineConfig({
   plugins: [
@@ -17,22 +21,21 @@ export default defineConfig({
       // The manifest lives in public/ and is linked from index.html.
       manifest: false,
       workbox: {
-        globPatterns: ['**/*.{js,mjs,css,html,svg,png,webp,webmanifest}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,webp,webmanifest}'],
         navigateFallback: '/index.html',
         cleanupOutdatedCaches: true,
-        // The rulebook is big, so it isn't downloaded up front: once opened, it's kept for offline reading.
+        // The rulebook is big, so it isn't downloaded up front: each page, once seen, is kept for offline reading.
         runtimeCaching: [
           {
-            urlPattern: ({ url }) => url.pathname === `/${RULEBOOK}`,
+            urlPattern: ({ url }) => url.pathname.startsWith('/rulebook/'),
             handler: 'CacheFirst',
-            options: { cacheName: 'rulebook', expiration: { maxEntries: 1 } },
+            options: { cacheName: 'rulebook', expiration: { maxEntries: 40 } },
           },
         ],
-        navigateFallbackDenylist: [/\.pdf$/],
       },
     }),
   ],
-  define: { __RULEBOOK__: JSON.stringify(hasRulebook ? `/${RULEBOOK}` : null) },
+  define: { __RULEBOOK__: JSON.stringify(rulebookPages > 0 ? rulebookPages : null) },
   server: { host: true },
   worker: { format: 'es' },
 });

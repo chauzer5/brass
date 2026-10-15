@@ -599,7 +599,7 @@ function Table({
       )}
       {sheet === 'log' && <GameLogSheet entries={log} names={names} onClose={() => setSheet(null)} />}
       {sheet === 'settings' && <Settings inGame onClose={() => setSheet(null)} />}
-      {sheet === 'rulebook' && __RULEBOOK__ && <Rulebook url={__RULEBOOK__} onClose={() => setSheet(null)} />}
+      {sheet === 'rulebook' && __RULEBOOK__ && <Rulebook pages={__RULEBOOK__} onClose={() => setSheet(null)} />}
       {showDiscards && <DiscardSheet view={view} names={names} onClose={() => setShowDiscards(false)} />}
       {matFor !== null && (
         <MatSheet

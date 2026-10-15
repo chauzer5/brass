@@ -1,2 +1,2 @@
-/** Where the rulebook PDF is served, or null when none was added (see vite.config.ts). */
-declare const __RULEBOOK__: string | null;
+/** How many rulebook pages there are in public/rulebook/, or null when there are none (see vite.config.ts). */
+declare const __RULEBOOK__: number | null;

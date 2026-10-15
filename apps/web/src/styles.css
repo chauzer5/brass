@@ -2942,6 +2942,8 @@ g.coach-target > rect:first-of-type {
 
 .rulebook-page {
   width: 100%;
+  /* The rulebook's pages are square. */
+  aspect-ratio: 1;
   display: grid;
   place-items: center;
   background: #3a322c;

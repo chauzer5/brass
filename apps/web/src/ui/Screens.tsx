@@ -28,7 +28,7 @@ export function NewGame({
 }) {
   const [page, setPage] = useState<'menu' | 'setup' | 'settings' | 'rulebook'>('menu');
   if (page === 'settings') return <Settings onClose={() => setPage('menu')} />;
-  if (page === 'rulebook' && __RULEBOOK__) return <Rulebook url={__RULEBOOK__} onClose={() => setPage('menu')} />;
+  if (page === 'rulebook' && __RULEBOOK__) return <Rulebook pages={__RULEBOOK__} onClose={() => setPage('menu')} />;
   if (page === 'setup') return <MatchSetup onStart={onStart} onBack={() => setPage('menu')} replacesSave={!!onResume} />;
   return (
     <div className="screen">
