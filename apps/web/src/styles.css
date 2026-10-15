@@ -2987,3 +2987,16 @@ g.coach-target > rect:first-of-type {
   text-anchor: middle;
   dominant-baseline: central;
 }
+
+/* Minimized, the coach always sits just above the hand; expanded, it goes back to its step's place. */
+.coach.folded {
+  top: auto;
+  bottom: calc(var(--tray-h, 0px) + 8px);
+  translate: none;
+}
+
+.coach-fold {
+  font-size: 20px !important;
+  font-weight: 700;
+  line-height: 1;
+}

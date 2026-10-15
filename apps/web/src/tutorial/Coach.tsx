@@ -145,7 +145,8 @@ export function Coach({
 
   // Overlays (like the era's scoring) leave room for the card above them, when it's at the top.
   const card = useRef<HTMLDivElement>(null);
-  const top = step.place === 'top';
+  // (Minimized, the card always sits just above the hand, whatever the step's place.)
+  const top = step.place === 'top' && !folded;
   useLayoutEffect(() => {
     const el = card.current;
     const root = document.documentElement.style;
@@ -169,7 +170,7 @@ export function Coach({
         </span>
         <h2>{step.title}</h2>
         <button className="coach-fold" onClick={() => setFolded((f) => !f)} aria-label={folded ? 'Show the tutorial' : 'Hide the tutorial'}>
-          {folded ? '▾' : '▴'}
+          {folded ? '+' : '−'}
         </button>
       </div>
       {!folded && (
