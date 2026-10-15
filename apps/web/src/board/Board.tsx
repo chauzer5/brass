@@ -240,6 +240,7 @@ function Slots({
   holdFor,
   flips,
   leaving,
+  peek,
 }: {
   location: brass.LocationId;
   slots: readonly brass.Slot[];
@@ -252,7 +253,9 @@ function Slots({
   flips?: ReadonlyMap<brass.SlotKey, number> | undefined;
   /** Tiles coming off the board at the end of the era, and when. */
   leaving?: { tiles: ReadonlySet<brass.SlotKey>; at: number } | null | undefined;
-  holdFor?: ((location: brass.LocationId, slot: number) => Record<string, (e: ReactPointerEvent) => void>) | undefined;
+  holdFor?: ((location: brass.LocationId, slot: number, tappable: boolean) => Record<string, (e: ReactPointerEvent) => void> | undefined) | undefined;
+  /** An unflipped tile being held: shown flipped, to see what it will score. */
+  peek?: brass.SlotKey | null | undefined;
 }) {
   const { width, height } = slotLayout(slots.length);
   return (
@@ -286,7 +289,7 @@ function Slots({
             className={[tappable ? 'tappable' : '', leaving?.tiles.has(key) ? 'leaving' : ''].filter(Boolean).join(' ') || undefined}
             style={leaving?.tiles.has(key) ? { animationDelay: `${leaving.at}ms` } : undefined}
             onClick={tappable ? () => onSlot?.(location, i) : undefined}
-            {...(!tappable && holdFor?.(location, i))}
+            {...holdFor?.(location, i, tappable)}
           >
             <title>{tile ? `${INDUSTRY_NAME[tile.industry]} ${roman(tile.level)}` : slot.map((ind) => INDUSTRY_NAME[ind]).join(' or ')}</title>
             {/* Generous invisible hit area for fingers. */}
@@ -303,11 +306,17 @@ function Slots({
                   <TileFace tile={tile} />
                 </g>
               </>
+            ) : tile && peek === key ? (
+              // Held: its back, turned over for as long as it's held.
+              <g className="tile-peek">
+                <rect width={SLOT} height={SLOT} rx={4} className={`${cls} flipped`} />
+                <TileFace tile={{ ...tile, flipped: true, cubes: 0 }} />
+              </g>
             ) : (
               <rect width={SLOT} height={SLOT} rx={4} className={cls} />
             )}
             {tile ? (
-              !flips?.has(key) && <TileFace tile={tile} />
+              !flips?.has(key) && peek !== key && <TileFace tile={tile} />
             ) : (
               <g className="slot-icons">
                 <SlotIcons slot={slot} />
@@ -387,36 +396,56 @@ export function Board({
     return () => ro.disconnect();
   }, []);
 
-  // Hold a space that isn't lit to see why: a bubble above the finger, gone on release.
+  // Holding a space: one that isn't lit while building says why (a bubble above the finger); an unflipped
+  // tile turns over to show its back (what it will score). Both go on release.
   const [why, setWhy] = useState<{ text: string; x: number; y: number } | null>(null);
+  const [peek, setPeek] = useState<brass.SlotKey | null>(null);
   const hold = useRef<{ x: number; y: number; timer: number } | null>(null);
+  // A hold that showed something isn't also a tap.
+  const held = useRef(false);
   const endHold = () => {
     if (hold.current) clearTimeout(hold.current.timer);
     hold.current = null;
     setWhy(null);
+    setPeek(null);
+    // The click that follows a released hold (if any) comes straight after; later taps are taps.
+    window.setTimeout(() => (held.current = false), 60);
   };
-  const holdFor = explainSlot
-    ? (location: brass.LocationId, slot: number) => ({
-        onPointerDown: (e: ReactPointerEvent) => {
-          if (e.button !== 0) return;
-          const { clientX: x, clientY: y } = e;
-          const timer = window.setTimeout(() => {
-            const text = explainSlot(location, slot);
-            if (text) {
-              setWhy({ text, x, y });
-              navigator.vibrate?.(8);
-            }
-          }, HOLD_MS);
-          hold.current = { x, y, timer };
-        },
-        onPointerMove: (e: ReactPointerEvent) => {
-          const h = hold.current;
-          if (h && Math.hypot(e.clientX - h.x, e.clientY - h.y) > HOLD_SLOP) endHold();
-        },
-        onPointerUp: endHold,
-        onPointerCancel: endHold,
-      })
-    : undefined;
+  const holdFor = (location: brass.LocationId, slot: number, tappable: boolean) => {
+    const key = brass.slotKey(location, slot);
+    const tile = tiles[key];
+    const canPeek = !!tile && !tile.flipped;
+    const canExplain = !!explainSlot && !tappable;
+    if (!canPeek && !canExplain) return undefined;
+    return {
+      onPointerDown: (e: ReactPointerEvent) => {
+        if (e.button !== 0) return;
+        held.current = false;
+        const { clientX: x, clientY: y } = e;
+        const timer = window.setTimeout(() => {
+          const text = canExplain ? explainSlot!(location, slot) : null;
+          if (text) setWhy({ text, x, y });
+          else if (canPeek) setPeek(key);
+          else return;
+          held.current = true;
+          navigator.vibrate?.(8);
+        }, HOLD_MS);
+        hold.current = { x, y, timer };
+      },
+      onPointerMove: (e: ReactPointerEvent) => {
+        const h = hold.current;
+        if (h && Math.hypot(e.clientX - h.x, e.clientY - h.y) > HOLD_SLOP) endHold();
+      },
+      onPointerUp: endHold,
+      onPointerCancel: endHold,
+      onPointerLeave: endHold,
+      onClickCapture: (e: { stopPropagation: () => void }) => {
+        if (!held.current) return;
+        held.current = false;
+        e.stopPropagation();
+      },
+    };
+  };
 
   /**
    * Pans and zooms so a box of the map (in map units) sits in the middle of
@@ -660,6 +689,7 @@ export function Board({
                     holdFor={holdFor}
                     flips={flips}
                     leaving={leaving}
+                    peek={peek}
                   />
                   {loc.kind === 'town' && (
                     <TownBanner
