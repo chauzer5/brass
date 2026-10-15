@@ -24,6 +24,8 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,webp,webmanifest}'],
         navigateFallback: '/index.html',
         cleanupOutdatedCaches: true,
+        // A new version, once told to take over, takes over open pages too (even ones it wasn't serving).
+        clientsClaim: true,
         // The rulebook is big, so it isn't downloaded up front: each page, once seen, is kept for offline reading.
         runtimeCaching: [
           {
