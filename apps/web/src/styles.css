@@ -2962,3 +2962,28 @@ g.coach-target > rect:first-of-type {
   font-size: 28px;
   font-weight: 700;
 }
+
+/* A Merchant's link points, on the corner of its stall (like the link icons printed on the board). */
+.stall-link-vp rect {
+  fill: #2a2420;
+  stroke: var(--stall-edge);
+  stroke-width: 1.5;
+}
+
+.stall-link-vp circle {
+  fill: #f6ead2;
+}
+
+.stall-link-line {
+  stroke: #f6ead2;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+.stall-link-vp text {
+  fill: #f6ead2;
+  font-size: 12px;
+  font-weight: 800;
+  text-anchor: middle;
+  dominant-baseline: central;
+}

@@ -757,6 +757,21 @@ function MerchantMarker({
       <text x={x} y={top + awning + 11} className="stall-name">
         {loc.name}
       </text>
+      {open && (
+        // Link points: each link into this Merchant scores this many VPs at the end of an era.
+        <g className="stall-link-vp" transform={`translate(${x + 44} ${top + 80})`}>
+          <title>{`Each link to ${loc.name} scores ${loc.linkVP} VPs at the end of an era`}</title>
+          <rect x={-16} y={-10} width={32} height={20} rx={10} />
+          <g transform="translate(-11 -5.5)">
+            <path d="M2.5 9.5 9.5 2.5" className="stall-link-line" />
+            <circle cx={2.5} cy={9.5} r={2} />
+            <circle cx={9.5} cy={2.5} r={2} />
+          </g>
+          <text x={7} y={0.5}>
+            {loc.linkVP}
+          </text>
+        </g>
+      )}
       {open ? (
         <>
           {spaces.map((space, i) => {
@@ -770,10 +785,11 @@ function MerchantMarker({
               </g>
             );
           })}
+          {/* The beer bonus, with the link points beside it. */}
           <g className="stall-bonus">
-            <rect x={x - 42} y={top + 70} width={84} height={20} rx={10} />
-            <IndustryIcon industry="brewery" size={13} x={x - 36} y={top + 73.5} />
-            <text x={x + 6} y={top + 80}>
+            <rect x={x - 59} y={top + 70} width={84} height={20} rx={10} />
+            <IndustryIcon industry="brewery" size={13} x={x - 53} y={top + 73.5} />
+            <text x={x - 11} y={top + 80}>
               {BONUS_LABEL(loc.beerBonus)}
             </text>
           </g>
