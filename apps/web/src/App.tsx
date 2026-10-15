@@ -8,7 +8,7 @@ import { ActionRail } from './ui/ActionRail.tsx';
 import { HandTray, type Arriving, type TrayTab } from './ui/HandTray.tsx';
 import { IncomeTrack } from './ui/IncomeTrack.tsx';
 import { PlayerMat } from './ui/PlayerMat.tsx';
-import { DiscardSheet, EraSummary, GameLogSheet, Handoff, Settings, MatSheet, NewGame, PlayerStrip } from './ui/Screens.tsx';
+import { DiscardSheet, EraSummary, FirstPlayer, GameLogSheet, Handoff, Settings, MatSheet, NewGame, PlayerStrip } from './ui/Screens.tsx';
 import { StepPanel, pickCard, tapMatRow, tapMerchant, tapSlot } from './ui/TurnPanel.tsx';
 import { choosable, chosenSource, sourceNeeds } from './game/sources.ts';
 import { gameLog, recapSince, type RecapItem } from './game/recap.ts';
@@ -168,6 +168,9 @@ function Table({
     return true;
   };
 
+  // A game that hasn't started yet opens with the draw for who goes first; nothing happens until it's seen.
+  const [intro, setIntro] = useState(match.log.length === 0);
+
   // Pass-the-device screens are only needed between people.
   const hidden = player !== null && humans.length > 1 && revealedFor !== player;
 
@@ -210,7 +213,7 @@ function Table({
   const usable = draft.kind ? usableCards(view.cards, hand, legal, draft) : null;
   const selectedCards = new Set(draft.kind === 'scout' ? draft.scoutCards : draft.card ? [draft.card] : []);
   // Waiting on the "Your turn" screen (it holds off while a sale animation plays): no actions until it's seen.
-  const showControls = player !== null && !hidden && soloRecap.length === 0;
+  const showControls = player !== null && !hidden && soloRecap.length === 0 && !intro;
   // The hand (and board) tray: shown to the human in control, or to the only human while bots play.
   const showTray = handOwner !== null && !hidden;
   // Develop, once its card is chosen, is played by tapping industries on the mat.
@@ -245,7 +248,7 @@ function Table({
 
   // Bots take their own turns: one action at a time, after a pause so the table can follow along, and not
   // while an animation or the end-of-era summary is showing.
-  const botTurn = active !== null && isBot(active) && !outcome && !summaryOpen && !sale;
+  const botTurn = active !== null && isBot(active) && !outcome && !summaryOpen && !sale && !intro;
   useEffect(() => {
     if (!botTurn || active === null) return;
     const seat = seats[active]!;
@@ -484,7 +487,8 @@ function Table({
         />
       )}
       {/* The next player's screen waits for a sale animation to finish, so whoever built sees it. */}
-      {hidden && player !== null && !sale && !summaryOpen && (
+      {intro && <FirstPlayer names={names} order={state.turnOrder} onDone={() => setIntro(false)} />}
+      {hidden && player !== null && !sale && !summaryOpen && !intro && (
         <Handoff
           name={names[player]!}
           names={names}

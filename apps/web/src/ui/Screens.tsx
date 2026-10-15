@@ -520,3 +520,95 @@ export function GameLogSheet({
     </div>
   );
 }
+
+/** How long the first-player wheel spins. */
+const SPIN_MS = 3200;
+
+/**
+ * Who goes first (rulebook p.5: the first round's order is random). A wheel
+ * with a slice per player spins and lands on the player the game already
+ * drew, then the whole first round's order is shown.
+ */
+export function FirstPlayer({ names, order, onDone }: { names: readonly string[]; order: readonly number[]; onDone: () => void }) {
+  const n = names.length;
+  const slice = 360 / n;
+  const first = order[0]!;
+  const [angle, setAngle] = useState(0);
+  const [landed, setLanded] = useState(false);
+  useEffect(() => {
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Land somewhere inside the first player's slice, after a few full turns. (Only where it stops is random-looking:
+    // the result was decided when the game was set up.)
+    const inside = (Math.random() - 0.5) * slice * 0.6;
+    const start = window.setTimeout(() => setAngle(360 * 5 - (first + 0.5) * slice + inside), 50);
+    const stop = window.setTimeout(() => setLanded(true), reduced ? 100 : SPIN_MS + 100);
+    return () => {
+      clearTimeout(start);
+      clearTimeout(stop);
+    };
+  }, [first, slice]);
+
+  const R = 100;
+  const point = (deg: number, r = R) => {
+    const rad = ((deg - 90) * Math.PI) / 180;
+    return `${(Math.cos(rad) * r).toFixed(2)} ${(Math.sin(rad) * r).toFixed(2)}`;
+  };
+  const short = (name: string) => (name.length > 11 ? `${name.slice(0, 10)}…` : name);
+
+  return (
+    <div className="overlay">
+      <div className="screen-card first-player">
+        <h2>{landed ? `${names[first]} goes first` : 'Who goes first?'}</h2>
+        <div className="wheel-wrap">
+          <svg viewBox="-110 -118 220 228" className="wheel" aria-hidden>
+            <g className="wheel-spin" style={{ transform: `rotate(${angle}deg)`, transitionDuration: `${SPIN_MS}ms` }}>
+              {names.map((name, i) => {
+                const mid = (i + 0.5) * slice;
+                return (
+                  <g key={i} className={`owner-${i} ${landed && i === first ? 'winner' : ''}`}>
+                    {n === 1 ? (
+                      <circle r={R} className="wheel-slice" />
+                    ) : (
+                      <path d={`M 0 0 L ${point(i * slice)} A ${R} ${R} 0 0 1 ${point((i + 1) * slice)} Z`} className="wheel-slice" />
+                    )}
+                    <text
+                      className="wheel-label"
+                      // Names read outward along their slice, so the one that lands under the pointer is upright.
+                      transform={`rotate(${mid}) translate(0 ${-R * 0.6})`}
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                    >
+                      {short(name)}
+                    </text>
+                  </g>
+                );
+              })}
+            </g>
+            <circle r={14} className="wheel-hub" />
+            {/* The pointer at the top. */}
+            <path d="M -10 -116 L 10 -116 L 0 -96 Z" className="wheel-pointer" />
+          </svg>
+        </div>
+        <section className={`recap first-order ${landed ? 'shown' : ''}`}>
+          <h3>First round's order</h3>
+          <ol>
+            {order.map((id, i) => (
+              <li key={id}>
+                <span className="order-num">{i + 1}</span>
+                <span className={`dot owner-${id}`} aria-hidden />
+                <span>{names[id]}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+        <button className="confirm" onClick={onDone} disabled={!landed}>
+          Let's play
+        </button>
+        {/* Kept in place (hidden) once landed, so the card doesn't jump. */}
+        <button className={`link-button skip-spin ${landed ? 'gone' : ''}`} onClick={() => setLanded(true)} disabled={landed}>
+          Skip
+        </button>
+      </div>
+    </div>
+  );
+}
