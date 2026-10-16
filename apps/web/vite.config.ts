@@ -26,6 +26,8 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         // A new version, once told to take over, takes over open pages too (even ones it wasn't serving).
         clientsClaim: true,
+        // Notifications (public/push-sw.js).
+        importScripts: ['push-sw.js'],
         // The rulebook is big, so it isn't downloaded up front: each page, once seen, is kept for offline reading.
         runtimeCaching: [
           {

@@ -3322,3 +3322,23 @@ button.lobby-seat:disabled {
 .turn-clock.urgent {
   color: var(--danger);
 }
+
+.push-prompt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.push-prompt span {
+  flex: 1;
+}
+
+.push-prompt button {
+  flex: none;
+  min-height: 40px;
+  padding: 0 16px;
+}
+
+.push-prompt button.confirm {
+  width: auto;
+}

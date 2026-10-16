@@ -90,6 +90,13 @@ export interface LeaveGameRequest {
   token: string;
 }
 
+/** Signing this phone up for notifications in a game (its turn, the game starting, ending or being cancelled). */
+export interface PushRegisterRequest {
+  token: string;
+  /** PushSubscription.toJSON() */
+  subscription: { endpoint: string; keys: { p256dh: string; auth: string } };
+}
+
 // ---- WebSocket ----
 
 export type ClientMessage =
@@ -100,7 +107,9 @@ export type ClientMessage =
    * made on a game that has since moved on is refused, so bots played by two phones at once don't both
    * land.
    */
-  | { t: 'act'; at: number; player: number; action: brass.BrassAction };
+  | { t: 'act'; at: number; player: number; action: brass.BrassAction }
+  /** Whether the app is on screen: notifications are only sent to players who aren't looking. */
+  | { t: 'visible'; visible: boolean };
 
 export type ServerMessage =
   | { t: 'state'; game: GameSnapshot }

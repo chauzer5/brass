@@ -6,7 +6,11 @@ import type { Game, Seat } from '../game/useGame.ts';
 import { DIFFICULTY_LABEL } from '../ui/Screens.tsx';
 import {
   createGame,
+  enablePush,
   forgetTicket,
+  pushState,
+  registerPush,
+  type PushState,
   joinGame,
   joinLink,
   leaveGame,
@@ -93,6 +97,7 @@ function OnlineHome({
             Join with code
           </button>
         </div>
+        <PushPrompt />
         {tickets.length > 0 && (
           <>
             <h3>Your games</h3>
@@ -392,6 +397,8 @@ function OnlineGame({ ticket, onBack }: { ticket: SavedTicket; onBack: () => voi
   const { snapshot, match, connection, error, clearError, play, playBot, start } = useOnlineGame(ticket);
   const [introSeen, setIntroSeen] = useState(!!ticket.introSeen);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  // Notifications for this game, if they're on (it's safe to sign up again each time).
+  useEffect(() => void registerPush(ticket), [ticket]);
   const [leaveError, setLeaveError] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
 
@@ -538,6 +545,40 @@ function OnlineGame({ ticket, onBack }: { ticket: SavedTicket; onBack: () => voi
   );
 }
 
+/**
+ * Turning on notifications (your turn, a game starting or ending). Shown until they're on; on an iPhone in
+ * Safari, where they can't be, it says how to get them.
+ */
+function PushPrompt() {
+  const [state, setState] = useState<PushState>(pushState);
+  const [busy, setBusy] = useState(false);
+  if (state === 'granted') return null;
+  if (state === 'unsupported') {
+    return inIosBrowser ? (
+      <p className="notice app-notice">
+        To be notified when it's your turn, add Brass to your Home Screen (Share → Add to Home Screen) and play from there.
+      </p>
+    ) : null;
+  }
+  if (state === 'denied') return <p className="muted setup-note">Notifications are blocked for Brass in your phone's settings.</p>;
+  return (
+    <div className="notice app-notice push-prompt">
+      <span>Get a notification when it's your turn.</span>
+      <button
+        className="confirm"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          setState(await enablePush().catch(() => pushState()));
+          setBusy(false);
+        }}
+      >
+        Turn on
+      </button>
+    </div>
+  );
+}
+
 /** "3 min", "1 hour", "1 day". */
 function limitLabel(seconds: number): string {
   if (seconds % 86400 === 0) return seconds === 86400 ? '1 day' : `${seconds / 86400} days`;
@@ -659,6 +700,7 @@ function Lobby({
           ))}
         </div>
         {turnLimit !== null && <p className="muted">Max turn time: {limitLabel(turnLimit)}</p>}
+        <PushPrompt />
         {error && <p className="error">{error}</p>}
         <button className="confirm" onClick={onStart} disabled={waiting > 0}>
           {waiting > 0 ? `Waiting for ${waiting} more` : 'Start game'}

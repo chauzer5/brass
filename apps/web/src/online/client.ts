@@ -34,6 +34,46 @@ export const lobbyInfo = (code: string) => request<LobbyInfo>(`/${code}`);
 export const leaveGame = (code: string, token: string) => request<{ ok: true }>(`/${code}/leave`, { method: 'POST', body: { token } });
 export const joinGame = (code: string, body: JoinGameRequest) => request<SeatTicket>(`/${code}/join`, { method: 'POST', body });
 
+// ---- Notifications ----
+
+/** Whether this browser can get notifications (an iPhone only can from the home-screen app). */
+export const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+
+export type PushState = 'unsupported' | 'default' | 'granted' | 'denied';
+export const pushState = (): PushState => (pushSupported() ? Notification.permission : 'unsupported');
+
+/** This phone's push subscription, made if needed (only once notifications are allowed). */
+async function subscription(): Promise<PushSubscription | null> {
+  if (!pushSupported() || Notification.permission !== 'granted') return null;
+  const reg = await navigator.serviceWorker.ready;
+  const existing = await reg.pushManager.getSubscription();
+  if (existing) return existing;
+  const { key } = await (await fetch(`${SERVER_URL}/api/push-key`)).json() as { key: string };
+  return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: fromB64url(key) });
+}
+
+const fromB64url = (s: string) =>
+  Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (s.length % 4)) % 4)), (c) => c.charCodeAt(0));
+
+/** Signs this phone up for notifications in a game (if they're allowed): safe to repeat. */
+export async function registerPush(ticket: SeatTicket): Promise<void> {
+  try {
+    const sub = await subscription();
+    if (!sub) return;
+    await request('/' + ticket.code + '/push', { method: 'POST', body: { token: ticket.token, subscription: sub.toJSON() } });
+  } catch (e) {
+    console.warn('Notifications not set up:', e);
+  }
+}
+
+/** Asks to allow notifications (from a tap), then signs up for every game this phone is in. */
+export async function enablePush(): Promise<PushState> {
+  if (!pushSupported()) return 'unsupported';
+  const result = await Notification.requestPermission();
+  if (result === 'granted') await Promise.all(savedTickets().map(registerPush));
+  return result;
+}
+
 // ---- The games this phone is in ----
 
 const TICKETS_KEY = 'brass:online:v1';
@@ -133,6 +173,8 @@ export function useOnlineGame(ticket: SeatTicket) {
       socket.onopen = () => {
         attempt = 0;
         setConnection('open');
+        // The server only sends notifications to players who aren't looking.
+        socket.send(JSON.stringify({ t: 'visible', visible: document.visibilityState === 'visible' } satisfies ClientMessage));
       };
       socket.onmessage = (e) => {
         const msg = JSON.parse(e.data as string) as ServerMessage;
@@ -164,7 +206,11 @@ export function useOnlineGame(ticket: SeatTicket) {
     connect();
     // Phones drop sockets in the background: reconnect straight away when the app comes back.
     const onVisible = () => {
-      if (document.visibilityState !== 'visible' || ws.current) return;
+      const socket = ws.current;
+      if (socket?.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ t: 'visible', visible: document.visibilityState === 'visible' } satisfies ClientMessage));
+      }
+      if (document.visibilityState !== 'visible' || socket) return;
       clearTimeout(retry);
       attempt = 0;
       connect();
