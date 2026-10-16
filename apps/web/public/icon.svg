@@ -19,6 +19,9 @@
   <!-- Full-bleed background, so the same art works as a maskable icon. -->
   <rect width="512" height="512" fill="url(#bg)"/>
 
+  <!-- The gear (drawn around y=262) is moved up to sit in the middle of the square. -->
+  <g transform="translate(0 -6)">
+
   <!-- Brass gear: 12 teeth around a ring. -->
   <g fill="url(#brass)">
     <g id="tooth">
@@ -78,4 +81,5 @@
 
   <!-- Hub ring highlight. -->
   <circle cx="256" cy="262" r="118" fill="none" stroke="#f6d58a" stroke-opacity="0.35" stroke-width="3"/>
+  </g>
 </svg>
