@@ -31,6 +31,7 @@ async function request<T>(path: string, init?: { method: string; body: unknown }
 
 export const createGame = (body: CreateGameRequest) => request<SeatTicket>('', { method: 'POST', body });
 export const lobbyInfo = (code: string) => request<LobbyInfo>(`/${code}`);
+export const leaveGame = (code: string, token: string) => request<{ ok: true }>(`/${code}/leave`, { method: 'POST', body: { token } });
 export const joinGame = (code: string, body: JoinGameRequest) => request<SeatTicket>(`/${code}/join`, { method: 'POST', body });
 
 // ---- The games this phone is in ----

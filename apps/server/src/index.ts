@@ -10,6 +10,7 @@ import {
   type GameSnapshot,
   type GameStatus,
   type JoinGameRequest,
+  type LeaveGameRequest,
   type LobbyInfo,
   type PublicSeat,
   type SeatSetup,
@@ -42,6 +43,7 @@ interface StoredGame {
   log: BrassMatch['log'];
   seats: StoredSeat[];
   createdAt: number;
+  leftBy?: number;
 }
 
 const MAX_NAME = 24;
@@ -95,6 +97,13 @@ export default {
       const body = (await request.json().catch(() => null)) as JoinGameRequest | null;
       if (!body) return fail('Bad request');
       const res = await room.join(body);
+      return 'error' in res ? fail(res.error, res.status) : json(res);
+    }
+    // POST /api/games/CODE/leave: leave the game (see LeaveGameRequest).
+    if (parts[3] === 'leave' && request.method === 'POST') {
+      const body = (await request.json().catch(() => null)) as LeaveGameRequest | null;
+      if (!body) return fail('Bad request');
+      const res = await room.leave(body);
       return 'error' in res ? fail(res.error, res.status) : json(res);
     }
     // GET /api/games/CODE/ws?token=…: the live connection.
@@ -176,7 +185,29 @@ export class GameRoom extends DurableObject<Env> {
       seats: this.publicSeats(game),
       current: game.status === 'playing' && !finished ? brass.currentPlayer(match.state) : null,
       finished,
+      leftBy: game.leftBy ?? null,
     };
+  }
+
+  async leave(req: LeaveGameRequest): Promise<{ ok: true } | { error: string; status: number }> {
+    const game = await this.load();
+    if (!game) return { ok: true };
+    const seat = game.seats.findIndex((s) => s.kind === 'human' && !!s.token && s.token === req.token);
+    if (seat < 0) return { error: 'Not a player in this game', status: 403 };
+    const finished = !!brass.brassGame.outcome(this.matchOf(game).state);
+    if (finished || game.status === 'cancelled') return { ok: true };
+    if (game.status === 'lobby') {
+      // The seat is free again; with nobody left waiting, the game is called off.
+      game.seats[seat] = { kind: 'human', name: null, token: null };
+      if (!game.seats.some((s) => s.kind === 'human' && s.token)) game.status = 'cancelled';
+    } else {
+      game.status = 'cancelled';
+      game.leftBy = seat;
+    }
+    await this.save(game);
+    for (const ws of this.ctx.getWebSockets(String(seat))) ws.close(4000, 'Left the game');
+    this.broadcast(game);
+    return { ok: true };
   }
 
   async join(req: JoinGameRequest): Promise<SeatTicket | { error: string; status: number }> {
@@ -261,6 +292,7 @@ export class GameRoom extends DurableObject<Env> {
       seed: game.seed,
       log: game.log,
       you,
+      leftBy: game.leftBy ?? null,
     };
     return { t: 'state', game: snapshot };
   }

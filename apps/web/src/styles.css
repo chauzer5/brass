@@ -3276,3 +3276,21 @@ button.lobby-seat:disabled {
   font-size: 14px;
   line-height: 1.4;
 }
+
+/* Online pop-ups (leaving, a cancelled game) sit over everything else in the game. */
+.online-modal {
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.confirm.danger {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+.lobby-leave {
+  align-self: center;
+  color: var(--muted);
+}

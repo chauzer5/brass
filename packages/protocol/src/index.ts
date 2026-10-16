@@ -17,7 +17,8 @@ export type PublicSeat =
   | { kind: 'human'; name: string | null; online: boolean }
   | { kind: 'bot'; difficulty: Difficulty; name: string };
 
-export type GameStatus = 'lobby' | 'playing';
+/** A game is cancelled when a player leaves it part-way through. */
+export type GameStatus = 'lobby' | 'playing' | 'cancelled';
 
 /** The game as the server sends it to each player. */
 export interface GameSnapshot {
@@ -30,6 +31,8 @@ export interface GameSnapshot {
   log: LoggedAction<brass.BrassAction>[];
   /** Which seat this phone plays. */
   you: number;
+  /** Who left, cancelling the game. */
+  leftBy: number | null;
 }
 
 // ---- HTTP ----
@@ -60,6 +63,16 @@ export interface LobbyInfo {
   /** Whose turn it is (null in the lobby, or once the game is over). */
   current: number | null;
   finished: boolean;
+  /** Who left, cancelling the game. */
+  leftBy: number | null;
+}
+
+/**
+ * Leaving: before the game starts, the seat is freed for someone else; part-way through, the game is
+ * cancelled for everyone; once it's over, nothing changes (the phone just forgets it).
+ */
+export interface LeaveGameRequest {
+  token: string;
 }
 
 // ---- WebSocket ----

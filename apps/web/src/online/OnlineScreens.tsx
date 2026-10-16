@@ -9,6 +9,7 @@ import {
   forgetTicket,
   joinGame,
   joinLink,
+  leaveGame,
   lobbyInfo,
   markIntroSeen,
   saveName,
@@ -37,7 +38,7 @@ export function Online({ join, onBack }: { join?: string | undefined; onBack: ()
 
   if (page.kind === 'create') return <CreateGame onBack={home} onCreated={open} />;
   if (page.kind === 'join') return <JoinGame initialCode={page.code} onBack={home} onJoined={open} />;
-  if (page.kind === 'game') return <OnlineGame key={page.ticket.code} ticket={page.ticket} onLeave={home} />;
+  if (page.kind === 'game') return <OnlineGame key={page.ticket.code} ticket={page.ticket} onBack={home} />;
   return <OnlineHome onBack={onBack} onCreate={() => setPage({ kind: 'create' })} onJoin={() => setPage({ kind: 'join', code: '' })} onOpen={open} />;
 }
 
@@ -108,7 +109,7 @@ function OnlineHome({
                       </span>
                       <span className="online-game-status">{label.text}</span>
                     </button>
-                    {(info === null || info?.finished) && (
+                    {(info === null || info?.finished || info?.status === 'cancelled') && (
                       <button className="close online-forget" onClick={() => forget(t.code)} aria-label={`Remove game ${t.code}`}>
                         ×
                       </button>
@@ -127,6 +128,7 @@ function OnlineHome({
 function statusLabel(info: LobbyInfo | null | undefined, you: number): { text: string; yours: boolean } {
   if (info === undefined) return { text: '', yours: false };
   if (info === null) return { text: '', yours: false };
+  if (info.status === 'cancelled') return { text: 'Cancelled', yours: false };
   if (info.finished) return { text: 'Finished', yours: false };
   if (info.status === 'lobby') {
     const free = info.seats.filter((s) => s.kind === 'human' && !s.name).length;
@@ -372,9 +374,12 @@ function JoinGame({ initialCode, onBack, onJoined }: { initialCode: string; onBa
 
 // ---- A game ----
 
-function OnlineGame({ ticket, onLeave }: { ticket: SavedTicket; onLeave: () => void }) {
+function OnlineGame({ ticket, onBack }: { ticket: SavedTicket; onBack: () => void }) {
   const { snapshot, match, connection, error, clearError, play, playBot, start } = useOnlineGame(ticket);
   const [introSeen, setIntroSeen] = useState(!!ticket.introSeen);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
+  const [leaving, setLeaving] = useState(false);
 
   // The server's complaints fade after a moment.
   useEffect(() => {
@@ -391,12 +396,31 @@ function OnlineGame({ ticket, onLeave }: { ticket: SavedTicket; onLeave: () => v
     return { match, names: snapshot.seats.map(seatName), seats, introSeen };
   }, [snapshot, match, introSeen]);
 
+  /** Leaves for good: the server is told (freeing the seat, or cancelling the game), then this phone forgets it. */
+  const leave = async () => {
+    setLeaving(true);
+    setLeaveError(null);
+    try {
+      await leaveGame(ticket.code, ticket.token);
+      forgetTicket(ticket.code);
+      onBack();
+    } catch (e) {
+      setLeaveError(errorText(e));
+      setLeaving(false);
+    }
+  };
+  /** A cancelled game: nothing more to do with it. */
+  const dismiss = () => {
+    forgetTicket(ticket.code);
+    onBack();
+  };
+
   if (!snapshot || !game) {
     return (
       <div className="screen">
         <div className="screen-card">
           <div className="panel-header">
-            <button className="close" onClick={onLeave} aria-label="Back">
+            <button className="close" onClick={onBack} aria-label="Back">
               ‹
             </button>
             <h2>Game {ticket.code}</h2>
@@ -407,20 +431,34 @@ function OnlineGame({ ticket, onLeave }: { ticket: SavedTicket; onLeave: () => v
     );
   }
 
-  if (snapshot.status === 'lobby') return <Lobby code={snapshot.code} seats={snapshot.seats} you={snapshot.you} onStart={start} onLeave={onLeave} error={error} />;
+  if (snapshot.status === 'lobby') {
+    return (
+      <Lobby
+        code={snapshot.code}
+        seats={snapshot.seats}
+        you={snapshot.you}
+        onStart={start}
+        onBack={onBack}
+        onLeave={leave}
+        error={leaveError ?? error}
+      />
+    );
+  }
 
+  const cancelled = snapshot.status === 'cancelled';
+  const finished = !!brass.brassGame.outcome(game.match.state);
   // Bots' turns are worked out by one phone: the first player who's online.
-  const runsBots = snapshot.seats.findIndex((s) => s.kind === 'human' && s.online) === snapshot.you;
+  const runsBots = !cancelled && snapshot.seats.findIndex((s) => s.kind === 'human' && s.online) === snapshot.you;
   return (
     <>
       <Table
         game={game}
         play={play}
         playBot={playBot}
-        onMenu={onLeave}
+        onMenu={onBack}
         menuLabel="Online games"
-        onNewGame={onLeave}
-        onExitTutorial={onLeave}
+        onNewGame={onBack}
+        onExitTutorial={onBack}
         onKeepPlaying={() => {}}
         onIntroDone={() => {
           markIntroSeen(ticket.code);
@@ -428,10 +466,52 @@ function OnlineGame({ ticket, onLeave }: { ticket: SavedTicket; onLeave: () => v
         }}
         runsBots={runsBots && connection === 'open'}
         status={<ConnectionStatus connection={connection} seats={snapshot.seats} you={snapshot.you} />}
+        extraMenu={cancelled ? [] : [[finished ? 'Remove game' : 'Leave game', () => setConfirmLeave(true)]]}
       />
-      {error && (
+      {error && !cancelled && (
         <div className="online-toast error" role="alert" onClick={clearError}>
           {error}
+        </div>
+      )}
+      {confirmLeave && !cancelled && (
+        <div className="overlay online-modal" onClick={() => !leaving && setConfirmLeave(false)}>
+          <div className="screen-card" role="alertdialog" aria-label="Leave the game" onClick={(e) => e.stopPropagation()}>
+            {finished ? (
+              <>
+                <h2>Remove this game?</h2>
+                <p className="muted">It's over, so it just leaves your list of games.</p>
+              </>
+            ) : (
+              <>
+                <h2>Leave the game?</h2>
+                <p className="muted">The game will be cancelled for everyone. This can't be undone.</p>
+              </>
+            )}
+            {leaveError && <p className="error">{leaveError}</p>}
+            <div className="online-actions">
+              <button className="secondary" onClick={() => setConfirmLeave(false)} disabled={leaving}>
+                Stay
+              </button>
+              <button className="confirm danger" onClick={leave} disabled={leaving}>
+                {leaving ? 'Leaving…' : finished ? 'Remove' : 'Leave game'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {cancelled && (
+        <div className="overlay online-modal">
+          <div className="screen-card" role="alertdialog" aria-label="Game cancelled">
+            <h2>Game cancelled</h2>
+            <p>
+              {snapshot.leftBy !== null && snapshot.seats[snapshot.leftBy]
+                ? `${seatName(snapshot.seats[snapshot.leftBy]!, snapshot.leftBy)} left the game, so it's been cancelled.`
+                : 'This game was called off.'}
+            </p>
+            <button className="confirm" onClick={dismiss}>
+              Back to online games
+            </button>
+          </div>
         </div>
       )}
     </>
@@ -441,9 +521,11 @@ function OnlineGame({ ticket, onLeave }: { ticket: SavedTicket; onLeave: () => v
 /** The top bar's dot: green when connected; who else is away, if anyone. */
 function ConnectionStatus({ connection, seats, you }: { connection: string; seats: PublicSeat[]; you: number }) {
   const away = seats.flatMap((s, i) => (s.kind === 'human' && i !== you && !s.online ? [seatName(s, i)] : []));
-  const text = connection !== 'open' ? 'Reconnecting…' : away.length > 0 ? `${away.join(', ')} away` : 'Online';
+  // Kept short: the top bar is narrow on a phone (who's away is in the tooltip).
+  const text = connection !== 'open' ? 'Reconnecting…' : away.length > 0 ? `${away.length} away` : 'Online';
+  const title = connection === 'open' && away.length > 0 ? `${away.join(', ')} away` : text;
   return (
-    <span className={`connection ${connection === 'open' ? 'open' : 'down'}`} title={text}>
+    <span className={`connection ${connection === 'open' ? 'open' : 'down'}`} title={title}>
       <span className="connection-dot" aria-hidden />
       {text !== 'Online' && <span className="connection-text">{text}</span>}
     </span>
@@ -456,6 +538,7 @@ function Lobby({
   seats,
   you,
   onStart,
+  onBack,
   onLeave,
   error,
 }: {
@@ -463,6 +546,8 @@ function Lobby({
   seats: PublicSeat[];
   you: number;
   onStart: () => void;
+  onBack: () => void;
+  /** Gives up the seat for good. */
   onLeave: () => void;
   error: string | null;
 }) {
@@ -484,7 +569,7 @@ function Lobby({
     <div className="screen">
       <div className="screen-card">
         <div className="panel-header">
-          <button className="close" onClick={onLeave} aria-label="Back">
+          <button className="close" onClick={onBack} aria-label="Back">
             ‹
           </button>
           <h2>Waiting for players</h2>
@@ -523,6 +608,9 @@ function Lobby({
         {error && <p className="error">{error}</p>}
         <button className="confirm" onClick={onStart} disabled={waiting > 0}>
           {waiting > 0 ? `Waiting for ${waiting} more` : 'Start game'}
+        </button>
+        <button className="link-button lobby-leave" onClick={onLeave}>
+          Leave game
         </button>
       </div>
     </div>

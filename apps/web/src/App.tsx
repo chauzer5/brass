@@ -92,6 +92,7 @@ export function Table({
   onIntroDone,
   runsBots = true,
   status,
+  extraMenu = [],
 }: {
   game: Game;
   play: (player: number, action: brass.BrassAction) => string | null;
@@ -108,6 +109,8 @@ export function Table({
   runsBots?: boolean;
   /** Shown in the top bar (online: the connection). */
   status?: ReactNode;
+  /** More entries for the ☰ menu (online: leaving the game). */
+  extraMenu?: readonly (readonly [string, () => void])[];
 }) {
   const { match, names, seats } = game;
   const state = match.state;
@@ -611,6 +614,7 @@ export function Table({
                 ['Game log', () => setSheet('log')],
                 ...(__RULEBOOK__ ? ([['Rulebook', () => setSheet('rulebook')]] as const) : []),
                 ['Settings', () => setSheet('settings')],
+                ...extraMenu,
               ] as const
             ).map(([label, run]) => (
               <button
