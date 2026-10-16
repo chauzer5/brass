@@ -496,11 +496,21 @@ function limitLabel(seconds: number): string {
   return `${Math.round(seconds / 60)} min`;
 }
 
-/** Time left in the current turn, counting down; red near the end. Hidden with no limit (or on a bot's turn). */
+/**
+ * Time left in the current turn, as a dial that empties (red near the end); tapping it shows the time.
+ * Hidden with no limit (or on a bot's turn).
+ */
 function TurnClock({ snapshot }: { snapshot: GameSnapshot }) {
   // The server's clock, as this phone's: their difference, measured when the game was sent.
   const offset = useMemo(() => snapshot.now - Date.now(), [snapshot]);
   const [, tick] = useState(0);
+  // Tapping the dial shows the exact time left, for a few seconds.
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    if (!shown) return;
+    const t = window.setTimeout(() => setShown(false), 3000);
+    return () => clearTimeout(t);
+  }, [shown]);
   const deadline = snapshot.turnDeadline;
   useEffect(() => {
     if (deadline === null) return;
@@ -513,9 +523,31 @@ function TurnClock({ snapshot }: { snapshot: GameSnapshot }) {
   const h = Math.floor(left / 3600);
   const m = Math.floor((left % 3600) / 60);
   const text = h > 0 ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}:${String(left % 60).padStart(2, '0')}`;
+  // The dial: a wedge for the time left, emptying clockwise from 12 o'clock.
+  const frac = Math.min(1, left / snapshot.turnLimit);
+  const R = 8;
+  const angle = frac * 2 * Math.PI;
+  const end = { x: 10 + R * Math.sin(angle), y: 10 - R * Math.cos(angle) };
+  const wedge = frac >= 0.999 ? null : `M10 10 L10 ${10 - R} A${R} ${R} 0 ${frac > 0.5 ? 1 : 0} 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)} Z`;
   return (
-    <span className={`turn-clock ${urgent ? 'urgent' : ''}`} title="Time left this turn" aria-label={`${text} left this turn`}>
-      ⏱ {text}
+    <span className="turn-clock-wrap">
+      <button
+        className={`turn-clock ${urgent ? 'urgent' : ''}`}
+        onClick={() => setShown((v) => !v)}
+        aria-label={`${text} left this turn`}
+        aria-expanded={shown}
+        title={`${text} left this turn`}
+      >
+        <svg viewBox="0 0 20 20" width="22" height="22" aria-hidden>
+          <circle cx="10" cy="10" r="9" className="turn-clock-face" />
+          {wedge ? <path d={wedge} className="turn-clock-left" /> : <circle cx="10" cy="10" r={R} className="turn-clock-left" />}
+        </svg>
+      </button>
+      {shown && (
+        <span className="turn-clock-bubble" role="status">
+          {text} left this turn
+        </span>
+      )}
     </span>
   );
 }

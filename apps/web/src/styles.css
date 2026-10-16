@@ -3311,16 +3311,52 @@ button.lobby-seat:disabled {
   min-width: 0;
 }
 
+.turn-clock-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
 .turn-clock {
-  font-size: 13px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
   color: var(--muted);
 }
 
 .turn-clock.urgent {
   color: var(--danger);
+}
+
+.turn-clock-face {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+}
+
+.turn-clock-left {
+  fill: currentColor;
+  opacity: 0.75;
+}
+
+.turn-clock-bubble {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: -8px;
+  z-index: 20;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .push-prompt {
