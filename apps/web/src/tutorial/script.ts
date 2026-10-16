@@ -101,16 +101,15 @@ export type Step = { place: Place } & (
 );
 
 const card = (s: brass.BrassState, id: string) => s.cards[id];
-/** Cards the plan needs later: kept out of "any card" moves (the hand shows them unusable). */
-const needed = (s: brass.BrassState, id: string) => {
+/** Whether a card is the Location card for a town (the tutorial names the card to use for each move). */
+const townCard = (s: brass.BrassState, id: string, town: brass.LocationId) => {
   const c = card(s, id);
-  return (
-    c?.kind === 'wildLocation' ||
-    c?.kind === 'wildIndustry' ||
-    (c?.kind === 'location' && (c.location === 'wolverhampton' || c.location === 'birmingham'))
-  );
+  return c?.kind === 'location' && c.location === town;
 };
-const spare = (s: brass.BrassState, id: string) => !needed(s, id);
+const industryCard = (s: brass.BrassState, id: string, industry: brass.Industry) => {
+  const c = card(s, id);
+  return c?.kind === 'industry' && c.industries.includes(industry);
+};
 /** The tutor keeps its Iron card for its Iron Works. */
 const tutorSpare = (s: brass.BrassState, id: string) => {
   const c = card(s, id);
@@ -130,13 +129,13 @@ export const STEPS: readonly Step[] = [
     kind: 'info',
     title: 'Welcome to Brass: Birmingham',
     place: 'middle',
-    text: "You're an entrepreneur in the Industrial Revolution: build industries, link towns with canals and railways, and sell your goods. The game has two halves, the Canal Era and the Rail Era, and whoever has the most victory points (VP) after both wins. This tutorial is a real game against Bot Richard, played with a plan, so you'll see why each move is made, not just how.",
+    text: "You're an entrepreneur in the Industrial Revolution: build industries, link towns with canals and railways, and sell your goods. The game has two halves, the Canal Era and the Rail Era, and whoever has the most victory points (VP) after both wins. This tutorial is a real game against Bot Richard.",
   },
   {
     kind: 'info',
     title: 'Money and VPs',
-    place: 'bottom',
-    text: 'Everyone starts with £17. Your money, income and VPs are shown up here. VPs mostly come at the end of each era, from your links and your flipped industry tiles: more on flipping soon.',
+    place: 'top',
+    text: 'Everyone starts with £17. Your money, income and VPs are shown up here. Most VPs are scored at the end of each era, from your links and your flipped industry tiles (more on flipping soon); a few Merchants also give VPs straight away, as a bonus for using their beer.',
     point: '.player-strip',
   },
   {
@@ -172,8 +171,8 @@ export const STEPS: readonly Step[] = [
     kind: 'do',
     title: 'Connect to the coal',
     place: 'bottom',
-    text: 'Tap Network, then the canal from Birmingham to Dudley, and any card. Canals cost £3. Your first link can go anywhere; after that, new links have to touch your network (towns with your tiles, or at the end of your links).',
-    allow: (a, s) => link(a, 'birmingham~dudley') && spare(s, a.card),
+    text: "Tap Network, then the canal from Birmingham to Dudley, and your Stafford card. Any card pays for a link, so spend one the plan doesn't need. Canals cost £3. Your first link can go anywhere; after that, new links have to touch your network (towns with your tiles, or at the end of your links).",
+    allow: (a, s) => link(a, 'birmingham~dudley') && townCard(s, a.card, 'stafford'),
     frame: DUDLEY,
   },
   {
@@ -194,8 +193,8 @@ export const STEPS: readonly Step[] = [
     kind: 'do',
     title: 'Take a loan',
     place: 'top',
-    text: "A loan gives you £30 straight away, but your income drops 3 levels, and you'll pay that every round until you earn it back by flipping tiles. Borrowing early, while there's lots of game left to use the money, is usually right. Tap Loan and any card.",
-    allow: (a, s) => a.type === 'loan' && spare(s, a.card),
+    text: "A loan gives you £30 straight away, but your income drops 3 levels, and you'll pay that every round until you earn it back by flipping tiles. Borrowing early, while there's lots of game left to use the money, is usually right. Tap Loan and your Pottery card.",
+    allow: (a, s) => a.type === 'loan' && industryCard(s, a.card, 'pottery'),
   },
   {
     kind: 'do',
@@ -248,8 +247,8 @@ export const STEPS: readonly Step[] = [
     kind: 'do',
     title: 'Connect to a Merchant',
     place: 'bottom',
-    text: "Now a buyer. Oxford buys goods: build the canal from Birmingham to Oxford, with any card. Your Wolverhampton Manufacturer gets there too, along Richard's canal and yours: links connect places whoever owns them.",
-    allow: (a, s) => link(a, 'birmingham~oxford') && spare(s, a.card),
+    text: "Now a buyer. Oxford buys goods: build the canal from Birmingham to Oxford, with your Worcester card. Your Wolverhampton Manufacturer gets there too, along Richard's canal and yours: links connect places whoever owns them.",
+    allow: (a, s) => link(a, 'birmingham~oxford') && townCard(s, a.card, 'worcester'),
     frame: HEARTLAND,
   },
   {
@@ -264,7 +263,7 @@ export const STEPS: readonly Step[] = [
     kind: 'info',
     title: 'Beer',
     place: 'top',
-    text: "Each Manufacturer needs a beer to sell. Oxford has a barrel of its own, and using it earns Oxford's bonus too: 2 more income. That's one. For the other we need a Brewery. Your own beer can be used anywhere, connected or not. But no card in your hand builds a Brewery anywhere useful.",
+    text: "Each Manufacturer needs a beer to sell. Oxford has a barrel of its own, and using it earns Oxford's bonus too: 2 more income. That's one. For the other we need a Brewery. Your own beer can be used anywhere, connected or not. But where can we build one? Your Brewery cards are Industry cards: they only build in your network, and none of its towns (Birmingham, Dudley, Wolverhampton) has a Brewery space. And none of your Location cards is for a town that does.",
     frame: HEARTLAND,
   },
   {
@@ -272,14 +271,14 @@ export const STEPS: readonly Step[] = [
     title: 'Scout for Wild cards',
     place: 'top',
     text: "Scouting swaps 3 cards for a Wild Location and a Wild Industry card, which build almost anywhere. It's for exactly this: when your hand doesn't fit your plan. Tap Scout and choose 3 cards.",
-    allow: (a, s) => a.type === 'scout' && a.cards.every((c) => spare(s, c)),
+    allow: (a) => a.type === 'scout',
   },
   {
     kind: 'do',
     title: 'Build a Brewery',
     place: 'bottom',
     text: "Tap Build, then your Wild Location card and any Brewery space on the map: Walsall is close by. A Brewery costs £5 and 1 iron, and comes with 1 barrel of beer (2 in the Rail Era). Richard's Develop used the last iron on his Iron Works (flipping it), so this iron is bought from the market.",
-    allow: (a, s) => a.type === 'build' && a.industry === 'brewery' && card(s, a.card)?.kind === 'wildLocation',
+    allow: (a) => a.type === 'build' && a.industry === 'brewery',
     frame: HEARTLAND,
   },
   {
@@ -294,7 +293,7 @@ export const STEPS: readonly Step[] = [
     kind: 'do',
     title: 'Sell both at once',
     place: 'bottom',
-    text: "One Sell action sells as many tiles as you like, as long as each has a buyer and a beer. Tap Sell and any card, then your Manufacturers one at a time, each to Oxford. One takes Oxford's barrel, the other your Brewery's. Confirm when both are in.",
+    text: "One Sell action sells as many tiles as you like, as long as each has a buyer and a beer. Tap Sell and any card, then your Manufacturers one at a time, each to Oxford. One takes Oxford's barrel, the other your Brewery's. Confirm when both are in. (The sale's details fill the bottom of the screen: tap − on this card to shrink it out of the way.)",
     allow: (a) => a.type === 'sell' && a.sales.every((x) => x.location === 'birmingham' || x.location === 'wolverhampton'),
     require: { match: (a) => a.type === 'sell' && a.sales.length === 2, hint: 'Add your other Manufacturer too: both sell in this one action.' },
     frame: HEARTLAND,
