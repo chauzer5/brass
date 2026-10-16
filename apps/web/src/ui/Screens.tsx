@@ -176,7 +176,7 @@ export function MatchSetup({ onStart, header }: { onStart: (names: string[], sea
 }
 
 const THEME_OPTIONS: { value: ThemeSetting; label: string }[] = [
-  { value: 'system', label: 'Match phone' },
+  { value: 'system', label: 'Match device' },
   { value: 'light', label: 'Light' },
   { value: 'dark', label: 'Dark' },
 ];
@@ -207,7 +207,7 @@ export function Settings({ onClose, inGame = false }: { onClose: () => void; inG
             </button>
           ))}
         </div>
-        <p className="muted">"Match phone" follows your phone's light or dark setting.</p>
+        <p className="muted">"Match device" follows your device's light or dark setting.</p>
         <button className="confirm" onClick={onClose}>
           Done
         </button>
