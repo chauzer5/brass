@@ -16,6 +16,7 @@ import { choosable, chosenSource, gloucesterBonus, sourceNeeds } from './game/so
 import { gameLog, recapSince, type RecapItem } from './game/recap.ts';
 import { runBot } from './bot/runBot.ts';
 import { Coach, useCoach } from './tutorial/Coach.tsx';
+import { useWide } from './ui/layout.ts';
 import { Online } from './online/OnlineScreens.tsx';
 import { normalizeCode } from '@brass/protocol';
 
@@ -114,6 +115,8 @@ export function Table({
 }) {
   const { match, names, seats } = game;
   const state = match.state;
+  // A big screen: the hand and the player's board sit in a sidebar beside the map instead of a drawer over it.
+  const wide = useWide();
   const outcome = brass.brassGame.outcome(state);
   // An era that ends while playing shows its scoring before anything else (and the game's end stays up until
   // dismissed to look at the board). Eras that ended before this game was opened aren't shown again.
@@ -435,8 +438,94 @@ export function Table({
     setPeek({ location: card.location, key: `${id}:${Date.now()}` });
   };
 
+  const tray = showTray && (
+        <HandTray
+          cards={view.cards}
+          hand={hand}
+          arriving={arriving}
+          usable={usable}
+          selected={selectedCards}
+          onPick={(id) => {
+            if (!draft.kind) return;
+            const next = pickCard(draft, id, view.cards, legal);
+            setDraft(next);
+            // Develop is played on the mat: once the card is chosen, show it.
+            if (next.kind === 'develop' && next.card) setTrayTab('mat');
+          }}
+          onDoubleTap={peekAt}
+          tucked={tucked}
+          onTuckedChange={setTucked}
+          tab={trayTab}
+          onTabChange={setTrayTab}
+          wide={wide}
+          mat={
+            <>
+            <div className="tray-income">
+              <h3>Income</h3>
+              <IncomeTrack players={view.players} focus={handOwner!} />
+            </div>
+            {bonus && bonus.options.length > 0 ? (
+              <PlayerMat
+                player={p!}
+                era={state.era}
+                picks={bonus.chosen ? [bonus.chosen] : []}
+                selectable={bonusOptions}
+                // Tapping the chosen industry again takes the bonus back.
+                onRow={(ind) => setBonus(ind === bonus.chosen ? null : ind)}
+                onUnpick={() => setBonus(null)}
+              />
+            ) : developing ? (
+              <PlayerMat
+                player={p!}
+                era={state.era}
+                picks={draft.industries}
+                selectable={developable}
+                onRow={(ind) => setDraft((d) => tapMatRow(d, ind, developable))}
+                onUnpick={(i) => setDraft((d) => ({ ...d, industries: d.industries.filter((_, j) => j !== i) }))}
+              />
+            ) : (
+              <PlayerMat player={p!} era={state.era} />
+            )}
+            </>
+          }
+          panelOnMat={developing || (bonus !== null && bonus.options.length > 0)}
+          header={
+            <>
+              Deck {view.deckSize} · Coal £{coalPrice} · Iron £{ironPrice}
+            </>
+          }
+        >
+          {message && <p className="error">{message}</p>}
+          {player !== null ? (
+            <StepPanel
+              view={view}
+              player={player}
+              legal={legal}
+              draft={draft}
+              setDraft={setDraft}
+              validate={(a) => brass.brassGame.validate(state, player, a)}
+              full={state}
+              names={names}
+              onPlay={submit}
+            />
+          ) : (
+            active !== null && (
+              <p className="hint bot-thinking">
+                {coach?.autoplay ? (
+                  'Fast-forwarding…'
+                ) : (
+                  <>
+                    <span className={`dot owner-${active}`} aria-hidden /> {names[active]} is playing…
+                  </>
+                )}
+              </p>
+            )
+          )}
+        </HandTray>
+  );
+
   return (
-    <div className="app">
+    <div className={`app ${wide ? 'wide' : ''}`}>
       <header className="topbar">
         <button className="brand" onClick={() => setMenuOpen((o) => !o)} aria-label="Menu" aria-expanded={menuOpen} aria-haspopup="menu">
           <img src="/icon.svg" alt="" className="brand-logo" />
@@ -500,6 +589,7 @@ export function Table({
           onLink={(id) => setDraft((d) => tapLink(view.cards, legal, d, id))}
           frame={hidden ? null : outcome && resultsHidden ? WHOLE_MAP : (sourceFrame ?? coach?.frame ?? null)}
           rail={showControls && state.phase.kind === 'actions'}
+          zoomControls={wide}
           focus={buildFocus ?? peek}
         />
         {showControls && state.phase.kind === 'actions' && (
@@ -518,91 +608,9 @@ export function Table({
             onUndo={() => undoLast?.()}
           />
         )}
-        {showTray && (
-          <HandTray
-            cards={view.cards}
-            hand={hand}
-            arriving={arriving}
-            usable={usable}
-            selected={selectedCards}
-            onPick={(id) => {
-              if (!draft.kind) return;
-              const next = pickCard(draft, id, view.cards, legal);
-              setDraft(next);
-              // Develop is played on the mat: once the card is chosen, show it.
-              if (next.kind === 'develop' && next.card) setTrayTab('mat');
-            }}
-            onDoubleTap={peekAt}
-            tucked={tucked}
-            onTuckedChange={setTucked}
-            tab={trayTab}
-            onTabChange={setTrayTab}
-            mat={
-              <>
-              <div className="tray-income">
-                <h3>Income</h3>
-                <IncomeTrack players={view.players} focus={handOwner!} />
-              </div>
-              {bonus && bonus.options.length > 0 ? (
-                <PlayerMat
-                  player={p!}
-                  era={state.era}
-                  picks={bonus.chosen ? [bonus.chosen] : []}
-                  selectable={bonusOptions}
-                  // Tapping the chosen industry again takes the bonus back.
-                  onRow={(ind) => setBonus(ind === bonus.chosen ? null : ind)}
-                  onUnpick={() => setBonus(null)}
-                />
-              ) : developing ? (
-                <PlayerMat
-                  player={p!}
-                  era={state.era}
-                  picks={draft.industries}
-                  selectable={developable}
-                  onRow={(ind) => setDraft((d) => tapMatRow(d, ind, developable))}
-                  onUnpick={(i) => setDraft((d) => ({ ...d, industries: d.industries.filter((_, j) => j !== i) }))}
-                />
-              ) : (
-                <PlayerMat player={p!} era={state.era} />
-              )}
-              </>
-            }
-            panelOnMat={developing || (bonus !== null && bonus.options.length > 0)}
-            header={
-              <>
-                Deck {view.deckSize} · Coal £{coalPrice} · Iron £{ironPrice}
-              </>
-            }
-          >
-            {message && <p className="error">{message}</p>}
-            {player !== null ? (
-              <StepPanel
-                view={view}
-                player={player}
-                legal={legal}
-                draft={draft}
-                setDraft={setDraft}
-                validate={(a) => brass.brassGame.validate(state, player, a)}
-                full={state}
-                names={names}
-                onPlay={submit}
-              />
-            ) : (
-              active !== null && (
-                <p className="hint bot-thinking">
-                  {coach?.autoplay ? (
-                    'Fast-forwarding…'
-                  ) : (
-                    <>
-                      <span className={`dot owner-${active}`} aria-hidden /> {names[active]} is playing…
-                    </>
-                  )}
-                </p>
-              )
-            )}
-          </HandTray>
-        )}
+        {!wide && tray}
       </main>
+      {wide && tray}
       {menuOpen && (
         <>
           {/* Tapping anywhere else closes the menu. */}

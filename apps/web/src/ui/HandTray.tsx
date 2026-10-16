@@ -141,6 +141,7 @@ export function HandTray({
   mat,
   panelOnMat = false,
   arriving,
+  wide = false,
   children,
 }: {
   cards: Record<brass.CardId, brass.Card>;
@@ -160,8 +161,11 @@ export function HandTray({
   /** Also show the step panel above the mat (for actions played on the mat, like Develop). */
   panelOnMat?: boolean;
   arriving?: Arriving | null | undefined;
+  /** A big screen: a sidebar showing the panel, the hand and the mat all at once (no tabs, nothing tucks away). */
+  wide?: boolean;
   children?: ReactNode;
 }) {
+  if (wide) tucked = false;
   const rowRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
 
@@ -295,7 +299,9 @@ export function HandTray({
 
   const n = hand.length;
   const stepFor = (perRow: number) => (perRow > 1 ? (width - CARD_WIDTH) / (perRow - 1) : CARD_WIDTH);
-  const rows = stepFor(n) >= MIN_PEEK ? 1 : 2;
+  // A sidebar has room to spare: cards never overlap there, wrapping to a second row instead.
+  const fit = Math.max(1, Math.floor((width + CARD_GAP) / (CARD_WIDTH + CARD_GAP)));
+  const rows = wide ? (n <= fit ? 1 : 2) : stepFor(n) >= MIN_PEEK ? 1 : 2;
   const perRow = Math.ceil(n / rows);
   const step = Math.min(CARD_WIDTH + CARD_GAP, stepFor(perRow));
   // Each row is centred; the last row may hold fewer cards.
@@ -345,11 +351,17 @@ export function HandTray({
   return (
     <section
       ref={trayRef}
-      className="hand-tray"
+      className={`hand-tray ${wide ? 'wide' : ''}`}
       data-tucked={tucked}
       data-dragging={drag !== null}
       style={follow ? { transform: `translateY(${follow}px)` } : undefined}
     >
+      {wide ? (
+        <div className="tray-bar">
+          <h3 className="tray-heading">Hand ({n})</h3>
+          <span className="tray-info">{header}</span>
+        </div>
+      ) : (
       <div
         className="tray-bar"
         onPointerDown={onBarDown}
@@ -378,15 +390,16 @@ export function HandTray({
         </span>
         <span className="tray-info">{header}</span>
       </div>
-      {(tab === 'hand' || panelOnMat) && children && <div className="tray-panel">{children}</div>}
-      {tab === 'mat' && (
+      )}
+      {(wide || tab === 'hand' || panelOnMat) && children && <div className="tray-panel">{children}</div>}
+      {!wide && tab === 'mat' && (
         // Collapses to nothing when tucked, sliding like the hand row does.
         <div className="tray-mat">
           <div className="tray-mat-scroll">{mat}</div>
         </div>
       )}
       <div
-        hidden={tab !== 'hand'}
+        hidden={!wide && tab !== 'hand'}
         className={`hand-row ${step < TIGHT_PEEK ? 'tight' : ''}`}
         data-peeking={peek !== null || dealing}
         ref={rowRef}
@@ -443,6 +456,12 @@ export function HandTray({
         })}
         </div>
       </div>
+      {wide && (
+        <div className="tray-side-mat">
+          <h3 className="tray-heading">Your board</h3>
+          {mat}
+        </div>
+      )}
     </section>
   );
 }

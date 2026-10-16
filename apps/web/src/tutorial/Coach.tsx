@@ -129,7 +129,8 @@ export function Coach({
     const root = document.documentElement.style;
     const tray = document.querySelector('.hand-tray');
     const set = () => {
-      const top = tray?.getBoundingClientRect().top ?? window.innerHeight;
+      // (On a big screen the hand is a sidebar beside the map, not over its bottom.)
+      const top = tray && !tray.classList.contains('wide') ? tray.getBoundingClientRect().top : window.innerHeight;
       root.setProperty('--tray-h', `${Math.max(0, window.innerHeight - top)}px`);
     };
     set();

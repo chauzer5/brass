@@ -50,6 +50,8 @@ interface BoardProps {
   frame?: { box: MapBox; key: string } | null | undefined;
   /** Whether the action rail is over the board's right edge (the map can then be dragged out from under it). */
   rail?: boolean;
+  /** Zoom buttons, for a mouse (a big screen); phones pinch instead. */
+  zoomControls?: boolean;
 }
 
 /** Holding a space this long explains why it can't be built on; moving further than the slop is a pan instead. */
@@ -365,6 +367,7 @@ export function Board({
   focus,
   frame,
   rail = true,
+  zoomControls = false,
 }: BoardProps) {
   const tiles = state?.tiles ?? {};
   // Tiles turning over during an animation, and when each starts.
@@ -475,8 +478,10 @@ export function Board({
     const unit = Math.min(svgW, svgH) / BOARD_SIZE;
     const offsetX = (svgW - BOARD_SIZE * unit) / 2;
     const view = wrapper.getBoundingClientRect();
+    // (Only a tray over the board counts: on a big screen it's a sidebar beside it.)
     const tray = document.querySelector('.hand-tray')?.getBoundingClientRect();
-    let visibleBottom = tray ? Math.min(view.bottom, tray.top) : view.bottom;
+    const trayOver = tray && tray.left < view.right && tray.right > view.left;
+    let visibleBottom = trayOver ? Math.min(view.bottom, tray.top) : view.bottom;
     // The tutorial's coach card covers the top or the bottom of the board: frame what's left.
     let visibleTop = view.top;
     const coach = document.querySelector('.coach')?.getBoundingClientRect();
@@ -605,7 +610,15 @@ export function Board({
         {why.text}
       </div>
     )}
-    <TransformWrapper ref={zoom} minScale={MIN_SCALE} maxScale={6} doubleClick={{ mode: 'zoomIn' }} onTransform={(_, { scale }) => {
+    <TransformWrapper
+      ref={zoom}
+      minScale={MIN_SCALE}
+      maxScale={6}
+      doubleClick={{ mode: 'zoomIn' }}
+      // A mouse wheel or trackpad zooms gently: the default step is per pixel scrolled, so one notch of a
+      // mouse wheel (100px) jumped 1.5x. This makes it about a quarter.
+      {...(zoomControls && { wheel: { step: 0.0025 } })}
+      onTransform={(_, { scale }) => {
         zoomScale.current = scale;
         fitHighlights();
       }}>
@@ -723,6 +736,19 @@ export function Board({
           {era && <EraAnimation key={era.id} era={era} />}
         </svg>
       </TransformComponent>
+      {zoomControls && (
+        <div className="zoom-controls" role="group" aria-label="Zoom">
+          <button onClick={() => zoom.current?.zoomIn(0.5)} aria-label="Zoom in" title="Zoom in">
+            +
+          </button>
+          <button onClick={() => zoom.current?.zoomOut(0.5)} aria-label="Zoom out" title="Zoom out">
+            −
+          </button>
+          <button onClick={() => zoom.current?.resetTransform()} aria-label="Show the whole map" title="Show the whole map">
+            ⤢
+          </button>
+        </div>
+      )}
     </TransformWrapper>
     </>
   );

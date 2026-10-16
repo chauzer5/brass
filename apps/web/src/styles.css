@@ -3342,3 +3342,109 @@ button.lobby-seat:disabled {
 .push-prompt button.confirm {
   width: auto;
 }
+
+/* ---- Big screens: the map beside a sidebar (see ui/layout.ts) ---- */
+
+.app.wide {
+  --side-w: clamp(380px, 30vw, 460px);
+  grid-template-columns: minmax(0, 1fr) var(--side-w);
+  grid-template-rows: auto auto 1fr;
+  grid-template-areas: 'top top' 'strip side' 'board side';
+}
+
+.app.wide .hand-tray {
+  grid-area: side;
+  position: static;
+  transform: none;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  gap: 6px;
+  padding-bottom: 16px;
+  background: var(--surface);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-top: 0;
+  border-left: 1px solid var(--line);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* The sidebar scrolls; its sections keep their full height. */
+.app.wide .hand-tray > * {
+  flex-shrink: 0;
+}
+
+.app.wide .tray-bar {
+  min-height: 0;
+  padding: 14px 16px 2px;
+  cursor: default;
+  touch-action: auto;
+}
+
+.app.wide .tray-panel {
+  max-height: none;
+  overflow: visible;
+}
+
+.tray-heading {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.tray-side-mat {
+  margin-top: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.tray-side-mat > .tray-heading {
+  padding: 0 16px 4px;
+}
+
+.tray-side-mat > .player-mat {
+  padding: 2px 12px 8px;
+}
+
+/* The tutorial's card sits over the map, not the sidebar. */
+.app.wide .coach {
+  right: calc(var(--side-w) + 12px);
+}
+
+.zoom-controls {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.zoom-controls button {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.zoom-controls button + button {
+  border-top: 1px solid var(--line);
+}
+
+.zoom-controls button:hover {
+  background: color-mix(in srgb, var(--line) 40%, transparent);
+}
