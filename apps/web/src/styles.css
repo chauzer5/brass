@@ -3464,10 +3464,6 @@ button.lobby-seat:disabled {
   font: inherit;
 }
 
-.join-link {
-  align-self: center;
-}
-
 .game-kind {
   grid-area: code;
   display: inline-flex;

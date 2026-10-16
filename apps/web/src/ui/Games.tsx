@@ -11,18 +11,16 @@ const MODE_KEY = 'brass:new-mode:v1';
 
 /**
  * Starting a game: on this device (pass it round, or play the bots) or online (friends on their own
- * phones). The last choice is remembered. Joining a friend's online game is from here too.
+ * phones). The last choice is remembered. (Joining a friend's online game is on the main menu.)
  */
 export function NewGameFlow({
   onBack,
   onStartLocal,
   onCreatedOnline,
-  onJoin,
 }: {
   onBack: () => void;
   onStartLocal: (names: string[], seats: Seat[]) => void;
   onCreatedOnline: (ticket: SavedTicket) => void;
-  onJoin: () => void;
 }) {
   const [mode, setModeState] = useState<Mode>(() => {
     try {
@@ -62,11 +60,6 @@ export function NewGameFlow({
           </button>
         ))}
       </div>
-      {mode === 'online' && (
-        <button className="link-button join-link" onClick={onJoin}>
-          Have a code? Join a friend's game
-        </button>
-      )}
     </>
   );
   return mode === 'local' ? (

@@ -91,7 +91,7 @@ export function App() {
   if (screen.kind === 'online') {
     return <OnlineGame key={screen.ticket.code} ticket={screen.ticket} onBack={menu} onNewGame={() => setScreen({ kind: 'new' })} />;
   }
-  if (screen.kind === 'join') return <JoinGame initialCode={screen.code} onBack={() => setScreen({ kind: 'new' })} onJoined={openOnline} />;
+  if (screen.kind === 'join') return <JoinGame initialCode={screen.code} onBack={menu} onJoined={openOnline} />;
   if (screen.kind === 'new') {
     return (
       <NewGameFlow
@@ -101,7 +101,6 @@ export function App() {
           setScreen({ kind: 'local' });
         }}
         onCreatedOnline={openOnline}
-        onJoin={() => setScreen({ kind: 'join', code: '' })}
       />
     );
   }
@@ -119,6 +118,7 @@ export function App() {
     <MainMenu
       onResume={lastTicket ? () => openOnline(lastTicket) : lastLocal ? () => openLocal(lastLocal) : undefined}
       onNew={() => setScreen({ kind: 'new' })}
+      onJoin={() => setScreen({ kind: 'join', code: '' })}
       onList={() => setScreen({ kind: 'list' })}
       onTutorial={() => {
         local.startTutorial();

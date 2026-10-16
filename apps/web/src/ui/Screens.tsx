@@ -14,17 +14,20 @@ const BOT_NAMES = ['Bot Richard', 'Bot George', 'Bot Eleanor'];
 export const DIFFICULTY_LABEL: Record<brass.BotDifficulty, string> = { easy: 'Easy', normal: 'Medium', hard: 'Hard' };
 
 /**
- * The main menu: carry on, start a game, the list of games, learn, read the rules, settings.
+ * The main menu: carry on, start or join a game, the list of games, learn, read the rules, settings.
  * New games, the list of games and the games themselves are pages of their own.
  */
 export function MainMenu({
   onResume,
   onNew,
+  onJoin,
   onList,
   onTutorial,
 }: {
   onResume?: (() => void) | undefined;
   onNew: () => void;
+  /** Joining a friend's online game with its code. */
+  onJoin: () => void;
   onList: () => void;
   onTutorial: () => void;
 }) {
@@ -43,6 +46,9 @@ export function MainMenu({
         )}
         <button className={onResume ? 'secondary' : 'confirm'} onClick={onNew}>
           New game
+        </button>
+        <button className="secondary" onClick={onJoin}>
+          Join game
         </button>
         <button className="secondary" onClick={onList}>
           Games list
