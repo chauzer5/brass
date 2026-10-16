@@ -3267,3 +3267,12 @@ button.lobby-seat:disabled {
   border: 1px solid var(--line);
   box-shadow: var(--shadow);
 }
+
+.app-notice {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--highlight) 60%, var(--line));
+  background: color-mix(in srgb, var(--highlight) 12%, var(--surface));
+  font-size: 14px;
+  line-height: 1.4;
+}

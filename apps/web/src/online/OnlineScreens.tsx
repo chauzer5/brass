@@ -304,6 +304,12 @@ function JoinGame({ initialCode, onBack, onJoined }: { initialCode: string; onBa
           </button>
           <h2>Join game</h2>
         </div>
+        {inIosBrowser && (
+          <p className="notice app-notice">
+            <strong>Have Brass on your home screen?</strong> Open it and tap Play online → Join with code. A game joined here, in the
+            browser, won't show up in the app.
+          </p>
+        )}
         <h3>Game code</h3>
         <input
           className="code-input"
@@ -462,16 +468,8 @@ function Lobby({
 }) {
   const [copied, setCopied] = useState(false);
   const waiting = seats.filter((s) => s.kind === 'human' && !s.name).length;
-  const share = async () => {
-    const url = joinLink(code);
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: 'Brass', text: `Join my game of Brass: code ${code}`, url });
-        return;
-      } catch {
-        // Cancelled, or not allowed: copy it instead.
-      }
-    }
+  const url = joinLink(code);
+  const copy = async () => {
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
@@ -480,6 +478,7 @@ function Lobby({
       // Nothing more to try: the code is on screen.
     }
   };
+  const share = () => navigator.share({ title: 'Brass', text: `Join my game of Brass (code ${code}):`, url }).catch(() => {});
 
   return (
     <div className="screen">
@@ -494,9 +493,16 @@ function Lobby({
         <div className="lobby-code" aria-label={`Game code ${code.split('').join(' ')}`}>
           {code}
         </div>
-        <button className="secondary" onClick={share}>
-          {copied ? 'Link copied' : 'Share link'}
-        </button>
+        <div className="online-actions">
+          <button className="secondary" onClick={copy}>
+            {copied ? 'Copied!' : 'Copy link'}
+          </button>
+          {'share' in navigator && (
+            <button className="secondary" onClick={share}>
+              Share…
+            </button>
+          )}
+        </div>
         <h3>Players</h3>
         <div className="name-list">
           {seats.map((s, i) => (
@@ -522,6 +528,15 @@ function Lobby({
     </div>
   );
 }
+
+/**
+ * Opened in Safari on an iPhone or iPad, not the home-screen app. Links there always open in the browser,
+ * and the browser keeps its games apart from the app's.
+ */
+const inIosBrowser =
+  (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.userAgent.includes('Macintosh') && navigator.maxTouchPoints > 1)) &&
+  !(navigator as { standalone?: boolean }).standalone &&
+  !matchMedia('(display-mode: standalone)').matches;
 
 const errorText = (e: unknown) =>
   e instanceof TypeError ? "Can't reach the game server. Check your connection." : e instanceof Error ? e.message : String(e);

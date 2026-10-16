@@ -1,10 +1,13 @@
 {
+  "id": "/",
   "name": "Brass",
   "short_name": "Brass",
   "description": "Brass: Birmingham, playable in the browser.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "launch_handler": { "client_mode": ["navigate-existing", "auto"] },
+  "handle_links": "preferred",
   "orientation": "any",
   "background_color": "#1f140c",
   "theme_color": "#2b1d14",
