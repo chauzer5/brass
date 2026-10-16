@@ -433,14 +433,19 @@ export function Board({
     const canExplain = !!explainSlot && !tappable;
     if (!canPeek && !canExplain) return undefined;
     return {
+      // With a mouse, an unflipped tile shows its back as soon as the pointer is over it.
+      onPointerEnter: (e: ReactPointerEvent) => {
+        if (e.pointerType === 'mouse' && canPeek) setPeek({ tile: tile!, x: e.clientX, y: e.clientY });
+      },
       onPointerDown: (e: ReactPointerEvent) => {
         if (e.button !== 0) return;
         held.current = false;
-        const { clientX: x, clientY: y } = e;
+        const { clientX: x, clientY: y, pointerType } = e;
         const timer = window.setTimeout(() => {
           const text = canExplain ? explainSlot!(location, slot) : null;
           if (text) setWhy({ text, x, y });
-          else if (canPeek) setPeek({ tile: tile!, x, y });
+          // (A mouse already sees the tile's back on hover.)
+          else if (canPeek && pointerType !== 'mouse') setPeek({ tile: tile!, x, y });
           else return;
           held.current = true;
           navigator.vibrate?.(8);
@@ -449,7 +454,11 @@ export function Board({
       },
       onPointerMove: (e: ReactPointerEvent) => {
         const h = hold.current;
-        if (h && Math.hypot(e.clientX - h.x, e.clientY - h.y) > HOLD_SLOP) endHold();
+        if (!h || Math.hypot(e.clientX - h.x, e.clientY - h.y) <= HOLD_SLOP) return;
+        if (e.pointerType !== 'mouse') return endHold();
+        // A mouse moving on: no hold, but the hovered tile's back stays up.
+        clearTimeout(h.timer);
+        hold.current = null;
       },
       onPointerUp: endHold,
       onPointerCancel: endHold,

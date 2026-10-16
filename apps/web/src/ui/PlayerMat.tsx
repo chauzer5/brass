@@ -84,6 +84,9 @@ function eraNote(tile: brass.TileLevel, era: brass.Era): string | null {
   return null;
 }
 
+/** A mouse (or trackpad) can hover: levels show their tile when pointed at, rather than held. */
+const canHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+
 /** Holding a level box this long shows that level's tile in place of the next one. */
 const HOLD_MS = 250;
 /** A finger that moves further than this (px) before the hold kicks in is a scroll, not a hold. */
@@ -114,7 +117,8 @@ function useInspect() {
     onPointerDown: (e: PointerEvent<HTMLDivElement>) => {
       swallowClick.current = false;
       const start = levelAt(e.clientX, e.clientY);
-      if (!start || e.button !== 0) return;
+      // A mouse sees levels on hover (below), so a click is just a click.
+      if (!start || e.button !== 0 || e.pointerType === 'mouse') return;
       const target = e.currentTarget;
       const { pointerId } = e;
       const timer = window.setTimeout(() => {
@@ -126,6 +130,12 @@ function useInspect() {
       hold.current = { x: e.clientX, y: e.clientY, timer };
     },
     onPointerMove: (e: PointerEvent<HTMLDivElement>) => {
+      // With a mouse, the level under the pointer shows its tile.
+      if (e.pointerType === 'mouse') {
+        const at = levelAt(e.clientX, e.clientY);
+        if (at?.industry !== inspect?.industry || at?.level !== inspect?.level) setInspect(at);
+        return;
+      }
       const h = hold.current;
       if (!h) return;
       if (!inspect) {
@@ -138,8 +148,9 @@ function useInspect() {
         navigator.vibrate?.(4);
       }
     },
-    onPointerUp: end,
+    onPointerUp: (e: PointerEvent<HTMLDivElement>) => e.pointerType !== 'mouse' && end(),
     onPointerCancel: end,
+    onPointerLeave: (e: PointerEvent<HTMLDivElement>) => e.pointerType === 'mouse' && end(),
     onContextMenu: (e: { preventDefault: () => void }) => e.preventDefault(),
     onClickCapture: (e: { stopPropagation: () => void }) => {
       // The release that ends a hold shouldn't also pick a row.
@@ -299,7 +310,7 @@ export function PlayerMat({
         <span>
           <Glyph kind="link" /> {player.linksInSupply} link tiles left
         </span>
-        <span>Hold a level to see its tile</span>
+        <span>{canHover ? 'Point at a level to see its tile' : 'Hold a level to see its tile'}</span>
         <span className="mat-legend">
           <span className="legend-swatch canal-only" /> Canal only
           <span className="legend-swatch rail-only" /> Rail only
