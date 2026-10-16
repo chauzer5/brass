@@ -1,8 +1,32 @@
 import { useState } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 
-/** How often an open app checks for a new version (installed apps can stay open for days). */
-const CHECK_EVERY_MS = 60 * 60 * 1000;
+/** How often an app left on screen checks for a new version (installed apps can stay open for days). */
+const CHECK_EVERY_MS = 15 * 60 * 1000;
+/** Coming back to the app checks too, but not more often than this. */
+const MIN_GAP_MS = 60 * 1000;
+
+/**
+ * Browsers only look for a new version when a page loads (or about once a day). An installed app
+ * isn't reloaded when it comes back from the background, and phones pause timers while it's away, so
+ * without this a new version was only noticed after closing the app completely. So: check whenever
+ * the app comes back on screen or back online, and every so often while it's open.
+ */
+function watchForUpdates(registration: ServiceWorkerRegistration) {
+  let last = Date.now();
+  const check = (force = false) => {
+    if (!force && Date.now() - last < MIN_GAP_MS) return;
+    last = Date.now();
+    registration.update().catch(() => {});
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') check();
+  });
+  window.addEventListener('online', () => check(true));
+  window.setInterval(() => {
+    if (document.visibilityState === 'visible') check(true);
+  }, CHECK_EVERY_MS);
+}
 
 /**
  * Switches to the downloaded version and reloads. The plugin's own reload waits for the new version to
@@ -38,7 +62,7 @@ export function UpdatePrompt() {
     updateServiceWorker,
   } = useRegisterSW({
     onRegisteredSW(_url, registration) {
-      if (registration) setInterval(() => registration.update().catch(() => {}), CHECK_EVERY_MS);
+      if (registration) watchForUpdates(registration);
     },
   });
   const [updating, setUpdating] = useState(false);
