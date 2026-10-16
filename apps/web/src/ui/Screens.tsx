@@ -11,7 +11,7 @@ import { useTheme, type ThemeSetting } from '../settings.ts';
 /** Bots are named after the players on the front of the Brass rulebook. */
 const BOT_NAMES = ['Bot Richard', 'Bot George', 'Bot Eleanor'];
 
-const DIFFICULTY_LABEL: Record<brass.BotDifficulty, string> = { easy: 'Easy', normal: 'Medium', hard: 'Hard' };
+export const DIFFICULTY_LABEL: Record<brass.BotDifficulty, string> = { easy: 'Easy', normal: 'Medium', hard: 'Hard' };
 
 /**
  * The main menu: carry on, start a game, learn, read the rules, settings.
@@ -21,10 +21,12 @@ export function NewGame({
   onStart,
   onResume,
   onTutorial,
+  onOnline,
 }: {
   onStart: (names: string[], seats: Seat[]) => void;
   onResume?: (() => void) | undefined;
   onTutorial: () => void;
+  onOnline: () => void;
 }) {
   const [page, setPage] = useState<'menu' | 'setup' | 'settings' | 'rulebook'>('menu');
   if (page === 'settings') return <Settings onClose={() => setPage('menu')} />;
@@ -42,6 +44,9 @@ export function NewGame({
         )}
         <button className={onResume ? 'secondary' : 'confirm'} onClick={() => setPage('setup')}>
           New game
+        </button>
+        <button className="secondary" onClick={onOnline}>
+          Play online
         </button>
         <button className="secondary" onClick={onTutorial}>
           Learn to play

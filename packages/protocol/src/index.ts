@@ -57,6 +57,9 @@ export interface LobbyInfo {
   code: string;
   status: GameStatus;
   seats: PublicSeat[];
+  /** Whose turn it is (null in the lobby, or once the game is over). */
+  current: number | null;
+  finished: boolean;
 }
 
 // ---- WebSocket ----

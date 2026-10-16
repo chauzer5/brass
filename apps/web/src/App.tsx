@@ -1,5 +1,5 @@
 import { brass } from '@brass/engine';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Board, MARKET_BOX, cubesDuration, eraDuration, goodsDuration, saleDuration, type MarketSale } from './board/Board.tsx';
 import { effectsOf, type CubeScene, type EraScene, type GoodsSale } from './game/effects.ts';
 import { EMPTY_DRAFT, availableKinds, compose, developIndustries, highlights, tapLink, usableCards, type Draft } from './game/draft.ts';
@@ -16,6 +16,8 @@ import { choosable, chosenSource, gloucesterBonus, sourceNeeds } from './game/so
 import { gameLog, recapSince, type RecapItem } from './game/recap.ts';
 import { runBot } from './bot/runBot.ts';
 import { Coach, useCoach } from './tutorial/Coach.tsx';
+import { Online } from './online/OnlineScreens.tsx';
+import { normalizeCode } from '@brass/protocol';
 
 /** Looking over a finished game: the whole map. */
 const WHOLE_MAP = { box: { x0: 0, y0: 0, x1: 1000, y1: 1000 }, key: 'whole-map' };
@@ -25,13 +27,25 @@ const BOT_PAUSE_MS = 900;
 /** The tutorial's fast-forward. */
 const FAST_BOT_PAUSE_MS = 120;
 
+/** A join link (/?join=CODE) opens that game's join page; the link is then cleared from the address. */
+function takeJoinCode(): string | undefined {
+  const code = new URLSearchParams(location.search).get('join');
+  if (code === null) return undefined;
+  history.replaceState(null, '', location.pathname);
+  return normalizeCode(code);
+}
+
 export function App() {
   const { game, start, play, playBot, undoLast, quit, startTutorial, exitTutorial, keepPlaying, introDone } = useGame();
+  const [join] = useState(takeJoinCode);
+  const [online, setOnline] = useState(join !== undefined);
   const [showSetup, setShowSetup] = useState(!game);
 
+  if (online) return <Online join={join} onBack={() => setOnline(false)} />;
   if (!game || showSetup) {
     return (
       <NewGame
+        onOnline={() => setOnline(true)}
         onStart={(names, seats) => {
           start(names, seats);
           setShowSetup(false);
@@ -65,26 +79,35 @@ export function App() {
   );
 }
 
-function Table({
+export function Table({
   game,
   play,
   playBot,
   undoLast,
   onMenu,
+  menuLabel = 'Main menu',
   onNewGame,
   onExitTutorial,
   onKeepPlaying,
   onIntroDone,
+  runsBots = true,
+  status,
 }: {
   game: Game;
   play: (player: number, action: brass.BrassAction) => string | null;
   playBot: (player: number, action: brass.BrassAction, at: number) => void;
-  undoLast: () => void;
+  /** Missing online: moves there can't be taken back. */
+  undoLast?: (() => void) | undefined;
   onMenu: () => void;
+  menuLabel?: string;
   onNewGame: () => void;
   onExitTutorial: () => void;
   onKeepPlaying: () => void;
   onIntroDone: () => void;
+  /** Bots' turns are worked out on this device (online, only one phone plays them). */
+  runsBots?: boolean;
+  /** Shown in the top bar (online: the connection). */
+  status?: ReactNode;
 }) {
   const { match, names, seats } = game;
   const state = match.state;
@@ -108,11 +131,12 @@ function Table({
   const animating = sale !== null || goods !== null || cubes !== null || scoringToPlay;
   // The tutorial's coach, when this is the tutorial.
   const coach = useCoach({ enabled: !!game.tutorial, match, playBot, busy: animating, summaryOpen });
-  // Whose turn it is; `player` is that player only when it's a human at the device (bots play themselves).
+  // Whose turn it is; `player` is that player only when it's a human at the device (bots play themselves,
+  // and online, other people play on their own phones).
   const active = brass.currentPlayer(state);
   const isBot = (id: number) => coach?.autoplay || seats[id]?.kind === 'bot';
   const humans = seats.flatMap((s, i) => (s.kind === 'human' ? [i] : []));
-  const player = active !== null && !isBot(active) ? active : null;
+  const player = active !== null && !isBot(active) && seats[active]?.kind === 'human' ? active : null;
   // With one human, their hand stays on screen through the bots' turns; with several, nobody's does.
   const soleHuman = humans.length === 1 ? humans[0]! : null;
   const handOwner = player ?? soleHuman;
@@ -352,7 +376,7 @@ function Table({
   // Bots take their own turns: one action at a time, after a pause so the table can follow along, and not
   // while an animation or the end-of-era summary is showing.
   // (The tutorial's tutor plays scripted moves instead, except when fast-forwarding.)
-  const botTurn = active !== null && isBot(active) && !outcome && !summaryOpen && !animating && !intro && (!coach || coach.autoplay);
+  const botTurn = runsBots && active !== null && isBot(active) && !outcome && !summaryOpen && !animating && !intro && (!coach || coach.autoplay);
   useEffect(() => {
     if (!botTurn || active === null) return;
     const seat = seats[active]!;
@@ -424,6 +448,7 @@ function Table({
             </>
           )}
         </span>
+        {status}
       </header>
       <PlayerStrip
         view={view}
@@ -486,8 +511,8 @@ function Table({
                 setTrayTab('hand');
               }
             }}
-            canUndo={!coach && canUndo(match)}
-            onUndo={undoLast}
+            canUndo={!coach && !!undoLast && canUndo(match)}
+            onUndo={() => undoLast?.()}
           />
         )}
         {showTray && (
@@ -582,7 +607,7 @@ function Table({
           <div className="game-menu" role="menu">
             {(
               [
-                coach ? (['Exit tutorial', onExitTutorial] as const) : (['Main menu', onMenu] as const),
+                coach ? (['Exit tutorial', onExitTutorial] as const) : ([menuLabel, onMenu] as const),
                 ['Game log', () => setSheet('log')],
                 ...(__RULEBOOK__ ? ([['Rulebook', () => setSheet('rulebook')]] as const) : []),
                 ['Settings', () => setSheet('settings')],

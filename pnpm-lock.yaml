@@ -39,6 +39,9 @@ importers:
       '@brass/engine':
         specifier: workspace:*
         version: link:../../packages/engine
+      '@brass/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
       react:
         specifier: ^19.3.0
         version: 19.3.0

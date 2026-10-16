@@ -167,7 +167,16 @@ export class GameRoom extends DurableObject<Env> {
 
   async info(): Promise<LobbyInfo | null> {
     const game = await this.load();
-    return game && { code: game.code, status: game.status, seats: this.publicSeats(game) };
+    if (!game) return null;
+    const match = this.matchOf(game);
+    const finished = !!brass.brassGame.outcome(match.state);
+    return {
+      code: game.code,
+      status: game.status,
+      seats: this.publicSeats(game),
+      current: game.status === 'playing' && !finished ? brass.currentPlayer(match.state) : null,
+      finished,
+    };
   }
 
   async join(req: JoinGameRequest): Promise<SeatTicket | { error: string; status: number }> {

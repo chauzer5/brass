@@ -4,8 +4,8 @@ import { TUTORIAL_NAMES, TUTORIAL_PRESET, TUTORIAL_SEED } from '../tutorial/scri
 
 export type BrassMatch = Match<brass.BrassConfig, brass.BrassState, brass.BrassAction>;
 
-/** Who plays a seat: a person at the device, or a bot at some difficulty. */
-export type Seat = { kind: 'human' } | { kind: 'bot'; difficulty: brass.BotDifficulty };
+/** Who plays a seat: a person at the device, a bot at some difficulty, or (online) a person on another phone. */
+export type Seat = { kind: 'human' } | { kind: 'bot'; difficulty: brass.BotDifficulty } | { kind: 'remote' };
 
 export const HUMAN: Seat = { kind: 'human' };
 
