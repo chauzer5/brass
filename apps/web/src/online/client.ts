@@ -140,7 +140,8 @@ export function saveName(name: string) {
 }
 
 /** The link that opens the app on a game's join page. */
-export const joinLink = (code: string) => `${location.origin}/?join=${code}`;
+// (Through the invite page, so a link sent in a message shows a proper preview; see vite.config.ts.)
+export const joinLink = (code: string) => `${location.origin}/invite/?join=${code}`;
 
 // ---- A live game ----
 

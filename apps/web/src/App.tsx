@@ -30,11 +30,11 @@ const BOT_PAUSE_MS = 900;
 /** The tutorial's fast-forward. */
 const FAST_BOT_PAUSE_MS = 120;
 
-/** A join link (/?join=CODE) opens that game's join page; the link is then cleared from the address. */
+/** A join link (/invite/?join=CODE, or /?join=CODE) opens that game's join page; the address is then tidied back to /. */
 function takeJoinCode(): string | undefined {
   const code = new URLSearchParams(location.search).get('join');
   if (code === null) return undefined;
-  history.replaceState(null, '', location.pathname);
+  history.replaceState(null, '', '/');
   return normalizeCode(code);
 }
 

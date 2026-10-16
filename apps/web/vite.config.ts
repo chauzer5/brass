@@ -11,9 +11,50 @@ import { existsSync, readdirSync } from 'node:fs';
 const rulebookDir = new URL('./public/rulebook/', import.meta.url);
 const rulebookPages = existsSync(rulebookDir) ? readdirSync(rulebookDir).filter((f) => /^page-\d+\.jpg$/.test(f)).length : 0;
 
+/**
+ * The page invite links open (/invite/?join=CODE). It's only there for its preview: messaging apps
+ * show its title, description and picture instead of a bare link. It sends people straight on to the
+ * game's join page. (In the installed app, which serves every page itself, the app reads the code
+ * from the address the same way.) Previews need the picture's full address: the site's own, which
+ * Vercel provides when it builds.
+ */
+const site = process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL;
+const INVITE_TITLE = "You've been invited to a game of Brass: Birmingham!";
+const INVITE_TEXT = 'Tap to join the game.';
+const invitePage = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${INVITE_TITLE}</title>
+    <meta name="description" content="${INVITE_TEXT}" />
+    <meta property="og:title" content="${INVITE_TITLE}" />
+    <meta property="og:description" content="${INVITE_TEXT}" />
+    <meta property="og:site_name" content="Brass" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="${site ? `https://${site}` : ''}/invite-card.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#2b1d14" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <script>
+      location.replace('/' + location.search);
+    </script>
+  </head>
+  <body style="background: #1f140c"></body>
+</html>
+`;
+
 export default defineConfig({
   plugins: [
     react(),
+    {
+      name: 'invite-page',
+      generateBundle() {
+        this.emitFile({ type: 'asset', fileName: 'invite/index.html', source: invitePage });
+      },
+    },
     // A service worker that keeps a copy of the whole app on the device, so it starts without a
     // connection. New versions download in the background and wait for the player to reload.
     VitePWA({
