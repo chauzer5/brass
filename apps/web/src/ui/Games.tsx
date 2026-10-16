@@ -95,7 +95,7 @@ export function GamesList({
       const outcome = brass.brassGame.outcome(state);
       const current = brass.currentPlayer(state);
       const humans = game.seats.filter((s) => s.kind === 'human').length;
-      const era = `${state.era === 'canal' ? 'Canal' : 'Rail'} round ${state.round}`;
+      const era = `${state.era === 'canal' ? 'Canal' : 'Rail'} Era · Round ${state.round}/${brass.ROUNDS_PER_ERA[state.playerCount]}`;
       const status = outcome
         ? `Finished · ${outcome.ranking
             .filter((r) => r.rank === 1)

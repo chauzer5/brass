@@ -192,6 +192,7 @@ button {
   display: flex;
   align-items: center;
   gap: 8px;
+  white-space: nowrap;
   color: inherit;
   font: inherit;
   font-weight: 700;
@@ -225,6 +226,33 @@ button {
 .topbar-status {
   color: var(--muted);
   font-size: 14px;
+}
+
+.topbar-status > span {
+  white-space: nowrap;
+}
+
+.topbar-action::before {
+  content: ' · ';
+  white-space: pre;
+}
+
+/* A phone's top bar has no room for it all on one line: the action goes underneath. */
+@media (max-width: 480px) {
+  .topbar-status {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.25;
+  }
+
+  .topbar-action {
+    font-size: 12px;
+  }
+
+  .topbar-action::before {
+    content: none;
+  }
 }
 
 .board-area {

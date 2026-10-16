@@ -578,12 +578,13 @@ export function Table({
           Brass ☰
         </button>
         <span className="topbar-status">
-          {state.era === 'canal' ? 'Canal' : 'Rail'} · Round {state.round}
+          <span>
+            {state.era === 'canal' ? 'Canal' : 'Rail'} Era · Round {state.round}/{brass.ROUNDS_PER_ERA[state.playerCount]}
+          </span>
           {state.phase.kind === 'actions' && player !== null && (
-            <>
-              {' '}
-              · Action {state.actionsTaken + 1}/{actionsThisTurn}
-            </>
+            <span className="topbar-action">
+              Action {state.actionsTaken + 1}/{actionsThisTurn}
+            </span>
           )}
         </span>
         {status}
