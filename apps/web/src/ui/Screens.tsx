@@ -39,11 +39,11 @@ export function NewGame({
         <h1 className="menu-title">Brass: Birmingham</h1>
         {onResume && (
           <button className="confirm" onClick={onResume}>
-            Resume saved game
+            Resume local game
           </button>
         )}
         <button className={onResume ? 'secondary' : 'confirm'} onClick={() => setPage('setup')}>
-          New game
+          New local game
         </button>
         <button className="secondary" onClick={onOnline}>
           Play online
@@ -106,7 +106,7 @@ function MatchSetup({
           <button className="close" onClick={onBack} aria-label="Back to menu">
             ‹
           </button>
-          <h2>New game</h2>
+          <h2>New local game</h2>
         </div>
         <p className="muted">
           {humans === 1 ? 'You against the bots.' : 'Pass the device between players; bots take their turns on their own.'}

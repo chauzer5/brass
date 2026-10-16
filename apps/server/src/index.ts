@@ -6,7 +6,6 @@ import {
   TURN_LIMITS,
   CODE_LENGTH,
   normalizeCode,
-  type CancelReason,
   type ClientMessage,
   type CreateGameRequest,
   type GameSnapshot,
@@ -54,7 +53,8 @@ interface StoredGame {
   seats: StoredSeat[];
   createdAt: number;
   leftBy?: number;
-  cancelReason?: CancelReason;
+  /** Whoever made the game (missing in older games: the first person's seat). */
+  host?: number;
   /** The most a turn may take, in seconds. */
   turnLimit?: number;
   /** When the current player's turn began (ms). */
@@ -73,6 +73,9 @@ const CORS = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...CORS } });
 const fail = (message: string, status = 400) => json({ error: message }, status);
+
+/** The host's seat (older games, from before there was one: the first person's). */
+const hostOf = (game: StoredGame) => game.host ?? game.seats.findIndex((s) => s.kind === 'human');
 
 /** "3 minutes", "1 hour", "1 day". */
 function limitText(seconds: number): string {
@@ -204,6 +207,7 @@ export class GameRoom extends DurableObject<Env> {
       log: [],
       seats: stored,
       createdAt: Date.now(),
+      host: first,
       ...(turnLimit && { turnLimit }),
     };
     if (game.status === 'playing') game.turnStartedAt = Date.now();
@@ -224,7 +228,6 @@ export class GameRoom extends DurableObject<Env> {
       current: game.status === 'playing' && !finished ? brass.currentPlayer(match.state) : null,
       finished,
       leftBy: game.leftBy ?? null,
-      cancelReason: game.cancelReason ?? null,
     };
   }
 
@@ -245,7 +248,7 @@ export class GameRoom extends DurableObject<Env> {
     else await this.ctx.storage.setAlarm(at);
   }
 
-  /** The turn ran out: the game is cancelled, as if that player had left. */
+  /** The turn ran out: the player passes (with a random card) for whatever is left of their turn. */
   override async alarm() {
     const game = await this.load();
     if (!game) return;
@@ -255,12 +258,32 @@ export class GameRoom extends DurableObject<Env> {
       await this.ctx.storage.setAlarm(at);
       return;
     }
-    game.status = 'cancelled';
-    game.leftBy = brass.currentPlayer(this.matchOf(game).state)!;
-    game.cancelReason = 'timeout';
+    let match = this.matchOf(game);
+    const player = brass.currentPlayer(match.state)!;
+    // Each action left this turn is a Pass (or, when they must sell tiles to cover a debt, a random one).
+    for (let i = 0; i < 8; i++) {
+      const legal = brass.brassGame.legalActions(match.state, player);
+      const passes = legal.filter((a) => a.type === 'pass');
+      const options = passes.length > 0 ? passes : legal;
+      const r = act(brass.brassGame, match, player, options[Math.floor(Math.random() * options.length)]!);
+      if (!r.ok) break;
+      match = r.value;
+      const s = match.state;
+      if (brass.brassGame.outcome(s) || brass.currentPlayer(s) !== player || (s.phase.kind === 'actions' && s.actionsTaken === 0)) break;
+    }
+    this.match = match;
+    game.log = match.log;
+    game.turnStartedAt = Date.now();
     await this.save(game);
+    await this.scheduleTimeout(game);
     this.broadcast(game);
-    this.notifyCancelled(game);
+    const name = this.nameOf(game, player);
+    for (const ws of this.ctx.getWebSockets()) {
+      const you = Number(this.ctx.getTags(ws)[0]);
+      this.send(ws, { t: 'notice', message: you === player ? 'You ran out of time, so you passed.' : `${name} ran out of time, so they passed.` });
+    }
+    this.notify(game, [player], () => ({ title: 'Your turn ran out', body: `You passed in game ${game.code}.` }));
+    this.afterMove(game, player);
   }
 
   async leave(req: LeaveGameRequest): Promise<{ ok: true } | { error: string; status: number }> {
@@ -273,11 +296,13 @@ export class GameRoom extends DurableObject<Env> {
     if (game.status === 'lobby') {
       // The seat is free again; with nobody left waiting, the game is called off.
       game.seats[seat] = { kind: 'human', name: null, token: null };
-      if (!game.seats.some((s) => s.kind === 'human' && s.token)) game.status = 'cancelled';
+      const seated = game.seats.findIndex((s) => s.kind === 'human' && !!s.token);
+      if (seated < 0) game.status = 'cancelled';
+      // The host leaving hands the game (and starting it) to the next person in it.
+      else if (hostOf(game) === seat) game.host = seated;
     } else {
       game.status = 'cancelled';
       game.leftBy = seat;
-      game.cancelReason = 'left';
     }
     await this.save(game);
     await this.scheduleTimeout(game);
@@ -338,10 +363,24 @@ export class GameRoom extends DurableObject<Env> {
     return game.seats.flatMap((s, i) => (s.kind === 'human' && s.token && i !== except ? [i] : []));
   }
 
+  /** After a turn ends: tells the next player it's theirs, or everyone that the game is over. */
+  private afterMove(game: StoredGame, mover: number) {
+    const state = this.matchOf(game).state;
+    const outcome = brass.brassGame.outcome(state);
+    if (outcome) {
+      const winners = outcome.ranking.filter((r) => r.rank === 1).map((r) => this.nameOf(game, r.player));
+      this.notify(game, this.humans(game), () => ({ title: 'Game over', body: `${winners.join(' and ')} won game ${game.code}.` }));
+      return;
+    }
+    const current = brass.currentPlayer(state);
+    if (current === null || game.seats[current]?.kind !== 'human') return;
+    const limit = game.turnLimit ? ` You have ${limitText(game.turnLimit)}.` : '';
+    this.notify(game, [current], () => ({ title: 'Your turn in Brass', body: `${this.nameOf(game, mover)} played in game ${game.code}.${limit}` }));
+  }
+
   private notifyCancelled(game: StoredGame) {
     const who = this.nameOf(game, game.leftBy!);
-    const why = game.cancelReason === 'timeout' ? 'ran out of time' : 'left the game';
-    this.notify(game, this.humans(game, game.leftBy), () => ({ title: 'Game cancelled', body: `${who} ${why}, so game ${game.code} has been cancelled.` }));
+    this.notify(game, this.humans(game, game.leftBy), () => ({ title: 'Game cancelled', body: `${who} left, so game ${game.code} has been cancelled.` }));
   }
 
   async join(req: JoinGameRequest): Promise<SeatTicket | { error: string; status: number }> {
@@ -398,6 +437,7 @@ export class GameRoom extends DurableObject<Env> {
 
     if (msg.t === 'start') {
       if (game.status !== 'lobby') return this.send(ws, this.snapshotMessage(game, you));
+      if (you !== hostOf(game)) return this.send(ws, { t: 'error', message: `Only ${this.nameOf(game, hostOf(game))} can start the game` });
       if (game.seats.some((s) => s.kind === 'human' && !s.token)) return this.send(ws, { t: 'error', message: 'Waiting for players' });
       game.status = 'playing';
       game.turnStartedAt = Date.now();
@@ -415,7 +455,7 @@ export class GameRoom extends DurableObject<Env> {
 
     if (msg.t === 'act') {
       if (game.status !== 'playing') return this.send(ws, { t: 'error', message: 'The game has not started' });
-      // Too late (the alarm is about to cancel the game): cancel it now.
+      // Too late (the alarm is about to pass for them): pass now; the move itself is refused.
       const deadline = this.deadline(game);
       if (deadline !== null && Date.now() >= deadline) return this.alarm();
       // A move made on an older position (a bot played by two phones, or a late tap): resend the game.
@@ -432,20 +472,12 @@ export class GameRoom extends DurableObject<Env> {
       game.log = r.value.log;
       // A new turn starts the clock (the same player can go twice in a row, across a round's end).
       const next = r.value.state;
-      const current = brass.currentPlayer(next);
-      const newTurn = current !== before || (next.phase.kind === 'actions' && next.actionsTaken === 0);
+      const newTurn = brass.currentPlayer(next) !== before || (next.phase.kind === 'actions' && next.actionsTaken === 0);
       if (newTurn) game.turnStartedAt = Date.now();
       await this.save(game);
       await this.scheduleTimeout(game);
       this.broadcast(game);
-      const outcome = brass.brassGame.outcome(next);
-      if (outcome) {
-        const winners = outcome.ranking.filter((r) => r.rank === 1).map((r) => this.nameOf(game, r.player));
-        this.notify(game, this.humans(game), () => ({ title: 'Game over', body: `${winners.join(' and ')} won game ${game.code}.` }));
-      } else if (newTurn && current !== null && game.seats[current]?.kind === 'human') {
-        const limit = game.turnLimit ? ` You have ${limitText(game.turnLimit)}.` : '';
-        this.notify(game, [current], () => ({ title: 'Your turn in Brass', body: `${this.nameOf(game, msg.player)} played in game ${game.code}.${limit}` }));
-      }
+      if (newTurn || brass.brassGame.outcome(next)) this.afterMove(game, msg.player);
       return;
     }
   }
@@ -467,7 +499,7 @@ export class GameRoom extends DurableObject<Env> {
       log: game.log,
       you,
       leftBy: game.leftBy ?? null,
-      cancelReason: game.cancelReason ?? null,
+      host: hostOf(game),
       turnLimit: game.turnLimit ?? null,
       turnDeadline: this.deadline(game),
       now: Date.now(),

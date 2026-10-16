@@ -31,18 +31,17 @@ export interface GameSnapshot {
   log: LoggedAction<brass.BrassAction>[];
   /** Which seat this phone plays. */
   you: number;
-  /** Who left (or ran out of time), cancelling the game. */
+  /** Who left, cancelling the game. */
   leftBy: number | null;
-  cancelReason: CancelReason | null;
-  /** The most a turn may take, in seconds (null: no limit). */
+  /** The seat of whoever made the game: only they can start it. */
+  host: number;
+  /** The most a turn may take, in seconds (null: no limit). A turn that runs out is passed automatically. */
   turnLimit: number | null;
   /** When the current turn runs out (ms since 1970, server time), if it can. */
   turnDeadline: number | null;
   /** The server's clock when this was sent, to count down against. */
   now: number;
 }
-
-export type CancelReason = 'left' | 'timeout';
 
 /** The turn-time choices offered when making a game, in seconds (null: no limit). */
 export const TURN_LIMITS: readonly (number | null)[] = [null, 3 * 60, 10 * 60, 60 * 60, 24 * 60 * 60];
@@ -77,9 +76,8 @@ export interface LobbyInfo {
   /** Whose turn it is (null in the lobby, or once the game is over). */
   current: number | null;
   finished: boolean;
-  /** Who left (or ran out of time), cancelling the game. */
+  /** Who left, cancelling the game. */
   leftBy: number | null;
-  cancelReason: CancelReason | null;
 }
 
 /**
@@ -100,7 +98,7 @@ export interface PushRegisterRequest {
 // ---- WebSocket ----
 
 export type ClientMessage =
-  /** Start the game (any seated player, once every human seat is taken). */
+  /** Start the game (its host, once every human seat is taken). */
   | { t: 'start' }
   /**
    * A move, for this phone's seat or for a bot seat. `at` is the log length it was made at: a move
@@ -113,7 +111,9 @@ export type ClientMessage =
 
 export type ServerMessage =
   | { t: 'state'; game: GameSnapshot }
-  | { t: 'error'; message: string };
+  | { t: 'error'; message: string }
+  /** Something everyone should know (e.g. a turn that ran out and was passed). */
+  | { t: 'notice'; message: string };
 
 /** Game codes: 5 letters and digits that can't be confused (no 0/O, 1/I/L). */
 export const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';

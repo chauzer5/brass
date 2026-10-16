@@ -249,7 +249,7 @@ function CreateGame({ onBack, onCreated }: { onBack: () => void; onCreated: (tic
         <p className="muted setup-note">
           {turnLimit === null
             ? 'Turns can take as long as they need.'
-            : `A player who takes longer than ${limitLabel(turnLimit)} over a turn ends the game for everyone.`}
+            : `A player who takes longer than ${limitLabel(turnLimit)} over a turn passes automatically, discarding a random card.`}
         </p>
         {error && <p className="error">{error}</p>}
         <button className="confirm" onClick={create} disabled={busy}>
@@ -394,7 +394,7 @@ function JoinGame({ initialCode, onBack, onJoined }: { initialCode: string; onBa
 // ---- A game ----
 
 function OnlineGame({ ticket, onBack }: { ticket: SavedTicket; onBack: () => void }) {
-  const { snapshot, match, connection, error, clearError, play, playBot, start } = useOnlineGame(ticket);
+  const { snapshot, match, connection, error, clearError, notice, clearNotice, play, playBot, start } = useOnlineGame(ticket);
   const [introSeen, setIntroSeen] = useState(!!ticket.introSeen);
   const [confirmLeave, setConfirmLeave] = useState(false);
   // Notifications for this game, if they're on (it's safe to sign up again each time).
@@ -408,6 +408,11 @@ function OnlineGame({ ticket, onBack }: { ticket: SavedTicket; onBack: () => voi
     const t = window.setTimeout(clearError, 4000);
     return () => clearTimeout(t);
   }, [error]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!notice) return;
+    const t = window.setTimeout(clearNotice, 5000);
+    return () => clearTimeout(t);
+  }, [notice]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const game = useMemo<Game | null>(() => {
     if (!snapshot || !match) return null;
@@ -455,6 +460,7 @@ function OnlineGame({ ticket, onBack }: { ticket: SavedTicket; onBack: () => voi
   if (snapshot.status === 'lobby') {
     return (
       <Lobby
+        host={snapshot.host}
         turnLimit={snapshot.turnLimit}
         code={snapshot.code}
         seats={snapshot.seats}
@@ -495,9 +501,9 @@ function OnlineGame({ ticket, onBack }: { ticket: SavedTicket; onBack: () => voi
         }
         extraMenu={cancelled ? [] : [[finished ? 'Remove game' : 'Leave game', () => setConfirmLeave(true)]]}
       />
-      {error && !cancelled && (
-        <div className="online-toast error" role="alert" onClick={clearError}>
-          {error}
+      {(error || notice) && !cancelled && (
+        <div className={`online-toast ${error ? 'error' : ''}`} role="alert" onClick={error ? clearError : clearNotice}>
+          {error ?? notice}
         </div>
       )}
       {confirmLeave && !cancelled && (
@@ -532,7 +538,7 @@ function OnlineGame({ ticket, onBack }: { ticket: SavedTicket; onBack: () => voi
             <h2>Game cancelled</h2>
             <p>
               {snapshot.leftBy !== null && snapshot.seats[snapshot.leftBy]
-                ? `${seatName(snapshot.seats[snapshot.leftBy]!, snapshot.leftBy)} ${snapshot.cancelReason === 'timeout' ? 'ran out of time' : 'left the game'}, so it's been cancelled.`
+                ? `${seatName(snapshot.seats[snapshot.leftBy]!, snapshot.leftBy)} left the game, so it's been cancelled.`
                 : 'This game was called off.'}
             </p>
             <button className="confirm" onClick={dismiss}>
@@ -626,6 +632,7 @@ function ConnectionStatus({ connection, seats, you }: { connection: string; seat
 
 /** Before the game starts: the code to share, who's in, and Start once everyone is. */
 function Lobby({
+  host,
   turnLimit,
   code,
   seats,
@@ -635,6 +642,8 @@ function Lobby({
   onLeave,
   error,
 }: {
+  /** Whoever made the game: only they can start it. */
+  host: number;
   turnLimit: number | null;
   code: string;
   seats: PublicSeat[];
@@ -702,9 +711,15 @@ function Lobby({
         {turnLimit !== null && <p className="muted">Max turn time: {limitLabel(turnLimit)}</p>}
         <PushPrompt />
         {error && <p className="error">{error}</p>}
-        <button className="confirm" onClick={onStart} disabled={waiting > 0}>
-          {waiting > 0 ? `Waiting for ${waiting} more` : 'Start game'}
-        </button>
+        {you === host ? (
+          <button className="confirm" onClick={onStart} disabled={waiting > 0}>
+            {waiting > 0 ? `Waiting for ${waiting} more` : 'Start game'}
+          </button>
+        ) : (
+          <button className="confirm" disabled>
+            {waiting > 0 ? `Waiting for ${waiting} more` : `Waiting for ${seatName(seats[host]!, host)} to start`}
+          </button>
+        )}
         <button className="link-button lobby-leave" onClick={onLeave}>
           Leave game
         </button>

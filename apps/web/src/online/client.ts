@@ -156,6 +156,7 @@ export function useOnlineGame(ticket: SeatTicket) {
   const [match, setMatch] = useState<BrassMatch | null>(null);
   const [connection, setConnection] = useState<Connection>('connecting');
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const ws = useRef<WebSocket | null>(null);
   const matchRef = useRef<BrassMatch | null>(null);
   matchRef.current = match;
@@ -180,6 +181,10 @@ export function useOnlineGame(ticket: SeatTicket) {
         const msg = JSON.parse(e.data as string) as ServerMessage;
         if (msg.t === 'error') {
           setError(msg.message);
+          return;
+        }
+        if (msg.t === 'notice') {
+          setNotice(msg.message);
           return;
         }
         const game = msg.game;
@@ -261,5 +266,5 @@ export function useOnlineGame(ticket: SeatTicket) {
 
   const start = useCallback(() => send({ t: 'start' }), [send]);
 
-  return { snapshot, match, connection, error, clearError: () => setError(null), play, playBot, start };
+  return { snapshot, match, connection, error, clearError: () => setError(null), notice, clearNotice: () => setNotice(null), play, playBot, start };
 }
