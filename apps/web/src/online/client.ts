@@ -84,6 +84,8 @@ export interface SavedTicket extends SeatTicket {
   introSeen?: boolean;
   /** When it was last opened on this phone (ms). */
   viewedAt?: number;
+  /** Seen to be over (finished or cancelled): not offered by "Resume current game". */
+  done?: boolean;
 }
 
 export function savedTickets(): SavedTicket[] {
@@ -106,6 +108,10 @@ export function saveTicket(ticket: SeatTicket): SavedTicket {
   const saved = { ...ticket, joinedAt: Date.now() };
   storeTickets([saved, ...savedTickets().filter((t) => t.code !== ticket.code)]);
   return saved;
+}
+
+export function markDone(code: string) {
+  if (savedTickets().some((t) => t.code === code && !t.done)) storeTickets(savedTickets().map((t) => (t.code === code ? { ...t, done: true } : t)));
 }
 
 export function markViewed(code: string) {

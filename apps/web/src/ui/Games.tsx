@@ -2,7 +2,7 @@ import { brass } from '@brass/engine';
 import type { LobbyInfo } from '@brass/protocol';
 import { useEffect, useMemo, useState } from 'react';
 import { deleteLocalGame, loadLocal, savedLocalGames, type Seat } from '../game/useGame.ts';
-import { forgetTicket, lobbyInfo, savedTickets, type SavedTicket } from '../online/client.ts';
+import { forgetTicket, lobbyInfo, markDone, savedTickets, type SavedTicket } from '../online/client.ts';
 import { CreateGame, PushPrompt, seatName, statusLabel } from '../online/OnlineScreens.tsx';
 import { MatchSetup } from './Screens.tsx';
 
@@ -119,7 +119,10 @@ export function GamesList({
     let cancelled = false;
     for (const t of savedTickets()) {
       lobbyInfo(t.code)
-        .then((info) => !cancelled && setInfos((m) => ({ ...m, [t.code]: info })))
+        .then((info) => {
+          if (info.finished || info.status === 'cancelled') markDone(t.code);
+          if (!cancelled) setInfos((m) => ({ ...m, [t.code]: info }));
+        })
         .catch(() => !cancelled && setInfos((m) => ({ ...m, [t.code]: null })));
     }
     return () => {

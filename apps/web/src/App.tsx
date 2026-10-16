@@ -4,7 +4,7 @@ import { Board, MARKET_BOX, cubesDuration, eraDuration, goodsDuration, saleDurat
 import { effectsOf, type CubeScene, type EraScene, type GoodsSale } from './game/effects.ts';
 import { EMPTY_DRAFT, availableKinds, compose, developIndustries, highlights, tapLink, usableCards, type Draft } from './game/draft.ts';
 import { explainBuild, explainBuildAny } from './game/explain.ts';
-import { canUndo, lastGame, savedLocalGames, useGame, type Game } from './game/useGame.ts';
+import { canUndo, lastGame, loadLocal, savedLocalGames, useGame, type Game } from './game/useGame.ts';
 import { ActionRail } from './ui/ActionRail.tsx';
 import { HandTray, type Arriving, type TrayTab } from './ui/HandTray.tsx';
 import { IncomeTrack } from './ui/IncomeTrack.tsx';
@@ -18,7 +18,7 @@ import { runBot } from './bot/runBot.ts';
 import { Coach, useCoach } from './tutorial/Coach.tsx';
 import { useWide } from './ui/layout.ts';
 import { JoinGame, OnlineGame } from './online/OnlineScreens.tsx';
-import { savedTickets, type SavedTicket } from './online/client.ts';
+import { lobbyInfo, markDone, savedTickets, type SavedTicket } from './online/client.ts';
 import { GamesList, NewGameFlow } from './ui/Games.tsx';
 import { normalizeCode } from '@brass/protocol';
 
@@ -63,6 +63,26 @@ export function App() {
     setScreen({ kind: 'menu' });
   };
   const openOnline = (ticket: SavedTicket) => setScreen({ kind: 'online', ticket });
+  // On the main menu, ask the server whether the last online game has ended since this phone last saw it
+  // (then "Resume current game" isn't offered for it).
+  const [, recheck] = useState(0);
+  useEffect(() => {
+    if (screen.kind !== 'menu') return;
+    const last = lastGame();
+    const ticket = last?.kind === 'online' ? savedTickets().find((t) => t.code === last.code && !t.done) : undefined;
+    if (!ticket) return;
+    let cancelled = false;
+    lobbyInfo(ticket.code)
+      .then((info) => {
+        if (!info.finished && info.status !== 'cancelled') return;
+        markDone(ticket.code);
+        if (!cancelled) recheck((n) => n + 1);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [screen.kind]);
   const openLocal = (id: string) => {
     if (local.open(id)) setScreen({ kind: 'local' });
   };
@@ -112,8 +132,11 @@ export function App() {
   // (Reading the local games first also moves a game saved the old way into the list, and makes it the last.)
   const locals = savedLocalGames();
   const last = lastGame();
-  const lastTicket = last?.kind === 'online' ? savedTickets().find((t) => t.code === last.code) : undefined;
-  const lastLocal = last?.kind === 'local' && locals.some((g) => g.id === last.id) ? last.id : undefined;
+  // (Only a game still being played: a finished or cancelled one isn't resumed.)
+  const lastTicket = last?.kind === 'online' ? savedTickets().find((t) => t.code === last.code && !t.done) : undefined;
+  const lastSaved = last?.kind === 'local' ? locals.find((g) => g.id === last.id) : undefined;
+  const lastGameLocal = lastSaved && loadLocal(lastSaved);
+  const lastLocal = lastGameLocal && !brass.brassGame.outcome(lastGameLocal.match.state) ? lastSaved.id : undefined;
   return (
     <MainMenu
       onResume={lastTicket ? () => openOnline(lastTicket) : lastLocal ? () => openLocal(lastLocal) : undefined}

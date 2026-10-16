@@ -16,6 +16,7 @@ import {
   leaveGame,
   lobbyInfo,
   markIntroSeen,
+  markDone,
   markViewed,
   saveName,
   saveTicket,
@@ -318,6 +319,12 @@ export function OnlineGame({ ticket, onBack, onNewGame }: { ticket: SavedTicket;
     const t = window.setTimeout(clearNotice, 5000);
     return () => clearTimeout(t);
   }, [notice]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A game seen to be over isn't the one "Resume current game" offers any more.
+  const over = snapshot?.status === 'cancelled' || (!!match && !!brass.brassGame.outcome(match.state));
+  useEffect(() => {
+    if (over) markDone(ticket.code);
+  }, [over, ticket.code]);
 
   const game = useMemo<Game | null>(() => {
     if (!snapshot || !match) return null;
