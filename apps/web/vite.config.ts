@@ -42,7 +42,7 @@ const invitePage = `<!doctype html>
       location.replace('/' + location.search);
     </script>
   </head>
-  <body style="background: #1f140c"></body>
+  <body style="margin: 0; min-height: 100vh; background: #1f140c url(/board-bg.webp) center / cover"></body>
 </html>
 `;
 
