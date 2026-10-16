@@ -11,9 +11,13 @@ import type {
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { BrassMatch } from '../game/useGame.ts';
 
-/** The game server: set at build time; in development, the local one beside the app. */
+/** The deployed game server (Cloudflare). */
+const LIVE_SERVER = 'https://brass-server.chauzer-reed.workers.dev';
+
+/** The game server: VITE_SERVER_URL if set at build time; on this computer or the local network, the local one (`wrangler dev`). */
 export const SERVER_URL: string =
-  (import.meta.env.VITE_SERVER_URL as string | undefined) ?? `${location.protocol}//${location.hostname}:8787`;
+  (import.meta.env.VITE_SERVER_URL as string | undefined) ??
+  (/^(localhost|127\.|192\.168\.|10\.)/.test(location.hostname) ? `${location.protocol}//${location.hostname}:8787` : LIVE_SERVER);
 
 async function request<T>(path: string, init?: { method: string; body: unknown }): Promise<T> {
   const res = await fetch(
