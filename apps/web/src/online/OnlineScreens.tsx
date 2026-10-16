@@ -1,5 +1,5 @@
 import { brass } from '@brass/engine';
-import { CODE_LENGTH, normalizeCode, type LobbyInfo, type PublicSeat, type SeatSetup } from '@brass/protocol';
+import { CODE_LENGTH, TURN_LIMITS, normalizeCode, type GameSnapshot, type LobbyInfo, type PublicSeat, type SeatSetup } from '@brass/protocol';
 import { useEffect, useMemo, useState } from 'react';
 import { Table } from '../App.tsx';
 import type { Game, Seat } from '../game/useGame.ts';
@@ -148,6 +148,7 @@ function CreateGame({ onBack, onCreated }: { onBack: () => void; onCreated: (tic
   const [name, setName] = useState(savedName);
   const [count, setCount] = useState(2);
   const [others, setOthers] = useState<OtherSeat[]>([{ kind: 'friend' }, { kind: 'friend' }, { kind: 'friend' }]);
+  const [turnLimit, setTurnLimit] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const setOther = (i: number, seat: OtherSeat) => setOthers((os) => os.map((s, j) => (j === i ? seat : s)));
@@ -165,7 +166,7 @@ function CreateGame({ onBack, onCreated }: { onBack: () => void; onCreated: (tic
     ];
     try {
       saveName(name);
-      onCreated(saveTicket(await createGame({ seats, name: name.trim() })));
+      onCreated(saveTicket(await createGame({ seats, name: name.trim(), turnLimit })));
     } catch (e) {
       setError(errorText(e));
       setBusy(false);
@@ -232,6 +233,19 @@ function CreateGame({ onBack, onCreated }: { onBack: () => void; onCreated: (tic
             </div>
           ))}
         </div>
+        <h3>Max turn time</h3>
+        <div className="segmented turn-limits" role="radiogroup" aria-label="Max turn time">
+          {TURN_LIMITS.map((t) => (
+            <button key={t ?? 0} role="radio" aria-checked={turnLimit === t} className={turnLimit === t ? 'selected' : ''} onClick={() => setTurnLimit(t)}>
+              {t === null ? 'None' : limitLabel(t)}
+            </button>
+          ))}
+        </div>
+        <p className="muted setup-note">
+          {turnLimit === null
+            ? 'Turns can take as long as they need.'
+            : `A player who takes longer than ${limitLabel(turnLimit)} over a turn ends the game for everyone.`}
+        </p>
         {error && <p className="error">{error}</p>}
         <button className="confirm" onClick={create} disabled={busy}>
           {busy ? 'Creating…' : 'Create game'}
@@ -434,6 +448,7 @@ function OnlineGame({ ticket, onBack }: { ticket: SavedTicket; onBack: () => voi
   if (snapshot.status === 'lobby') {
     return (
       <Lobby
+        turnLimit={snapshot.turnLimit}
         code={snapshot.code}
         seats={snapshot.seats}
         you={snapshot.you}
@@ -465,7 +480,12 @@ function OnlineGame({ ticket, onBack }: { ticket: SavedTicket; onBack: () => voi
           setIntroSeen(true);
         }}
         runsBots={runsBots && connection === 'open'}
-        status={<ConnectionStatus connection={connection} seats={snapshot.seats} you={snapshot.you} />}
+        status={
+          <span className="online-status">
+            {!cancelled && <TurnClock snapshot={snapshot} />}
+            <ConnectionStatus connection={connection} seats={snapshot.seats} you={snapshot.you} />
+          </span>
+        }
         extraMenu={cancelled ? [] : [[finished ? 'Remove game' : 'Leave game', () => setConfirmLeave(true)]]}
       />
       {error && !cancelled && (
@@ -505,7 +525,7 @@ function OnlineGame({ ticket, onBack }: { ticket: SavedTicket; onBack: () => voi
             <h2>Game cancelled</h2>
             <p>
               {snapshot.leftBy !== null && snapshot.seats[snapshot.leftBy]
-                ? `${seatName(snapshot.seats[snapshot.leftBy]!, snapshot.leftBy)} left the game, so it's been cancelled.`
+                ? `${seatName(snapshot.seats[snapshot.leftBy]!, snapshot.leftBy)} ${snapshot.cancelReason === 'timeout' ? 'ran out of time' : 'left the game'}, so it's been cancelled.`
                 : 'This game was called off.'}
             </p>
             <button className="confirm" onClick={dismiss}>
@@ -515,6 +535,37 @@ function OnlineGame({ ticket, onBack }: { ticket: SavedTicket; onBack: () => voi
         </div>
       )}
     </>
+  );
+}
+
+/** "3 min", "1 hour", "1 day". */
+function limitLabel(seconds: number): string {
+  if (seconds % 86400 === 0) return seconds === 86400 ? '1 day' : `${seconds / 86400} days`;
+  if (seconds % 3600 === 0) return seconds === 3600 ? '1 hour' : `${seconds / 3600} hours`;
+  return `${Math.round(seconds / 60)} min`;
+}
+
+/** Time left in the current turn, counting down; red near the end. Hidden with no limit (or on a bot's turn). */
+function TurnClock({ snapshot }: { snapshot: GameSnapshot }) {
+  // The server's clock, as this phone's: their difference, measured when the game was sent.
+  const offset = useMemo(() => snapshot.now - Date.now(), [snapshot]);
+  const [, tick] = useState(0);
+  const deadline = snapshot.turnDeadline;
+  useEffect(() => {
+    if (deadline === null) return;
+    const t = window.setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [deadline]);
+  if (deadline === null || snapshot.turnLimit === null) return null;
+  const left = Math.max(0, Math.ceil((deadline - (Date.now() + offset)) / 1000));
+  const urgent = left <= Math.min(60, snapshot.turnLimit * 0.2);
+  const h = Math.floor(left / 3600);
+  const m = Math.floor((left % 3600) / 60);
+  const text = h > 0 ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}:${String(left % 60).padStart(2, '0')}`;
+  return (
+    <span className={`turn-clock ${urgent ? 'urgent' : ''}`} title="Time left this turn" aria-label={`${text} left this turn`}>
+      ⏱ {text}
+    </span>
   );
 }
 
@@ -534,6 +585,7 @@ function ConnectionStatus({ connection, seats, you }: { connection: string; seat
 
 /** Before the game starts: the code to share, who's in, and Start once everyone is. */
 function Lobby({
+  turnLimit,
   code,
   seats,
   you,
@@ -542,6 +594,7 @@ function Lobby({
   onLeave,
   error,
 }: {
+  turnLimit: number | null;
   code: string;
   seats: PublicSeat[];
   you: number;
@@ -605,6 +658,7 @@ function Lobby({
             </div>
           ))}
         </div>
+        {turnLimit !== null && <p className="muted">Max turn time: {limitLabel(turnLimit)}</p>}
         {error && <p className="error">{error}</p>}
         <button className="confirm" onClick={onStart} disabled={waiting > 0}>
           {waiting > 0 ? `Waiting for ${waiting} more` : 'Start game'}

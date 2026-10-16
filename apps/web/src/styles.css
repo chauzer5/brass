@@ -3294,3 +3294,31 @@ button.lobby-seat:disabled {
   align-self: center;
   color: var(--muted);
 }
+
+.turn-limits {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.turn-limits button {
+  padding: 0 2px;
+  font-size: 14px;
+}
+
+.online-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.turn-clock {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.turn-clock.urgent {
+  color: var(--danger);
+}

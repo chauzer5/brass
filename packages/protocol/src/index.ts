@@ -31,9 +31,21 @@ export interface GameSnapshot {
   log: LoggedAction<brass.BrassAction>[];
   /** Which seat this phone plays. */
   you: number;
-  /** Who left, cancelling the game. */
+  /** Who left (or ran out of time), cancelling the game. */
   leftBy: number | null;
+  cancelReason: CancelReason | null;
+  /** The most a turn may take, in seconds (null: no limit). */
+  turnLimit: number | null;
+  /** When the current turn runs out (ms since 1970, server time), if it can. */
+  turnDeadline: number | null;
+  /** The server's clock when this was sent, to count down against. */
+  now: number;
 }
+
+export type CancelReason = 'left' | 'timeout';
+
+/** The turn-time choices offered when making a game, in seconds (null: no limit). */
+export const TURN_LIMITS: readonly (number | null)[] = [null, 3 * 60, 10 * 60, 60 * 60, 24 * 60 * 60];
 
 // ---- HTTP ----
 
@@ -41,6 +53,8 @@ export interface CreateGameRequest {
   seats: SeatSetup[];
   /** The creator's name: they take the first human seat. */
   name: string;
+  /** The most a turn may take, in seconds: one of TURN_LIMITS (missing: no limit). */
+  turnLimit?: number | null;
 }
 
 /** Joining (or creating) gives back the seat taken and its secret token, kept on the phone. */
@@ -63,8 +77,9 @@ export interface LobbyInfo {
   /** Whose turn it is (null in the lobby, or once the game is over). */
   current: number | null;
   finished: boolean;
-  /** Who left, cancelling the game. */
+  /** Who left (or ran out of time), cancelling the game. */
   leftBy: number | null;
+  cancelReason: CancelReason | null;
 }
 
 /**
