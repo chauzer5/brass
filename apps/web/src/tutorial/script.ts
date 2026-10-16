@@ -2,11 +2,14 @@ import { brass } from '@brass/engine';
 
 /*
  * The tutorial: a real two-player game against a tutor bot, from a fixed
- * start, played one step at a time. "Do" steps allow only the move they teach
- * (the usual map and hand highlights then point the way); the tutor's moves
- * are scripted; "info" steps explain and wait for Next. After the four rounds
- * that cover every action, the rest of the Canal Era fast-forwards to its
- * scoring, and the game can be played on from there.
+ * start, played one step at a time. It follows one plan, making money from
+ * manufactured goods, and each step says why, not just how: borrowing an
+ * opponent's coal, a loan when the money runs short, Location and Industry
+ * cards, iron, a link to a Merchant, a Brewery for beer, and selling two
+ * tiles at once. "Do" steps allow only the move they teach (the usual map
+ * and hand highlights then point the way); the tutor's moves are scripted;
+ * "info" steps explain and wait for Next. Then the rest of the Canal Era
+ * fast-forwards to its scoring, and the game can be played on from there.
  */
 
 export const TUTORIAL_SEED = 1781;
@@ -15,11 +18,15 @@ export const YOU = 0;
 export const TUTOR = 1;
 
 export const TUTORIAL_PRESET: brass.BrassPreset = {
-  firstPlayer: YOU,
-  hands: [[{ location: 'worcester' }], [{ location: 'coalbrookdale' }, { industries: ['coal'] }]],
+  firstPlayer: TUTOR,
+  hands: [
+    [{ location: 'birmingham' }, { location: 'wolverhampton' }],
+    [{ location: 'dudley' }, { industries: ['iron'] }],
+  ],
   merchants: {
-    shrewsbury: [['manufacturer']],
-    gloucester: [['cotton'], []],
+    // Shrewsbury and Gloucester are out of the way: Oxford is the one buyer of goods within reach.
+    shrewsbury: [[]],
+    gloucester: [['cotton'], ['manufacturer']],
     oxford: [['cotton', 'manufacturer', 'pottery'], []],
   },
 };
@@ -62,6 +69,11 @@ export type Step = { place: Place } & (
       text: string;
       /** The only moves allowed (the engine's legal moves, filtered). */
       allow: Match;
+      /**
+       * What the finished move must also be, beyond `allow` (which also shapes what the screens offer
+       * along the way: a sale of two tiles is put together from tiles that could each be sold alone).
+       */
+      require?: { match: Match; hint: string };
       point?: string;
       frame?: Frame;
     }
@@ -88,27 +100,37 @@ export type Step = { place: Place } & (
   | { kind: 'finish'; title: string; text: string }
 );
 
-const cardIs = (state: brass.BrassState, id: string, location: string) => {
-  const card = state.cards[id];
-  return card?.kind === 'location' && card.location === location;
+const card = (s: brass.BrassState, id: string) => s.cards[id];
+/** Cards the plan needs later: kept out of "any card" moves (the hand shows them unusable). */
+const needed = (s: brass.BrassState, id: string) => {
+  const c = card(s, id);
+  return (
+    c?.kind === 'wildLocation' ||
+    c?.kind === 'wildIndustry' ||
+    (c?.kind === 'location' && (c.location === 'wolverhampton' || c.location === 'birmingham'))
+  );
 };
-const anyOf = (type: brass.BrassAction['type']): Match => (a) => a.type === type;
-/** The tutor keeps its Coal card for later. */
-const spare = (s: brass.BrassState, card: string) => {
-  const c = s.cards[card];
-  return !(c?.kind === 'industry' && c.industries.includes('coal'));
+const spare = (s: brass.BrassState, id: string) => !needed(s, id);
+/** The tutor keeps its Iron card for its Iron Works. */
+const tutorSpare = (s: brass.BrassState, id: string) => {
+  const c = card(s, id);
+  return !(c?.kind === 'industry' && c.industries.includes('iron')) && !(c?.kind === 'location' && c.location === 'dudley');
 };
+const link = (a: brass.BrassAction, id: string): a is Extract<brass.BrassAction, { type: 'network' }> =>
+  a.type === 'network' && a.links.length === 1 && a.links[0] === id;
 
-const WORCESTER: Frame = { x0: 300, y0: 820, x1: 640, y1: 1000 };
+/** Birmingham and its neighbours: Dudley, Wolverhampton, Oxford. */
+const HEARTLAND: Frame = { x0: 330, y0: 470, x1: 860, y1: 900 };
+const DUDLEY: Frame = { x0: 360, y0: 560, x1: 720, y1: 720 };
+const WEST: Frame = { x0: 200, y0: 470, x1: 720, y1: 720 };
 const MARKETS: Frame = { x0: 780, y0: 240, x1: 1000, y1: 660 };
-const COALBROOKDALE: Frame = { x0: 60, y0: 480, x1: 480, y1: 640 };
 
 export const STEPS: readonly Step[] = [
   {
     kind: 'info',
     title: 'Welcome to Brass: Birmingham',
     place: 'middle',
-    text: "You're an entrepreneur in the Industrial Revolution. Build industries, link towns with canals and railways, and sell your goods. The game has two halves, the Canal Era and the Rail Era, and whoever has the most victory points (VP) after both wins. This tutorial is a real game against Bot Richard: you'll make every move yourself.",
+    text: "You're an entrepreneur in the Industrial Revolution: build industries, link towns with canals and railways, and sell your goods. The game has two halves, the Canal Era and the Rail Era, and whoever has the most victory points (VP) after both wins. This tutorial is a real game against Bot Richard, played with a plan, so you'll see why each move is made, not just how.",
   },
   {
     kind: 'info',
@@ -121,136 +143,181 @@ export const STEPS: readonly Step[] = [
     kind: 'info',
     title: 'Your hand',
     place: 'middle',
-    text: 'Every action costs a card from your hand. Location cards build in that town; Industry cards build that industry anywhere in your network. In the first round each player takes 1 action; after that, 2 actions per turn.',
+    text: 'Every action costs a card from your hand. A Location card builds in its town; an Industry card builds that industry in any town in your network. In the first round each player takes 1 action; after that, 2 actions per turn.',
     point: '.hand-tray',
   },
   {
-    kind: 'do',
-    title: 'Build a Cotton Mill',
-    place: 'bottom',
-    text: 'Tap Build, then a highlighted space in Worcester (or your Worcester card first, either way). Building takes the lowest tile of that industry from your player board and costs its price: £12 for Cotton Mill I.',
-    allow: (a, s) => a.type === 'build' && a.location === 'worcester' && a.industry === 'cotton' && cardIs(s, a.card, 'worcester'),
-    frame: WORCESTER,
-  },
-  {
     kind: 'info',
-    title: 'Tiles flip to score',
+    title: 'The plan: sell goods',
     place: 'top',
-    text: 'Your mill is on the map, but it scores nothing yet. Tiles flip over when they do their job, and only flipped tiles score VPs and raise your income. A Cotton Mill flips when you sell its cotton to a Merchant that buys it.',
-    frame: WORCESTER,
+    text: "We'll make our money from manufactured goods. A Manufacturer is built in a town with a goods space, like Birmingham, and sold to a Merchant that buys goods, like Oxford (a Merchant's tile shows what it buys). Building one takes £8 and 1 coal; selling it takes a beer. Right now we have £17, no coal, no beer and no route to Oxford. Let's see how we get there.",
+    frame: HEARTLAND,
   },
   {
     kind: 'tutor',
-    title: "Bot Richard's turn",
+    title: 'Richard builds a Coal Mine',
     place: 'top',
-    text: "Richard builds a Coal Mine in Coalbrookdale. Coal mines come with coal cubes that anyone connected to them can use for building; a mine flips when its last cube is used. Coal and iron works also sell their cubes to the market straight away, if they're linked to a Merchant.",
-    moves: [(a, s) => a.type === 'build' && a.location === 'coalbrookdale' && a.industry === 'coal' && cardIs(s, a.card, 'coalbrookdale')],
-    frame: COALBROOKDALE,
+    text: "Richard goes first, with a Coal Mine in Dudley, right next to Birmingham. A new mine comes with coal cubes: 2 for this one. Had it been connected to a Merchant, it would have sold them to the coal market straight away. It isn't, so they stay on the tile, for anyone connected to it to use.",
+    moves: [(a) => a.type === 'build' && a.location === 'dudley' && a.industry === 'coal'],
+    frame: DUDLEY,
+  },
+  {
+    kind: 'info',
+    title: "Richard's coal is good news",
+    place: 'top',
+    text: "Building a Manufacturer needs coal from a mine connected to where you build. Richard's coal costs us nothing once we're connected, and every cube we take brings his mine closer to flipping, which scores him VPs and raises his income. He gets a better mine, we save building our own: both of us win. That's why players so often end up sharing coal.",
+    frame: DUDLEY,
+  },
+  {
+    kind: 'do',
+    title: 'Connect to the coal',
+    place: 'bottom',
+    text: 'Tap Network, then the canal from Birmingham to Dudley, and any card. Canals cost £3. Your first link can go anywhere; after that, new links have to touch your network (towns with your tiles, or at the end of your links).',
+    allow: (a, s) => link(a, 'birmingham~dudley') && spare(s, a.card),
+    frame: DUDLEY,
   },
   {
     kind: 'info',
     title: 'Who goes next?',
     place: 'top',
-    text: "At the end of each round, the turn order is set by money spent: least first. In round 1 you spent £12 and Richard £5, so he goes first now. This panel keeps track as each round goes. At the end of a round everyone also collects their income and draws back up to 8 cards.",
+    text: "At the end of each round, turn order is set by money spent: least first. You spent £3 and Richard £5, so you go first now. This panel keeps track as each round goes. At the end of a round everyone also collects their income and draws back up to 8 cards. From now on, every turn has 2 actions.",
     point: '.turn-order',
     frame: { x0: 0, y0: 640, x1: 440, y1: 1000 },
   },
   {
-    kind: 'tutor',
-    title: "Richard's turn: 2 actions",
-    place: 'top',
-    text: 'From now on every turn has 2 actions. Richard builds canals out of Coalbrookdale: £3 each in the Canal Era. Links grow your network, and score VPs at the end of the era.',
-    moves: [
-      (a, s) => a.type === 'network' && a.links[0] === 'coalbrookdale~shrewsbury' && spare(s, a.card),
-      (a, s) => a.type === 'network' && a.links[0] === 'coalbrookdale~wolverhampton' && spare(s, a.card),
-    ],
-    frame: COALBROOKDALE,
-  },
-  {
-    kind: 'do',
-    title: 'Build a canal',
-    place: 'bottom',
-    text: "Your mill needs a route to a Merchant who buys cotton, like Gloucester. Tap Network, then the highlighted canal from Worcester to Gloucester, and any card. A new link has to touch your network: a town where you have a tile or a link.",
-    allow: (a) => a.type === 'network' && a.links.length === 1 && a.links[0] === 'worcester~gloucester',
-    frame: WORCESTER,
-  },
-  {
-    kind: 'do',
-    title: 'Sell your cotton',
-    place: 'bottom',
-    text: "Selling a mill needs beer. Gloucester has a barrel of its own: using it earns its bonus too, a free Develop. Tap Sell, any card and your mill. Then pick any industry on your board for the bonus, and Confirm.",
-    allow: (a) =>
-      // Either Worcester space: the mill went on whichever you tapped.
-      a.type === 'sell' && a.sales.length === 1 && a.sales[0]!.location === 'worcester',
-    frame: WORCESTER,
-  },
-  {
     kind: 'info',
-    title: 'Flipped!',
-    place: 'bottom',
-    text: 'Your Cotton Mill flipped: it will score 5 VP at the end of the era, and your income went up (see the income track on your Board tab). Each round you collect your income. The free Develop removed a tile from your player board, so your next tile of that industry is a better one.',
-    point: '.player-strip',
+    title: 'Short of money',
+    place: 'middle',
+    text: "Here's what the plan needs: a Manufacturer in Birmingham (£8), a second one so we can sell two at once (£10), a canal to Oxford (£3) and a Brewery for beer (£5, plus iron). That's well over the £14 we have left. Waiting for income would take rounds; a loan is quicker.",
   },
   {
     kind: 'do',
     title: 'Take a loan',
     place: 'top',
-    text: "Money's tight. A loan gives you £30 straight away, but your income drops 3 levels for the rest of the game. Tap Loan and any card.",
-    allow: anyOf('loan'),
+    text: "A loan gives you £30 straight away, but your income drops 3 levels, and you'll pay that every round until you earn it back by flipping tiles. Borrowing early, while there's lots of game left to use the money, is usually right. Tap Loan and any card.",
+    allow: (a, s) => a.type === 'loan' && spare(s, a.card),
   },
   {
     kind: 'do',
-    title: 'Develop',
+    title: 'Build a Manufacturer',
     place: 'bottom',
-    text: "Developing removes the lowest tile of an industry (or two industries) from your player board without building it, to reach better tiles sooner: Level I tiles are gone at the end of the Canal Era anyway. Each tile removed costs 1 iron, from any Iron Works or the market. Tap Develop, any card, then an industry on your board.",
-    allow: anyOf('develop'),
+    text: "Tap Build, then a Manufacturer space in Birmingham, and your Birmingham card. The coal comes from Richard's mine, along your canal: one of his two cubes. Without the canal, Birmingham would have no coal to build with.",
+    allow: (a) => a.type === 'build' && a.location === 'birmingham' && a.industry === 'manufacturer',
+    frame: DUDLEY,
   },
   {
     kind: 'tutor',
     title: "Richard's turn",
     place: 'top',
-    text: "Richard takes a loan too, then builds a Coal Mine in Wolverhampton. His canals link it to Shrewsbury, a Merchant, so its coal is sold to the coal market straight away, as many cubes as the market has room for, and he's paid for them. (In the Canal Era, each player can only have one tile per town.)",
-    moves: [
-      (a, s) => a.type === 'loan' && spare(s, a.card),
-      (a) => a.type === 'build' && a.location === 'wolverhampton' && a.industry === 'coal',
-    ],
-    frame: COALBROOKDALE,
+    text: 'Richard links Dudley to Wolverhampton, and takes a loan of his own: he has plans too.',
+    moves: [(a, s) => link(a, 'wolverhampton~dudley') && tutorSpare(s, a.card), (a, s) => a.type === 'loan' && tutorSpare(s, a.card)],
+    frame: WEST,
+  },
+  {
+    kind: 'tutor',
+    title: 'Richard builds an Iron Works',
+    place: 'top',
+    text: "Richard spent less, so he goes first. He links Wolverhampton to Coalbrookdale and builds an Iron Works there. It needs coal, so he takes the last cube from his Dudley mine, and the mine flips: helped along by the cube you took. An Iron Works sells iron to the market straight away, as much as it has room for, and the rest stays on the tile. Iron needs no connection: anyone can use it, from anywhere.",
+    moves: [(a, s) => link(a, 'coalbrookdale~wolverhampton') && tutorSpare(s, a.card), (a) => a.type === 'build' && a.location === 'coalbrookdale' && a.industry === 'iron'],
+    frame: WEST,
   },
   {
     kind: 'info',
-    title: 'The coal and iron markets',
+    title: 'Coal and iron markets',
     place: 'bottom',
-    text: "Richard's coal landed in this market. Building often needs coal or iron. Coal comes free from the nearest Coal Mine connected to you (anyone's); if there isn't one, you buy it here, as long as you're connected to a Merchant. Iron comes free from any Iron Works, or from here.",
+    text: "Here are the markets. When there's no connected mine, you buy coal here, as long as you're connected to a Merchant; iron you can buy from anywhere. You always pay for the cheapest cube, so prices rise as a market empties. Free cubes on the board are used first.",
     point: '.markets',
     frame: MARKETS,
   },
   {
     kind: 'info',
-    title: 'Market prices',
+    title: 'A second Manufacturer',
     place: 'bottom',
-    text: 'You always buy the cheapest cube, so prices rise as the market empties. Once empty, coal costs £8 and iron £6. New mines and works sell into the most expensive empty spaces, and are paid those prices.',
-    point: '.markets',
-    frame: MARKETS,
+    text: "In the Canal Era you can only have one tile in each town, so the second Manufacturer can't go in Birmingham. Wolverhampton has a free Manufacturer space, and you have a Wolverhampton card: a Location card builds in its town even outside your network. Your next tile is a Manufacturer II, which needs 1 iron instead of coal, and Richard's Iron Works has iron to spare.",
+    frame: WEST,
   },
   {
     kind: 'do',
-    title: 'Scout',
+    title: 'Build in Wolverhampton',
+    place: 'bottom',
+    text: 'Tap Build, the Manufacturer space in Wolverhampton, and your Wolverhampton card. The iron comes from Richard\'s Iron Works, free, and brings it closer to flipping too.',
+    allow: (a) => a.type === 'build' && a.location === 'wolverhampton' && a.industry === 'manufacturer',
+    frame: WEST,
+  },
+  {
+    kind: 'do',
+    title: 'Connect to a Merchant',
+    place: 'bottom',
+    text: "Now a buyer. Oxford buys goods: build the canal from Birmingham to Oxford, with any card. Your Wolverhampton Manufacturer gets there too, along Richard's canal and yours: links connect places whoever owns them.",
+    allow: (a, s) => link(a, 'birmingham~oxford') && spare(s, a.card),
+    frame: HEARTLAND,
+  },
+  {
+    kind: 'tutor',
+    title: "Richard's turn",
     place: 'top',
-    text: "Scouting swaps 3 cards for a Wild Location and a Wild Industry card, which build almost anywhere. It's for when your hand doesn't fit your plans. Tap Scout and choose 3 cards.",
-    allow: anyOf('scout'),
+    text: "Richard links Coalbrookdale to Kidderminster, then Develops: that removes the lowest tile of an industry from his player board without building it, to reach better tiles sooner (Level I tiles are gone at the end of the Canal Era anyway). Each tile removed costs 1 iron.",
+    moves: [(a, s) => link(a, 'kidderminster~coalbrookdale') && tutorSpare(s, a.card), (a, s) => a.type === 'develop' && tutorSpare(s, a.card)],
+    frame: WEST,
+  },
+  {
+    kind: 'info',
+    title: 'Beer',
+    place: 'top',
+    text: "Each Manufacturer needs a beer to sell. Oxford has a barrel of its own, and using it earns Oxford's bonus too: 2 more income. That's one. For the other we need a Brewery. Your own beer can be used anywhere, connected or not. But no card in your hand builds a Brewery anywhere useful.",
+    frame: HEARTLAND,
+  },
+  {
+    kind: 'do',
+    title: 'Scout for Wild cards',
+    place: 'top',
+    text: "Scouting swaps 3 cards for a Wild Location and a Wild Industry card, which build almost anywhere. It's for exactly this: when your hand doesn't fit your plan. Tap Scout and choose 3 cards.",
+    allow: (a, s) => a.type === 'scout' && a.cards.every((c) => spare(s, c)),
+  },
+  {
+    kind: 'do',
+    title: 'Build a Brewery',
+    place: 'bottom',
+    text: "Tap Build, then your Wild Location card and any Brewery space on the map: Walsall is close by. A Brewery costs £5 and 1 iron, and comes with 1 barrel of beer (2 in the Rail Era). Richard's Develop used the last iron on his Iron Works (flipping it), so this iron is bought from the market.",
+    allow: (a, s) => a.type === 'build' && a.industry === 'brewery' && card(s, a.card)?.kind === 'wildLocation',
+    frame: HEARTLAND,
+  },
+  {
+    kind: 'tutor',
+    title: "Richard's turn",
+    place: 'top',
+    text: "Richard builds a Cotton Mill in Worcester, then passes: he discards a card and does nothing else. Sometimes that's the best move left.",
+    moves: [(a) => a.type === 'build' && a.location === 'worcester' && a.industry === 'cotton', (a) => a.type === 'pass'],
+    frame: WEST,
+  },
+  {
+    kind: 'do',
+    title: 'Sell both at once',
+    place: 'bottom',
+    text: "One Sell action sells as many tiles as you like, as long as each has a buyer and a beer. Tap Sell and any card, then your Manufacturers one at a time, each to Oxford. One takes Oxford's barrel, the other your Brewery's. Confirm when both are in.",
+    allow: (a) => a.type === 'sell' && a.sales.every((x) => x.location === 'birmingham' || x.location === 'wolverhampton'),
+    require: { match: (a) => a.type === 'sell' && a.sales.length === 2, hint: 'Add your other Manufacturer too: both sell in this one action.' },
+    frame: HEARTLAND,
+  },
+  {
+    kind: 'info',
+    title: 'Flipped!',
+    place: 'top',
+    text: "Both Manufacturers flipped: they'll score their VPs at the end of the era, and each raised your income. Oxford's bonus added 2 more, and your Brewery flipped too, its beer used. Your income is back above where the loan left it, and every round from now on it pays you. That's the whole engine of the game: build, connect, sell, flip.",
+    point: '.player-strip',
   },
   {
     kind: 'do',
     title: 'Pass',
     place: 'top',
-    text: 'Sometimes the best move is none: passing just discards a card. You still have to spend a card on each action, so a pass also gets rid of one you don\'t need. Tap Pass and any card.',
-    allow: anyOf('pass'),
+    text: "Nothing else worth doing this turn? Passing just discards a card. Every action costs a card, so a pass also clears out one you don't need. Tap Pass and any card.",
+    allow: (a) => a.type === 'pass',
   },
   {
     kind: 'info',
     title: 'The rest of the era',
     place: 'middle',
-    text: "That's every action: Build, Network, Develop, Sell, Loan, Scout and Pass. The Canal Era goes on until everyone's cards run out: 10 rounds with two players. Let's fast-forward, with bots playing both sides, to the end of the era.",
+    text: "You've now used every action: Build, Network, Develop (Richard showed it), Sell, Loan, Scout and Pass. The Canal Era goes on until everyone's cards run out: 10 rounds with two players. Let's fast-forward, with bots playing both sides, to the end of the era.",
   },
   {
     kind: 'fastForward',

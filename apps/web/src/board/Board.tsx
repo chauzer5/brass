@@ -540,7 +540,17 @@ export function Board({
   }, [rail]);
 
   useEffect(() => {
-    if (frame) showArea(frame.box, FOCUS_SCALE);
+    if (!frame) return;
+    // After the next layout: what covers the board (the tutorial's card, moving to its new place for a
+    // new step) has to be where it's going before the framing works around it.
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => showArea(frame.box, FOCUS_SCALE));
+    });
+    return () => {
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+    };
   }, [frame?.key]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // A sale to the market: frame the new tile and the market together, so the cubes' whole flight is in view.

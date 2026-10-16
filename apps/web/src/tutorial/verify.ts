@@ -15,11 +15,17 @@ const play = (p: number, a: brass.BrassAction) => {
   if (!r.ok) throw new Error(r.error);
   m = r.value;
 };
-const status = () => m.state.players.map((p, i) => `P${i} £${p.money} inc ${brass.incomeLevel(p.incomeSpace)} vp ${p.vp}`).join(' | ') + ` | ${m.state.era} r${m.state.round}`;
+const tiles = () =>
+  Object.entries(m.state.tiles)
+    .map(([k, t]) => `${k}:P${t!.owner}${t!.industry[0]}${t!.level}${t!.flipped ? 'F' : ''}${t!.cubes ? '×' + t!.cubes : ''}`)
+    .join(' ');
+const status = () =>
+  m.state.players.map((p, i) => `P${i} £${p.money} inc ${brass.incomeLevel(p.incomeSpace)} vp ${p.vp}`).join(' | ') +
+  ` | ${m.state.era} r${m.state.round} next P${who()} | coal mkt ${m.state.coalMarket} iron mkt ${m.state.ironMarket} | ${tiles()}`;
 for (const [i, step] of STEPS.entries()) {
   if (step.kind === 'do') {
     if (who() !== YOU) throw new Error(`step ${i} (${step.title}): it's player ${who()}'s turn, not yours`);
-    const legal = brass.brassGame.legalActions(m.state, YOU).filter((a) => step.allow(a, m.state));
+    const legal = brass.brassGame.legalActions(m.state, YOU).filter((a) => step.allow(a, m.state) && (!step.require || step.require.match(a, m.state)));
     if (legal.length === 0) throw new Error(`step ${i} (${step.title}): no allowed move`);
     play(YOU, legal[0]!);
     say(`#${i} you: ${step.title} -> ${JSON.stringify(legal[0])} (${legal.length} allowed) :: ${status()}`);

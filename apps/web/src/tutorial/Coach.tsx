@@ -11,6 +11,8 @@ export interface CoachState {
   index: number;
   /** Moves you may make now: null when it isn't a "do" step (no moves at all). */
   allow: ((action: brass.BrassAction, state: brass.BrassState) => boolean) | null;
+  /** A check on the finished move, with what to say when it isn't met (e.g. sell both tiles, not one). */
+  require: { match: (action: brass.BrassAction, state: brass.BrassState) => boolean; hint: string } | null;
   /** Bots play both seats, quickly. */
   autoplay: boolean;
   /** The step is waiting for Next. */
@@ -91,6 +93,7 @@ export function useCoach({
     step,
     index,
     allow: step.kind === 'do' && active === YOU ? step.allow : null,
+    require: step.kind === 'do' && active === YOU ? (step.require ?? null) : null,
     autoplay: step.kind === 'fastForward',
     canContinue: step.kind === 'info' || tutorDone,
     next,

@@ -218,6 +218,8 @@ export function Table({
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [revealedFor, setRevealedFor] = useState<number | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  // A message about the move being put together goes once it changes.
+  useEffect(() => setMessage(null), [draft]);
   const [tucked, setTucked] = useState(false);
   const [trayTab, setTrayTab] = useState<TrayTab>('hand');
   /** Another player whose mat is open in a sheet. */
@@ -351,6 +353,11 @@ export function Table({
 
   const submit = (action: brass.BrassAction) => {
     if (player === null) return;
+    // The tutorial can ask for more than any legal move (both tiles in one sale).
+    if (coach?.require && !coach.require.match(action, state)) {
+      setMessage(coach.require.hint);
+      return;
+    }
     const error = play(player, action);
     setMessage(error);
     if (error) return;
