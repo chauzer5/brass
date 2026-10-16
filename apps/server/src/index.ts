@@ -1,0 +1,273 @@
+import { DurableObject } from 'cloudflare:workers';
+import { act, brass, createMatch, randomSeed, replay, type Match } from '@brass/engine';
+import {
+  BOT_NAMES,
+  CODE_ALPHABET,
+  CODE_LENGTH,
+  normalizeCode,
+  type ClientMessage,
+  type CreateGameRequest,
+  type GameSnapshot,
+  type GameStatus,
+  type JoinGameRequest,
+  type LobbyInfo,
+  type PublicSeat,
+  type SeatSetup,
+  type SeatTicket,
+  type ServerMessage,
+} from '@brass/protocol';
+
+/*
+ * The online game server: a Worker that routes requests, and one Durable
+ * Object per game holding its seed, move log and seats. Every move is checked
+ * with the rules engine before it's kept and sent to everyone connected.
+ */
+
+export interface Env {
+  GAMES: DurableObjectNamespace<GameRoom>;
+}
+
+type BrassMatch = Match<brass.BrassConfig, brass.BrassState, brass.BrassAction>;
+
+/** A seat as stored: the secret token is what proves a phone sits there. */
+type StoredSeat =
+  | { kind: 'human'; name: string | null; token: string | null }
+  | { kind: 'bot'; difficulty: brass.BotDifficulty; name: string };
+
+interface StoredGame {
+  code: string;
+  playerCount: brass.PlayerCount;
+  status: GameStatus;
+  seed: number;
+  log: BrassMatch['log'];
+  seats: StoredSeat[];
+  createdAt: number;
+}
+
+const MAX_NAME = 24;
+const cleanName = (name: unknown) => (typeof name === 'string' ? name.trim().slice(0, MAX_NAME) : '');
+const configFor = (playerCount: brass.PlayerCount): brass.BrassConfig => ({ playerCount, components: brass.BIRMINGHAM_COMPONENTS });
+
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...CORS } });
+const fail = (message: string, status = 400) => json({ error: message }, status);
+
+function newCode(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(CODE_LENGTH));
+  return [...bytes].map((b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join('');
+}
+
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const url = new URL(request.url);
+    if (request.method === 'OPTIONS') return new Response(null, { headers: CORS });
+    const parts = url.pathname.split('/').filter(Boolean);
+    if (parts[0] !== 'api' || parts[1] !== 'games') return fail('Not found', 404);
+
+    // POST /api/games: a new game, with a fresh code.
+    if (parts.length === 2 && request.method === 'POST') {
+      const body = (await request.json().catch(() => null)) as CreateGameRequest | null;
+      if (!body) return fail('Bad request');
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const code = newCode();
+        const res = await env.GAMES.get(env.GAMES.idFromName(code)).create(code, body);
+        if (res !== 'taken') return 'error' in res ? fail(res.error) : json(res);
+      }
+      return fail('Could not find a free game code', 503);
+    }
+
+    const code = normalizeCode(parts[2] ?? '');
+    if (code.length !== CODE_LENGTH) return fail('No such game', 404);
+    const room = env.GAMES.get(env.GAMES.idFromName(code));
+
+    // GET /api/games/CODE: who's in, before joining.
+    if (parts.length === 3 && request.method === 'GET') {
+      const info = await room.info();
+      return info ? json(info) : fail('No such game', 404);
+    }
+    // POST /api/games/CODE/join: take a free seat.
+    if (parts[3] === 'join' && request.method === 'POST') {
+      const body = (await request.json().catch(() => null)) as JoinGameRequest | null;
+      if (!body) return fail('Bad request');
+      const res = await room.join(body);
+      return 'error' in res ? fail(res.error, res.status) : json(res);
+    }
+    // GET /api/games/CODE/ws?token=…: the live connection.
+    if (parts[3] === 'ws' && request.headers.get('Upgrade') === 'websocket') return room.fetch(request);
+    return fail('Not found', 404);
+  },
+};
+
+export class GameRoom extends DurableObject<Env> {
+  private game: StoredGame | null = null;
+  private match: BrassMatch | null = null;
+
+  private async load(): Promise<StoredGame | null> {
+    this.game ??= (await this.ctx.storage.get<StoredGame>('game')) ?? null;
+    return this.game;
+  }
+
+  private async save(game: StoredGame) {
+    this.game = game;
+    await this.ctx.storage.put('game', game);
+  }
+
+  /** The game so far, replayed from its seed and moves (kept in memory while the room is awake). */
+  private matchOf(game: StoredGame): BrassMatch {
+    if (this.match && this.match.log.length === game.log.length && this.match.seed === game.seed) return this.match;
+    const r = replay(brass.brassGame, configFor(game.playerCount), game.seed, game.log);
+    if (!r.ok) throw new Error(`Stored game ${game.code} doesn't replay: ${r.error}`);
+    this.match = r.value;
+    return this.match;
+  }
+
+  private publicSeats(game: StoredGame): PublicSeat[] {
+    return game.seats.map((s, i) =>
+      s.kind === 'bot'
+        ? { kind: 'bot', difficulty: s.difficulty, name: s.name }
+        : { kind: 'human', name: s.name, online: this.ctx.getWebSockets(String(i)).some((ws) => ws.readyState === WebSocket.OPEN) },
+    );
+  }
+
+  async create(code: string, req: CreateGameRequest): Promise<SeatTicket | { error: string } | 'taken'> {
+    if (await this.load()) return 'taken';
+    const seats = req.seats;
+    if (!Array.isArray(seats) || seats.length < 2 || seats.length > 4) return { error: 'A game has 2 to 4 players' };
+    const first = seats.findIndex((s) => s.kind === 'human');
+    if (first < 0) return { error: 'At least one player must be human' };
+    const name = cleanName(req.name);
+    if (!name) return { error: 'Enter your name' };
+    let bots = 0;
+    const token = crypto.randomUUID();
+    const stored: StoredSeat[] = seats.map((s: SeatSetup, i) => {
+      if (s.kind === 'bot') {
+        const difficulty = brass.AVAILABLE_DIFFICULTIES.includes(s.difficulty) ? s.difficulty : 'normal';
+        return { kind: 'bot', difficulty, name: BOT_NAMES[bots++ % BOT_NAMES.length]! };
+      }
+      return i === first ? { kind: 'human', name, token } : { kind: 'human', name: null, token: null };
+    });
+    const humansLeft = stored.some((s) => s.kind === 'human' && !s.token);
+    await this.save({
+      code,
+      playerCount: seats.length as brass.PlayerCount,
+      // With nobody else to wait for, the game starts straight away.
+      status: humansLeft ? 'lobby' : 'playing',
+      seed: randomSeed(),
+      log: [],
+      seats: stored,
+      createdAt: Date.now(),
+    });
+    return { code, seat: first, token };
+  }
+
+  async info(): Promise<LobbyInfo | null> {
+    const game = await this.load();
+    return game && { code: game.code, status: game.status, seats: this.publicSeats(game) };
+  }
+
+  async join(req: JoinGameRequest): Promise<SeatTicket | { error: string; status: number }> {
+    const game = await this.load();
+    if (!game) return { error: 'No such game', status: 404 };
+    const seat = game.seats[req.seat];
+    if (!seat || seat.kind !== 'human') return { error: 'That seat is not for a player', status: 400 };
+    if (seat.token) return { error: 'That seat is taken', status: 409 };
+    const name = cleanName(req.name);
+    if (!name) return { error: 'Enter your name', status: 400 };
+    const token = crypto.randomUUID();
+    game.seats[req.seat] = { kind: 'human', name, token };
+    await this.save(game);
+    this.broadcast(game);
+    return { code: game.code, seat: req.seat, token };
+  }
+
+  /** The WebSocket: checks the seat's token, then keeps the socket (tagged with its seat) across hibernation. */
+  override async fetch(request: Request): Promise<Response> {
+    const game = await this.load();
+    if (!game) return fail('No such game', 404);
+    const token = new URL(request.url).searchParams.get('token');
+    const seat = game.seats.findIndex((s) => s.kind === 'human' && !!s.token && s.token === token);
+    if (seat < 0) return fail('Not a player in this game', 403);
+    const pair = new WebSocketPair();
+    this.ctx.acceptWebSocket(pair[1], [String(seat)]);
+    // Everyone sees this player come online.
+    this.broadcast(game);
+    return new Response(null, { status: 101, webSocket: pair[0] });
+  }
+
+  override async webSocketMessage(ws: WebSocket, data: string | ArrayBuffer) {
+    const game = await this.load();
+    if (!game) return;
+    const you = Number(this.ctx.getTags(ws)[0]);
+    let msg: ClientMessage;
+    try {
+      msg = JSON.parse(typeof data === 'string' ? data : new TextDecoder().decode(data)) as ClientMessage;
+    } catch {
+      return this.send(ws, { t: 'error', message: 'Bad message' });
+    }
+
+    if (msg.t === 'start') {
+      if (game.status !== 'lobby') return this.send(ws, this.snapshotMessage(game, you));
+      if (game.seats.some((s) => s.kind === 'human' && !s.token)) return this.send(ws, { t: 'error', message: 'Waiting for players' });
+      game.status = 'playing';
+      await this.save(game);
+      return this.broadcast(game);
+    }
+
+    if (msg.t === 'act') {
+      if (game.status !== 'playing') return this.send(ws, { t: 'error', message: 'The game has not started' });
+      // A move made on an older position (a bot played by two phones, or a late tap): resend the game.
+      if (msg.at !== game.log.length) return this.send(ws, this.snapshotMessage(game, you));
+      const seat = game.seats[msg.player];
+      if (!seat || (msg.player !== you && seat.kind !== 'bot')) return this.send(ws, { t: 'error', message: "That isn't your seat" });
+      const r = act(brass.brassGame, this.matchOf(game), msg.player, msg.action);
+      if (!r.ok) {
+        this.send(ws, { t: 'error', message: r.error });
+        return this.send(ws, this.snapshotMessage(game, you));
+      }
+      this.match = r.value;
+      game.log = r.value.log;
+      await this.save(game);
+      return this.broadcast(game);
+    }
+  }
+
+  override async webSocketClose(ws: WebSocket) {
+    ws.close();
+    const game = await this.load();
+    // Everyone sees this player go offline (the closing socket no longer counts).
+    if (game) this.broadcast(game, ws);
+  }
+
+  private snapshotMessage(game: StoredGame, you: number): ServerMessage {
+    const snapshot: GameSnapshot = {
+      code: game.code,
+      playerCount: game.playerCount,
+      status: game.status,
+      seats: this.publicSeats(game),
+      seed: game.seed,
+      log: game.log,
+      you,
+    };
+    return { t: 'state', game: snapshot };
+  }
+
+  private send(ws: WebSocket, msg: ServerMessage) {
+    try {
+      ws.send(JSON.stringify(msg));
+    } catch {
+      // A socket that's going away.
+    }
+  }
+
+  private broadcast(game: StoredGame, except?: WebSocket) {
+    for (const ws of this.ctx.getWebSockets()) {
+      if (ws === except) continue;
+      this.send(ws, this.snapshotMessage(game, Number(this.ctx.getTags(ws)[0])));
+    }
+  }
+}
