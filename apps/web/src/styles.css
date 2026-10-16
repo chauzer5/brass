@@ -3448,3 +3448,86 @@ button.lobby-seat:disabled {
 .zoom-controls button:hover {
   background: color-mix(in srgb, var(--line) 40%, transparent);
 }
+
+/* ---- New game and the games list ---- */
+
+.mode-switch {
+  grid-template-columns: 1fr 1fr;
+}
+
+.mode-switch button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--ink);
+  font: inherit;
+}
+
+.join-link {
+  align-self: center;
+}
+
+.game-kind {
+  grid-area: code;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.game-kind-icon {
+  display: inline-grid;
+  place-items: center;
+}
+
+.game-kind.local {
+  color: var(--muted);
+}
+
+.game-kind.online {
+  color: #2f7fb8;
+}
+
+.game-row.online .online-game {
+  border-left: 4px solid #2f7fb8;
+}
+
+.game-row.local .online-game {
+  border-left: 4px solid var(--line);
+}
+
+.game-row.online.yours .online-game {
+  border-color: var(--highlight);
+  border-left-color: #2f7fb8;
+}
+
+.game-row.confirming {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--danger);
+}
+
+.game-row.confirming .confirm-text {
+  flex: 1;
+  font-weight: 700;
+}
+
+.game-row.confirming button {
+  width: auto;
+  min-height: 40px;
+  padding: 0 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .game-kind.online { color: #6db3e6; }
+  :root:not([data-theme='light']) .game-row.online .online-game { border-left-color: #6db3e6; }
+}
+
+:root[data-theme='dark'] .game-kind.online { color: #6db3e6; }
+:root[data-theme='dark'] .game-row.online .online-game { border-left-color: #6db3e6; }

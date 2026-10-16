@@ -82,6 +82,8 @@ export interface SavedTicket extends SeatTicket {
   joinedAt: number;
   /** The draw for who goes first has been shown on this phone. */
   introSeen?: boolean;
+  /** When it was last opened on this phone (ms). */
+  viewedAt?: number;
 }
 
 export function savedTickets(): SavedTicket[] {
@@ -104,6 +106,10 @@ export function saveTicket(ticket: SeatTicket): SavedTicket {
   const saved = { ...ticket, joinedAt: Date.now() };
   storeTickets([saved, ...savedTickets().filter((t) => t.code !== ticket.code)]);
   return saved;
+}
+
+export function markViewed(code: string) {
+  storeTickets(savedTickets().map((t) => (t.code === code ? { ...t, viewedAt: Date.now() } : t)));
 }
 
 export function markIntroSeen(code: string) {

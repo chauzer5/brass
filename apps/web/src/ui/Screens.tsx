@@ -1,5 +1,5 @@
 import { brass, type Outcome } from '@brass/engine';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { HUMAN, type Seat } from '../game/useGame.ts';
 import { GameCard } from './HandTray.tsx';
 import { IncomeTrack } from './IncomeTrack.tsx';
@@ -14,24 +14,23 @@ const BOT_NAMES = ['Bot Richard', 'Bot George', 'Bot Eleanor'];
 export const DIFFICULTY_LABEL: Record<brass.BotDifficulty, string> = { easy: 'Easy', normal: 'Medium', hard: 'Hard' };
 
 /**
- * The main menu: carry on, start a game, learn, read the rules, settings.
- * Setting up a new game is a page of its own.
+ * The main menu: carry on, start a game, the list of games, learn, read the rules, settings.
+ * New games, the list of games and the games themselves are pages of their own.
  */
-export function NewGame({
-  onStart,
+export function MainMenu({
   onResume,
+  onNew,
+  onList,
   onTutorial,
-  onOnline,
 }: {
-  onStart: (names: string[], seats: Seat[]) => void;
   onResume?: (() => void) | undefined;
+  onNew: () => void;
+  onList: () => void;
   onTutorial: () => void;
-  onOnline: () => void;
 }) {
-  const [page, setPage] = useState<'menu' | 'setup' | 'settings' | 'rulebook'>('menu');
+  const [page, setPage] = useState<'menu' | 'settings' | 'rulebook'>('menu');
   if (page === 'settings') return <Settings onClose={() => setPage('menu')} />;
   if (page === 'rulebook' && __RULEBOOK__) return <Rulebook pages={__RULEBOOK__} onClose={() => setPage('menu')} />;
-  if (page === 'setup') return <MatchSetup onStart={onStart} onBack={() => setPage('menu')} replacesSave={!!onResume} />;
   return (
     <div className="screen">
       <div className="screen-card main-menu">
@@ -39,14 +38,14 @@ export function NewGame({
         <h1 className="menu-title">Brass: Birmingham</h1>
         {onResume && (
           <button className="confirm" onClick={onResume}>
-            Resume local game
+            Resume current game
           </button>
         )}
-        <button className={onResume ? 'secondary' : 'confirm'} onClick={() => setPage('setup')}>
-          New local game
+        <button className={onResume ? 'secondary' : 'confirm'} onClick={onNew}>
+          New game
         </button>
-        <button className="secondary" onClick={onOnline}>
-          Play online
+        <button className="secondary" onClick={onList}>
+          Games list
         </button>
         <button className="secondary" onClick={onTutorial}>
           Learn to play
@@ -65,16 +64,7 @@ export function NewGame({
 }
 
 /** Setting up a game: how many players, and who (or which bot) plays each seat. */
-function MatchSetup({
-  onStart,
-  onBack,
-  replacesSave,
-}: {
-  onStart: (names: string[], seats: Seat[]) => void;
-  onBack: () => void;
-  /** Starting replaces the game that's saved. */
-  replacesSave: boolean;
-}) {
+export function MatchSetup({ onStart, header }: { onStart: (names: string[], seats: Seat[]) => void; header: ReactNode }) {
   const [count, setCount] = useState(2);
   const [names, setNames] = useState(['Player 1', 'Player 2', 'Player 3', 'Player 4']);
   const [seats, setSeats] = useState<Seat[]>([HUMAN, HUMAN, HUMAN, HUMAN]);
@@ -102,12 +92,7 @@ function MatchSetup({
   return (
     <div className="screen">
       <div className="screen-card">
-        <div className="panel-header">
-          <button className="close" onClick={onBack} aria-label="Back to menu">
-            ‹
-          </button>
-          <h2>New local game</h2>
-        </div>
+        {header}
         <p className="muted">
           {humans === 1 ? 'You against the bots.' : 'Pass the device between players; bots take their turns on their own.'}
         </p>
@@ -179,7 +164,6 @@ function MatchSetup({
         <button className="confirm" onClick={() => onStart(chosen.map((_, i) => nameOf(i)), chosen)}>
           Start game
         </button>
-        {replacesSave && <p className="muted setup-note">Starting replaces your saved game.</p>}
       </div>
     </div>
   );

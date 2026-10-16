@@ -4,20 +4,22 @@ import { Board, MARKET_BOX, cubesDuration, eraDuration, goodsDuration, saleDurat
 import { effectsOf, type CubeScene, type EraScene, type GoodsSale } from './game/effects.ts';
 import { EMPTY_DRAFT, availableKinds, compose, developIndustries, highlights, tapLink, usableCards, type Draft } from './game/draft.ts';
 import { explainBuild, explainBuildAny } from './game/explain.ts';
-import { canUndo, useGame, type Game } from './game/useGame.ts';
+import { canUndo, lastGame, savedLocalGames, useGame, type Game } from './game/useGame.ts';
 import { ActionRail } from './ui/ActionRail.tsx';
 import { HandTray, type Arriving, type TrayTab } from './ui/HandTray.tsx';
 import { IncomeTrack } from './ui/IncomeTrack.tsx';
 import { PlayerMat } from './ui/PlayerMat.tsx';
 import { Rulebook } from './ui/Rulebook.tsx';
-import { DiscardSheet, EraSummary, FirstPlayer, GameLogSheet, Handoff, Settings, MatSheet, NewGame, PlayerStrip } from './ui/Screens.tsx';
+import { DiscardSheet, EraSummary, FirstPlayer, GameLogSheet, Handoff, Settings, MatSheet, MainMenu, PlayerStrip } from './ui/Screens.tsx';
 import { StepPanel, pickCard, tapMatRow, tapMerchant, tapSlot } from './ui/TurnPanel.tsx';
 import { choosable, chosenSource, gloucesterBonus, sourceNeeds } from './game/sources.ts';
 import { gameLog, recapSince, type RecapItem } from './game/recap.ts';
 import { runBot } from './bot/runBot.ts';
 import { Coach, useCoach } from './tutorial/Coach.tsx';
 import { useWide } from './ui/layout.ts';
-import { Online } from './online/OnlineScreens.tsx';
+import { JoinGame, OnlineGame } from './online/OnlineScreens.tsx';
+import { savedTickets, type SavedTicket } from './online/client.ts';
+import { GamesList, NewGameFlow } from './ui/Games.tsx';
 import { normalizeCode } from '@brass/protocol';
 
 /** Looking over a finished game: the whole map. */
@@ -36,46 +38,92 @@ function takeJoinCode(): string | undefined {
   return normalizeCode(code);
 }
 
-export function App() {
-  const { game, start, play, playBot, undoLast, quit, startTutorial, exitTutorial, keepPlaying, introDone } = useGame();
-  const [join] = useState(takeJoinCode);
-  const [online, setOnline] = useState(join !== undefined);
-  const [showSetup, setShowSetup] = useState(!game);
+type Screen =
+  | { kind: 'menu' }
+  | { kind: 'new' }
+  | { kind: 'list' }
+  | { kind: 'join'; code: string }
+  /** The local game (or tutorial) that useGame holds. */
+  | { kind: 'local' }
+  | { kind: 'online'; ticket: SavedTicket };
 
-  if (online) return <Online join={join} onBack={() => setOnline(false)} />;
-  if (!game || showSetup) {
+/** Where the app opens: a join link (or a tapped notification) goes to that game, else the main menu. */
+function firstScreen(): Screen {
+  const code = takeJoinCode();
+  if (code === undefined) return { kind: 'menu' };
+  const ticket = savedTickets().find((t) => t.code === code);
+  return ticket ? { kind: 'online', ticket } : { kind: 'join', code };
+}
+
+export function App() {
+  const local = useGame();
+  const [screen, setScreen] = useState<Screen>(firstScreen);
+  const menu = () => {
+    local.close();
+    setScreen({ kind: 'menu' });
+  };
+  const openOnline = (ticket: SavedTicket) => setScreen({ kind: 'online', ticket });
+  const openLocal = (id: string) => {
+    if (local.open(id)) setScreen({ kind: 'local' });
+  };
+
+  if (screen.kind === 'local' && local.game) {
+    const game = local.game;
     return (
-      <NewGame
-        onOnline={() => setOnline(true)}
-        onStart={(names, seats) => {
-          start(names, seats);
-          setShowSetup(false);
+      <Table
+        key={game.id ?? 'tutorial'}
+        game={game}
+        play={local.play}
+        playBot={local.playBot}
+        undoLast={local.undoLast}
+        onMenu={menu}
+        // From the final scores: this game is done with (it goes from the list), on to a new one.
+        onNewGame={() => {
+          local.remove();
+          setScreen({ kind: 'new' });
         }}
-        onResume={game && !brass.brassGame.outcome(game.match.state) ? () => setShowSetup(false) : undefined}
-        onTutorial={() => {
-          startTutorial();
-          setShowSetup(false);
-        }}
+        onExitTutorial={menu}
+        onKeepPlaying={local.keepPlaying}
+        onIntroDone={local.introDone}
       />
     );
   }
+  if (screen.kind === 'online') {
+    return <OnlineGame key={screen.ticket.code} ticket={screen.ticket} onBack={menu} onNewGame={() => setScreen({ kind: 'new' })} />;
+  }
+  if (screen.kind === 'join') return <JoinGame initialCode={screen.code} onBack={() => setScreen({ kind: 'new' })} onJoined={openOnline} />;
+  if (screen.kind === 'new') {
+    return (
+      <NewGameFlow
+        onBack={menu}
+        onStartLocal={(names, seats) => {
+          local.start(names, seats);
+          setScreen({ kind: 'local' });
+        }}
+        onCreatedOnline={openOnline}
+        onJoin={() => setScreen({ kind: 'join', code: '' })}
+      />
+    );
+  }
+  if (screen.kind === 'list') {
+    return <GamesList onBack={menu} onOpenLocal={openLocal} onOpenOnline={openOnline} onNew={() => setScreen({ kind: 'new' })} />;
+  }
+
+  // "Resume current game": the last game looked at, local or online, if it's still here.
+  // (Reading the local games first also moves a game saved the old way into the list, and makes it the last.)
+  const locals = savedLocalGames();
+  const last = lastGame();
+  const lastTicket = last?.kind === 'online' ? savedTickets().find((t) => t.code === last.code) : undefined;
+  const lastLocal = last?.kind === 'local' && locals.some((g) => g.id === last.id) ? last.id : undefined;
   return (
-    <Table
-      game={game}
-      play={play}
-      playBot={playBot}
-      undoLast={undoLast}
-      onMenu={() => setShowSetup(true)}
-      onNewGame={() => {
-        quit();
-        setShowSetup(true);
+    <MainMenu
+      onResume={lastTicket ? () => openOnline(lastTicket) : lastLocal ? () => openLocal(lastLocal) : undefined}
+      onNew={() => setScreen({ kind: 'new' })}
+      onList={() => setScreen({ kind: 'list' })}
+      onTutorial={() => {
+        local.startTutorial();
+        setScreen({ kind: 'local' });
       }}
-      onExitTutorial={() => {
-        exitTutorial();
-        setShowSetup(true);
-      }}
-      onKeepPlaying={keepPlaying}
-      onIntroDone={introDone}
     />
   );
 }
@@ -86,7 +134,6 @@ export function Table({
   playBot,
   undoLast,
   onMenu,
-  menuLabel = 'Main menu',
   onNewGame,
   onExitTutorial,
   onKeepPlaying,
@@ -101,7 +148,6 @@ export function Table({
   /** Missing online: moves there can't be taken back. */
   undoLast?: (() => void) | undefined;
   onMenu: () => void;
-  menuLabel?: string;
   onNewGame: () => void;
   onExitTutorial: () => void;
   onKeepPlaying: () => void;
@@ -618,7 +664,7 @@ export function Table({
           <div className="game-menu" role="menu">
             {(
               [
-                coach ? (['Exit tutorial', onExitTutorial] as const) : ([menuLabel, onMenu] as const),
+                coach ? (['Exit tutorial', onExitTutorial] as const) : (['Main menu', onMenu] as const),
                 ['Game log', () => setSheet('log')],
                 ...(__RULEBOOK__ ? ([['Rulebook', () => setSheet('rulebook')]] as const) : []),
                 ['Settings', () => setSheet('settings')],

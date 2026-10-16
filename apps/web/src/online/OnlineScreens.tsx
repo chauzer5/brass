@@ -1,8 +1,8 @@
 import { brass } from '@brass/engine';
 import { CODE_LENGTH, TURN_LIMITS, normalizeCode, type GameSnapshot, type LobbyInfo, type PublicSeat, type SeatSetup } from '@brass/protocol';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Table } from '../App.tsx';
-import type { Game, Seat } from '../game/useGame.ts';
+import { setLastGame, type Game, type Seat } from '../game/useGame.ts';
 import { DIFFICULTY_LABEL } from '../ui/Screens.tsx';
 import {
   createGame,
@@ -16,6 +16,7 @@ import {
   leaveGame,
   lobbyInfo,
   markIntroSeen,
+  markViewed,
   saveName,
   saveTicket,
   savedName,
@@ -24,113 +25,7 @@ import {
   type SavedTicket,
 } from './client.ts';
 
-type Page = { kind: 'home' } | { kind: 'create' } | { kind: 'join'; code: string } | { kind: 'game'; ticket: SavedTicket };
-
-/**
- * Playing online: the games this phone is in, making a new one, joining one
- * with its code (or link), and the games themselves.
- */
-export function Online({ join, onBack }: { join?: string | undefined; onBack: () => void }) {
-  const [page, setPage] = useState<Page>(() => {
-    if (!join) return { kind: 'home' };
-    // A link to a game this phone is already in opens it.
-    const mine = savedTickets().find((t) => t.code === join);
-    return mine ? { kind: 'game', ticket: mine } : { kind: 'join', code: join };
-  });
-  const home = () => setPage({ kind: 'home' });
-  const open = (ticket: SavedTicket) => setPage({ kind: 'game', ticket });
-
-  if (page.kind === 'create') return <CreateGame onBack={home} onCreated={open} />;
-  if (page.kind === 'join') return <JoinGame initialCode={page.code} onBack={home} onJoined={open} />;
-  if (page.kind === 'game') return <OnlineGame key={page.ticket.code} ticket={page.ticket} onBack={home} />;
-  return <OnlineHome onBack={onBack} onCreate={() => setPage({ kind: 'create' })} onJoin={() => setPage({ kind: 'join', code: '' })} onOpen={open} />;
-}
-
-// ---- The games this phone is in ----
-
-function OnlineHome({
-  onBack,
-  onCreate,
-  onJoin,
-  onOpen,
-}: {
-  onBack: () => void;
-  onCreate: () => void;
-  onJoin: () => void;
-  onOpen: (ticket: SavedTicket) => void;
-}) {
-  const [tickets, setTickets] = useState(savedTickets);
-  // Each game's state, fetched when the list opens (null: couldn't be reached; missing: still loading).
-  const [infos, setInfos] = useState<Record<string, LobbyInfo | null>>({});
-  useEffect(() => {
-    let cancelled = false;
-    for (const t of tickets) {
-      lobbyInfo(t.code)
-        .then((info) => !cancelled && setInfos((m) => ({ ...m, [t.code]: info })))
-        .catch(() => !cancelled && setInfos((m) => ({ ...m, [t.code]: null })));
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const forget = (code: string) => {
-    forgetTicket(code);
-    setTickets(savedTickets());
-  };
-
-  return (
-    <div className="screen">
-      <div className="screen-card">
-        <div className="panel-header">
-          <button className="close" onClick={onBack} aria-label="Back to menu">
-            ‹
-          </button>
-          <h2>Play online</h2>
-        </div>
-        <p className="muted">Play with friends on their own phones. Start a game and send them its code, or join theirs.</p>
-        <div className="online-actions">
-          <button className="confirm" onClick={onCreate}>
-            Create game
-          </button>
-          <button className="secondary" onClick={onJoin}>
-            Join with code
-          </button>
-        </div>
-        <PushPrompt />
-        {tickets.length > 0 && (
-          <>
-            <h3>Your games</h3>
-            <ul className="online-games">
-              {tickets.map((t) => {
-                const info = infos[t.code];
-                const label = statusLabel(info, t.seat);
-                return (
-                  <li key={t.code} className={label.yours ? 'yours' : ''}>
-                    <button className="online-game" onClick={() => onOpen(t)}>
-                      <span className="online-game-code">{t.code}</span>
-                      <span className="online-game-players">
-                        {info ? info.seats.map((s, i) => seatName(s, i)).join(', ') : info === null ? 'Not found' : 'Loading…'}
-                      </span>
-                      <span className="online-game-status">{label.text}</span>
-                    </button>
-                    {(info === null || info?.finished || info?.status === 'cancelled') && (
-                      <button className="close online-forget" onClick={() => forget(t.code)} aria-label={`Remove game ${t.code}`}>
-                        ×
-                      </button>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function statusLabel(info: LobbyInfo | null | undefined, you: number): { text: string; yours: boolean } {
+export function statusLabel(info: LobbyInfo | null | undefined, you: number): { text: string; yours: boolean } {
   if (info === undefined) return { text: '', yours: false };
   if (info === null) return { text: '', yours: false };
   if (info.status === 'cancelled') return { text: 'Cancelled', yours: false };
@@ -143,13 +38,14 @@ function statusLabel(info: LobbyInfo | null | undefined, you: number): { text: s
   return { text: info.current !== null ? `${seatName(info.seats[info.current]!, info.current)}'s turn` : '', yours: false };
 }
 
-const seatName = (s: PublicSeat, i: number) => (s.kind === 'bot' ? s.name : (s.name ?? `Player ${i + 1}`));
+export const seatName = (s: PublicSeat, i: number) => (s.kind === 'bot' ? s.name : (s.name ?? `Player ${i + 1}`));
 
 // ---- Making a game ----
 
 type OtherSeat = { kind: 'friend' } | { kind: 'bot'; difficulty: brass.BotDifficulty };
 
-function CreateGame({ onBack, onCreated }: { onBack: () => void; onCreated: (ticket: SavedTicket) => void }) {
+/** Making an online game: your name, who else plays, the turn limit. (`header` tops the page.) */
+export function CreateGame({ header, onCreated }: { header: ReactNode; onCreated: (ticket: SavedTicket) => void }) {
   const [name, setName] = useState(savedName);
   const [count, setCount] = useState(2);
   const [others, setOthers] = useState<OtherSeat[]>([{ kind: 'friend' }, { kind: 'friend' }, { kind: 'friend' }]);
@@ -181,12 +77,8 @@ function CreateGame({ onBack, onCreated }: { onBack: () => void; onCreated: (tic
   return (
     <div className="screen">
       <div className="screen-card">
-        <div className="panel-header">
-          <button className="close" onClick={onBack} aria-label="Back">
-            ‹
-          </button>
-          <h2>Create game</h2>
-        </div>
+        {header}
+        <PushPrompt />
         <h3>Your name</h3>
         <div className="name-row">
           <span className="dot owner-0" aria-hidden />
@@ -263,7 +155,7 @@ function CreateGame({ onBack, onCreated }: { onBack: () => void; onCreated: (tic
 
 // ---- Joining a game ----
 
-function JoinGame({ initialCode, onBack, onJoined }: { initialCode: string; onBack: () => void; onJoined: (ticket: SavedTicket) => void }) {
+export function JoinGame({ initialCode, onBack, onJoined }: { initialCode: string; onBack: () => void; onJoined: (ticket: SavedTicket) => void }) {
   const [code, setCode] = useState(initialCode);
   const [info, setInfo] = useState<LobbyInfo | null>(null);
   const [name, setName] = useState(savedName);
@@ -393,12 +285,17 @@ function JoinGame({ initialCode, onBack, onJoined }: { initialCode: string; onBa
 
 // ---- A game ----
 
-function OnlineGame({ ticket, onBack }: { ticket: SavedTicket; onBack: () => void }) {
+export function OnlineGame({ ticket, onBack, onNewGame }: { ticket: SavedTicket; onBack: () => void; onNewGame: () => void }) {
   const { snapshot, match, connection, error, clearError, notice, clearNotice, play, playBot, start } = useOnlineGame(ticket);
   const [introSeen, setIntroSeen] = useState(!!ticket.introSeen);
   const [confirmLeave, setConfirmLeave] = useState(false);
-  // Notifications for this game, if they're on (it's safe to sign up again each time).
-  useEffect(() => void registerPush(ticket), [ticket]);
+  // Notifications for this game, if they're on (it's safe to sign up again each time). And it's the game
+  // "Resume current game" comes back to.
+  useEffect(() => {
+    void registerPush(ticket);
+    setLastGame({ kind: 'online', code: ticket.code });
+    markViewed(ticket.code);
+  }, [ticket]);
   const [leaveError, setLeaveError] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
 
@@ -484,8 +381,7 @@ function OnlineGame({ ticket, onBack }: { ticket: SavedTicket; onBack: () => voi
         play={play}
         playBot={playBot}
         onMenu={onBack}
-        menuLabel="Online games"
-        onNewGame={onBack}
+        onNewGame={onNewGame}
         onExitTutorial={onBack}
         onKeepPlaying={() => {}}
         onIntroDone={() => {
@@ -555,7 +451,7 @@ function OnlineGame({ ticket, onBack }: { ticket: SavedTicket; onBack: () => voi
  * Turning on notifications (your turn, a game starting or ending). Shown until they're on; on an iPhone in
  * Safari, where they can't be, it says how to get them.
  */
-function PushPrompt() {
+export function PushPrompt() {
   const [state, setState] = useState<PushState>(pushState);
   const [busy, setBusy] = useState(false);
   if (state === 'granted') return null;
