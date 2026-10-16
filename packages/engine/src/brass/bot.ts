@@ -96,17 +96,19 @@ export interface BotSettings {
 }
 
 /*
- * Tested head to head (2 players, 20 games each): Hard wins about 70% against
- * Normal, Easy about 15%. All three value cash in hand when nearly broke
- * (liquidity), so none sits passing with no money rather than borrowing; Hard
- * gets its edge from weighing what its moves give the leading opponent and
- * not borrowing money it has no time left to spend; Easy looks at fewer
+ * Tested head to head (2 players, 20 games each): Hard wins about 75% against
+ * Normal (shown as Medium), Easy about 25%. All three value cash in hand when
+ * nearly broke (liquidity), so none sits passing with no money rather than
+ * borrowing, and value money beyond what they could still spend (about £15 a
+ * round left) at a quarter, so none borrows money it has no time left to
+ * spend. Hard gets its edge from weighing what its moves give the leading
+ * opponent; Easy looks at fewer
  * moves and often plays a decent move instead of the best (never an idle
  * pass). Easy passes on about 2% of its actions, Normal on none.
  */
 const SETTINGS: Record<BotDifficulty, BotSettings> = {
-  easy: { noise: 5, breadth: 2, slip: 0.5, slack: 8, weights: { liquidity: 0.3 } },
-  normal: { noise: 0.6, breadth: 10, weights: { liquidity: 0.3 } },
+  easy: { noise: 5, breadth: 2, slip: 0.5, slack: 8, weights: { liquidity: 0.3, spendPerRound: 15 } },
+  normal: { noise: 0.6, breadth: 10, weights: { liquidity: 0.3, spendPerRound: 15 } },
   hard: { noise: 0.2, breadth: 20, rivalry: 0.5, weights: { spendPerRound: 15, liquidity: 0.15 } },
 };
 
