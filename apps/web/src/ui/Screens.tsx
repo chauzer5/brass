@@ -6,6 +6,7 @@ import { IncomeTrack } from './IncomeTrack.tsx';
 import { PlayerMat } from './PlayerMat.tsx';
 import { Rulebook } from './Rulebook.tsx';
 import type { LogEntry, RecapItem } from '../game/recap.ts';
+import { joinNames, tieBreaks } from '../game/ties.ts';
 import { useTheme, type ThemeSetting } from '../settings.ts';
 
 /** Bots are named after the players on the front of the Brass rulebook. */
@@ -391,14 +392,18 @@ export function EraSummary({
     : [...view.players]
         .sort((a, b) => b.vp - a.vp)
         .map((p, i, all) => ({ id: p.id, rank: 1 + all.findIndex((o) => o.vp === p.vp) }));
-  const tied = final && new Set(order.map((o) => view.players[o.id]!.vp)).size < order.length;
+  // Players level on VP at the end: what settled it (income, then money), or a shared place.
+  const ties = final ? tieBreaks(view.players, order, names) : [];
+  const inTie = new Set(ties.flatMap((t) => t.ids));
+  const showsMoney = new Set(ties.filter((t) => t.usedMoney).flatMap((t) => t.ids));
+  const winners = order.filter((o) => o.rank === 1).map((o) => names[o.id]!);
   const shownEras = final ? eras : [latest];
   const other = (id: number) => view.players[id]!.vp - eras.reduce((sum, e) => sum + e.players[id]!.after - e.players[id]!.before, 0);
   const eraLabel = (era: brass.Era) => (era === 'canal' ? 'Canal Era' : 'Rail Era');
   return (
     <div className="overlay">
       <div className="screen-card era-summary">
-        <h2>{final ? `${names[order[0]!.id]} wins!` : 'End of the Canal Era'}</h2>
+        <h2>{final ? (winners.length > 1 ? `${joinNames(winners)} share the win!` : `${winners[0]} wins!`) : 'End of the Canal Era'}</h2>
         <p className="muted">
           {final
             ? 'Final scores, with what each era scored.'
@@ -415,6 +420,24 @@ export function EraSummary({
                   <span className="era-name">{names[id]}</span>
                   <span className="era-total">{p.vp} VP</span>
                 </div>
+                {inTie.has(id) && (
+                  <div className="era-line era-tiebreak">
+                    <span className="era-which">Tiebreak</span>
+                    <span>
+                      Income{' '}
+                      <strong>
+                        {brass.incomeLevel(p.incomeSpace) >= 0 ? '+' : ''}
+                        {brass.incomeLevel(p.incomeSpace)}
+                      </strong>
+                      {showsMoney.has(id) && (
+                        <>
+                          {' '}
+                          · Money <strong>£{p.money}</strong>
+                        </>
+                      )}
+                    </span>
+                  </div>
+                )}
                 {shownEras.map((e) => {
                   const sc = e.players[id]!;
                   return (
@@ -445,7 +468,11 @@ export function EraSummary({
             );
           })}
         </ol>
-        {tied && <p className="muted era-note">Tied VPs are broken by income, then money.</p>}
+        {ties.map((t) => (
+          <p key={t.ids.join()} className="muted era-note">
+            {t.text}
+          </p>
+        ))}
         {!final && <p className="muted era-note">{eraLabel('rail')}: only rail links from now on, and Canal-only tiles can no longer be built.</p>}
         {final ? (
           <div className="era-buttons">

@@ -626,6 +626,11 @@ button {
   font-weight: 700;
 }
 
+/* "Tiebreak" is longer than the era labels. */
+.era-tiebreak .era-which {
+  width: auto;
+}
+
 .era-gain {
   margin-left: auto;
   font-weight: 700;
