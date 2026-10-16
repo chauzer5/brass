@@ -25,20 +25,23 @@ function Glyph({ kind }: { kind: 'coal' | 'iron' | 'beer' | 'link' }) {
   );
 }
 
-/** What a tile costs to build, and what it's worth once flipped. */
-export function TileStats({ tile }: { tile: brass.TileLevel }) {
+/** What a tile costs to build, what it makes when built (coal, iron or beer), and what it's worth once flipped. */
+export function TileStats({ tile, industry, era }: { tile: brass.TileLevel; industry: brass.Industry; era: brass.Era }) {
+  // Coal Mines and Iron Works make their level's cubes; a Brewery makes 1 barrel in the Canal Era, 2 in the Rail Era.
+  const makes = industry === 'coal' || industry === 'iron' ? tile.produces : industry === 'brewery' ? brass.BREWERY_BEER[era] : 0;
+  const kind = industry === 'brewery' ? 'beer' : industry;
   return (
     <span className="tile-stats">
       <span className="tile-cost">
         £{tile.cost}
         {tile.coal > 0 && (
-          <span className="stat">
+          <span className="stat" title="Coal to build">
             <Glyph kind="coal" />
             {tile.coal}
           </span>
         )}
         {tile.iron > 0 && (
-          <span className="stat">
+          <span className="stat" title="Iron to build">
             <Glyph kind="iron" />
             {tile.iron}
           </span>
@@ -47,6 +50,19 @@ export function TileStats({ tile }: { tile: brass.TileLevel }) {
           <span className="stat" title="Beer to sell">
             sell <Glyph kind="beer" />
             {tile.beer}
+          </span>
+        )}
+        {makes > 0 && (
+          <span
+            className="stat stat-makes"
+            title={
+              industry === 'brewery'
+                ? `Makes ${makes} beer when built (1 in the Canal Era, 2 in the Rail Era)`
+                : `Makes ${makes} ${industry} when built`
+            }
+          >
+            makes <Glyph kind={kind as 'coal' | 'iron' | 'beer'} />
+            {makes}
           </span>
         )}
       </span>
@@ -280,7 +296,7 @@ export function PlayerMat({
                     {/* The row already says which industry; keep the label short so the card stays clear of the boxes. */}
                     Level {roman(heldTile.level)} · {player.mat[industry][heldTile.level - 1] ?? 0} of {heldTile.count} left
                   </span>
-                  <TileStats tile={heldTile} />
+                  <TileStats tile={heldTile} industry={industry} era={era} />
                   {[
                     heldTile.canalOnly && 'Canal Era only',
                     heldTile.railOnly && 'Rail Era only',
@@ -296,7 +312,7 @@ export function PlayerMat({
               )}
               {tile ? (
                 <>
-                  <TileStats tile={tile} />
+                  <TileStats tile={tile} industry={industry} era={era} />
                   {note && <span className="mat-note">{note}</span>}
                 </>
               ) : (

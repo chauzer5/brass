@@ -243,8 +243,17 @@ function TileFace({ tile }: { tile: brass.BuiltTile }) {
         </g>
       )}
       {tile.cubes > 0 && (
-        <g transform={`translate(${SLOT - 4} 4)`}>
-          <circle r={7} className={`cube cube-${tile.industry}`} />
+        // What's left on it, drawn as the thing itself: a coal or iron cube, or a beer barrel, with the count.
+        <g transform={`translate(${SLOT - 4} 4)`} className="tile-cubes">
+          <title>{`${tile.cubes} ${tile.industry === 'brewery' ? 'beer' : tile.industry} left on it`}</title>
+          {tile.industry === 'brewery' ? (
+            <>
+              <rect x={-7} y={-8.5} width={14} height={17} rx={5} className="cube cube-brewery" />
+              <path d="M-7 -3.5 H7 M-7 3.5 H7" className="cube-band" />
+            </>
+          ) : (
+            <rect x={-7.5} y={-7.5} width={15} height={15} rx={2.5} className={`cube cube-${tile.industry}`} />
+          )}
           <text className="cube-count">{tile.cubes}</text>
         </g>
       )}

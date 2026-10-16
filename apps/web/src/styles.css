@@ -905,9 +905,12 @@ button {
 .cube-iron { fill: #e07b1f; }
 .cube-brewery { fill: #8a5a2b; }
 
+.cube-band { stroke: rgba(0, 0, 0, 0.35); stroke-width: 1.2; fill: none; }
+.tile-cubes .cube { stroke-width: 1.4; filter: drop-shadow(0 0.6px 0.8px rgba(0, 0, 0, 0.45)); }
+
 .cube-count {
   fill: #fff;
-  font-size: 9.5px;
+  font-size: 10.5px;
   font-weight: 700;
   text-anchor: middle;
   dominant-baseline: central;
@@ -1908,6 +1911,8 @@ button {
 .glyph-beer { fill: var(--beer); }
 .glyph-beer .glyph-band { stroke: color-mix(in srgb, var(--beer) 50%, #000); stroke-width: 1; fill: none; }
 .glyph-link { fill: var(--muted); }
+/* What a tile makes is set apart from what it costs. */
+.stat-makes { margin-left: 4px; font-weight: 700; }
 .glyph-link .glyph-line { stroke: var(--muted); stroke-width: 1.6; }
 
 .tile-stats .stat {

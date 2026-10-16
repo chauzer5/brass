@@ -326,7 +326,7 @@ function BuildSteps({ view, me, legal, draft, setDraft }: StepProps & { me: bras
       {tile && draft.industry && (
         <p className="muted build-summary">
           <IndustryIcon industry={draft.industry} size={16} /> {INDUSTRY_NAME[draft.industry]} {lowest(me, draft.industry)}
-          <TileStats tile={tile} />
+          <TileStats tile={tile} industry={draft.industry} era={view.era} />
         </p>
       )}
     </>
