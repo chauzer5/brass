@@ -53,6 +53,12 @@ export function CreateGame({ header, onCreated }: { header: ReactNode; onCreated
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const setOther = (i: number, seat: OtherSeat) => setOthers((os) => os.map((s, j) => (j === i ? seat : s)));
+  // An online game needs at least one friend (against only bots, play on this device).
+  const friends = others.slice(0, count - 1).filter((s) => s.kind === 'friend').length;
+  const changeCount = (n: number) => {
+    setCount(n);
+    if (!others.slice(0, n - 1).some((s) => s.kind === 'friend')) setOther(0, { kind: 'friend' });
+  };
 
   const create = async () => {
     if (!name.trim()) {
@@ -87,7 +93,7 @@ export function CreateGame({ header, onCreated }: { header: ReactNode; onCreated
         <h3>Players</h3>
         <div className="segmented" role="radiogroup" aria-label="Number of players">
           {[2, 3, 4].map((n) => (
-            <button key={n} role="radio" aria-checked={count === n} className={count === n ? 'selected' : ''} onClick={() => setCount(n)}>
+            <button key={n} role="radio" aria-checked={count === n} className={count === n ? 'selected' : ''} onClick={() => changeCount(n)}>
               {n}
             </button>
           ))}
@@ -105,6 +111,8 @@ export function CreateGame({ header, onCreated }: { header: ReactNode; onCreated
                       role="radio"
                       aria-checked={seat.kind === kind}
                       className={seat.kind === kind ? 'selected' : ''}
+                      disabled={kind === 'bot' && seat.kind === 'friend' && friends === 1}
+                      title={kind === 'bot' && seat.kind === 'friend' && friends === 1 ? 'An online game needs at least one friend' : undefined}
                       onClick={() => setOther(i, kind === 'friend' ? { kind } : { kind, difficulty: 'normal' })}
                     >
                       {kind === 'friend' ? 'Friend' : 'Bot'}

@@ -185,6 +185,8 @@ export class GameRoom extends DurableObject<Env> {
     if (!Array.isArray(seats) || seats.length < 2 || seats.length > 4) return { error: 'A game has 2 to 4 players' };
     const first = seats.findIndex((s) => s.kind === 'human');
     if (first < 0) return { error: 'At least one player must be human' };
+    // Against only bots there's nobody to play online with.
+    if (seats.filter((s) => s.kind === 'human').length < 2) return { error: 'An online game needs at least one friend' };
     const name = cleanName(req.name);
     if (!name) return { error: 'Enter your name' };
     let bots = 0;
