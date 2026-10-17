@@ -62,7 +62,7 @@ export default defineConfig({
       // The manifest lives in public/ and is linked from index.html.
       manifest: false,
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,webp,webmanifest}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,webp,webmanifest,woff2}'],
         navigateFallback: '/index.html',
         cleanupOutdatedCaches: true,
         // A new version, once told to take over, takes over open pages too (even ones it wasn't serving).

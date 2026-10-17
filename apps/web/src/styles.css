@@ -3635,7 +3635,7 @@ button.lobby-seat:disabled {
   padding-left: 50px;
   background: url(/icon.svg) left center / 40px 40px no-repeat;
   color: #fdf6ea;
-  font: 700 19px/1 Georgia, 'Times New Roman', serif;
+  font: 700 20px/1 'Playfair Display', Georgia, 'Times New Roman', serif;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
   pointer-events: none;
 }
@@ -3650,4 +3650,334 @@ button.lobby-seat:disabled {
 
 .screen > .screen-card {
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+}
+
+/* ================================================================== */
+/* ---- Polish: brass, ink and paper ----                             */
+/* One layer over everything above: the display face, the copper      */
+/* buttons, paper cards with a printed frame, the ink-and-brass top   */
+/* bar, and a little motion. Delete this block to go back to plain.   */
+/* ================================================================== */
+
+:root {
+  --display: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --brass-hi: #f4d48a;
+  --brass: #c9962f;
+  --brass-lo: #8a5a1c;
+  --copper-hi: #d98a4c;
+  --copper: #b5652b;
+  --copper-lo: #8e4518;
+  --ink-bar: #241811;
+  --ink-bar-2: #3a2719;
+  --paper-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .25 0 0 0 0 .15 0 0 0 .06 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* -- Type: the display face for titles and headings -- */
+
+.menu-title,
+.screen-card h1,
+.screen-card h2,
+.coach-head h2,
+.era-summary h2,
+.panel-header h2,
+.brand {
+  font-family: var(--display);
+  letter-spacing: 0.01em;
+}
+
+.screen-card h2 {
+  font-weight: 700;
+}
+
+.screen-card h3 {
+  font-family: var(--display);
+  font-weight: 600;
+}
+
+/* -- Buttons: copper for the main action, paper for the rest; both press down -- */
+
+.confirm {
+  position: relative;
+  background: linear-gradient(180deg, var(--copper-hi) 0%, var(--copper) 52%, var(--copper-lo) 100%);
+  border: 1px solid var(--copper-lo);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 236, 200, 0.55),
+    inset 0 -2px 0 rgba(60, 20, 0, 0.25),
+    0 2px 6px rgba(80, 35, 10, 0.25);
+  text-shadow: 0 1px 1px rgba(60, 20, 0, 0.45);
+  letter-spacing: 0.02em;
+  transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.15s ease;
+}
+
+.confirm:not(:disabled):hover {
+  filter: brightness(1.06);
+}
+
+.confirm:not(:disabled):active {
+  transform: translateY(1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 236, 200, 0.3),
+    inset 0 2px 4px rgba(60, 20, 0, 0.3),
+    0 1px 2px rgba(80, 35, 10, 0.2);
+}
+
+.confirm.danger {
+  background: linear-gradient(180deg, #c95a4a 0%, var(--danger) 55%, #7a1f1f 100%);
+  border-color: #6b1a1a;
+}
+
+.secondary,
+.close,
+.segmented button,
+.seat-kind,
+.seat-difficulty {
+  transition: transform 0.08s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.secondary,
+.close {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 70%, #fff) 0%, var(--bg) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 1px 2px rgba(60, 40, 20, 0.12);
+}
+
+.secondary:hover,
+.close:hover {
+  border-color: color-mix(in srgb, var(--brass) 55%, var(--line));
+}
+
+.secondary:active,
+.close:active,
+.segmented button:active {
+  transform: translateY(1px);
+}
+
+.segmented button.selected {
+  box-shadow: inset 0 0 0 1px var(--highlight), 0 1px 3px rgba(224, 102, 27, 0.25);
+}
+
+/* -- Paper cards with a printed frame -- */
+
+.screen-card {
+  background-color: var(--surface);
+  background-image: var(--paper-grain), linear-gradient(180deg, color-mix(in srgb, var(--surface) 85%, #fff) 0%, var(--surface) 40%);
+  border: 1px solid color-mix(in srgb, var(--brass) 45%, var(--line));
+  box-shadow:
+    inset 0 0 0 4px var(--surface),
+    inset 0 0 0 5px color-mix(in srgb, var(--brass) 28%, var(--line)),
+    0 12px 36px rgba(30, 18, 8, 0.28);
+}
+
+/* Cards and pop-ups arrive with a small lift. */
+.screen > .screen-card,
+.overlay > .screen-card {
+  animation: card-in 0.28s cubic-bezier(0.2, 0.8, 0.25, 1) both;
+}
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+}
+
+/* The main menu: a title with a rule beneath, and a glow behind the logo. */
+.main-menu .menu-logo {
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(201, 150, 47, 0.5), 0 0 34px rgba(244, 212, 138, 0.35);
+}
+
+.main-menu .menu-title {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.main-menu .menu-title::after {
+  content: '';
+  display: block;
+  width: 140px;
+  height: 9px;
+  margin: 10px auto 2px;
+  background:
+    radial-gradient(circle, var(--brass) 0 3px, transparent 3.5px) center / 9px 9px no-repeat,
+    linear-gradient(90deg, transparent, var(--brass) 30%, transparent 46%, transparent 54%, var(--brass) 70%, transparent) center / 100% 1px no-repeat;
+}
+
+/* -- The in-game top bar: ink with a brass rule -- */
+
+.topbar {
+  background: linear-gradient(180deg, var(--ink-bar-2) 0%, var(--ink-bar) 100%);
+  color: #f6ead6;
+  border-bottom: 0;
+  box-shadow: inset 0 -2px 0 var(--brass-lo), inset 0 -3px 0 rgba(244, 212, 138, 0.35), 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.topbar .brand {
+  color: #f6ead6;
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.topbar .brand-logo {
+  box-shadow: 0 0 0 1px rgba(201, 150, 47, 0.6), 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+.topbar .topbar-status {
+  color: #d8c4a6;
+}
+
+.topbar .connection,
+.topbar .turn-clock {
+  color: #d8c4a6;
+}
+
+.topbar .turn-clock.urgent {
+  color: #ff9a86;
+}
+
+/* -- Players: paper chips; whoever's turn it is glows -- */
+
+.player-strip {
+  background: color-mix(in srgb, var(--bg) 80%, var(--surface));
+}
+
+.player-chip {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 80%, #fff) 0%, var(--surface) 100%);
+}
+
+.player-chip.active {
+  animation: turn-glow 2.4s ease-in-out infinite;
+}
+
+@keyframes turn-glow {
+  50% {
+    box-shadow: inset 4px 0 0 var(--owner), 0 0 0 1px var(--highlight), 0 0 10px rgba(224, 102, 27, 0.35);
+  }
+}
+
+/* -- The action rail and the hand -- */
+
+.action-rail {
+  border: 1px solid color-mix(in srgb, var(--brass) 40%, var(--line));
+}
+
+.rail-button {
+  transition: background-color 0.15s ease, transform 0.08s ease;
+}
+
+.rail-button:active {
+  transform: scale(0.96);
+}
+
+.rail-button.selected {
+  background: linear-gradient(180deg, var(--copper-hi) 0%, var(--copper) 55%, var(--copper-lo) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 236, 200, 0.5), 0 1px 3px rgba(80, 35, 10, 0.3);
+}
+
+.hand-tray {
+  border-top-color: color-mix(in srgb, var(--brass) 45%, var(--line));
+}
+
+.game-card {
+  background-color: var(--bg);
+  background-image: linear-gradient(180deg, color-mix(in srgb, var(--surface) 75%, #fff) 0%, transparent 60%);
+}
+
+.tray-tab[aria-selected='true'] {
+  font-family: var(--display);
+}
+
+/* -- The tutorial's card: paper with a brass edge -- */
+
+.coach {
+  border-color: var(--brass);
+  background-color: var(--surface);
+  background-image: var(--paper-grain);
+  box-shadow: 0 10px 30px rgba(30, 18, 8, 0.32), inset 0 0 0 1px rgba(244, 212, 138, 0.35);
+}
+
+.coach-count {
+  color: var(--brass-lo);
+}
+
+/* -- Menus and prompts -- */
+
+.game-menu {
+  border-color: color-mix(in srgb, var(--brass) 45%, var(--line));
+  animation: menu-in 0.16s ease-out both;
+  transform-origin: top left;
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+  }
+}
+
+.game-menu button:hover {
+  background: color-mix(in srgb, var(--brass) 14%, transparent);
+}
+
+.update-prompt {
+  border: 1px solid var(--brass);
+}
+
+/* Final scores: the winner's row in brass. */
+.era-table li.winner {
+  border-color: var(--brass);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--brass-hi) 35%, var(--surface)) 0%, var(--surface) 100%);
+}
+
+/* -- Dark mode: deeper ink, warmer brass -- */
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --ink-bar: #120c08;
+    --ink-bar-2: #22170f;
+    --brass: #d9a944;
+    --brass-lo: #9a6a24;
+  }
+  :root:not([data-theme='light']) .secondary,
+  :root:not([data-theme='light']) .close {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 85%, #fff) 0%, var(--bg) 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 1px 2px rgba(0, 0, 0, 0.3);
+  }
+  :root:not([data-theme='light']) .player-chip,
+  :root:not([data-theme='light']) .game-card {
+    background-image: linear-gradient(180deg, color-mix(in srgb, var(--surface) 90%, #fff) 0%, transparent 70%);
+  }
+  :root:not([data-theme='light']) .screen-card {
+    background-image: var(--paper-grain), linear-gradient(180deg, color-mix(in srgb, var(--surface) 92%, #fff) 0%, var(--surface) 40%);
+  }
+}
+
+:root[data-theme='dark'] {
+  --ink-bar: #120c08;
+  --ink-bar-2: #22170f;
+  --brass: #d9a944;
+  --brass-lo: #9a6a24;
+}
+
+:root[data-theme='dark'] .secondary,
+:root[data-theme='dark'] .close {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 85%, #fff) 0%, var(--bg) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+:root[data-theme='dark'] .player-chip,
+:root[data-theme='dark'] .game-card {
+  background-image: linear-gradient(180deg, color-mix(in srgb, var(--surface) 90%, #fff) 0%, transparent 70%);
+}
+
+:root[data-theme='dark'] .screen-card {
+  background-image: var(--paper-grain), linear-gradient(180deg, color-mix(in srgb, var(--surface) 92%, #fff) 0%, var(--surface) 40%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen > .screen-card,
+  .overlay > .screen-card,
+  .game-menu,
+  .player-chip.active {
+    animation: none;
+  }
 }
