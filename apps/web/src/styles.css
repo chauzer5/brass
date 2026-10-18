@@ -4245,3 +4245,177 @@ button.lobby-seat:disabled {
     animation: none;
   }
 }
+
+/* ================================================================== */
+/* ---- Menu pages, to match the title screen (more quietly) ----     */
+/* New game, Join game, Games list, the lobby and Settings: dark, the */
+/* map faint behind, a translucent panel edged in brass, the title in */
+/* the display face. They look the same in light and dark mode, like  */
+/* the title screen.                                                  */
+/* ================================================================== */
+
+.screen {
+  --bg: #1b130d;
+  --surface: #241912;
+  --ink: #f6ead6;
+  --muted: rgba(241, 223, 184, 0.62);
+  --line: rgba(201, 150, 47, 0.3);
+  --highlight: #e8a24a;
+  --danger: #f08a8a;
+  --brass: #d9a944;
+  color-scheme: dark;
+  color: var(--ink);
+  background: #120c08;
+}
+
+/* The map, darker and still. */
+.screen::before {
+  background:
+    radial-gradient(ellipse 85% 65% at 50% 40%, rgba(18, 12, 8, 0.5), rgba(18, 12, 8, 0.88) 70%, #120c08 100%),
+    url(/board-bg.webp) center / cover #120c08;
+  filter: none;
+}
+
+/* The corner mark: the logo and BRASS in brass. */
+.screen::after {
+  content: 'BRASS';
+  font: 700 19px/1 var(--display);
+  letter-spacing: 0.14em;
+  color: #e9c87a;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+  background-size: 34px 34px;
+  padding-left: 44px;
+  min-height: 34px;
+}
+
+/* The panel: dark glass with a brass hairline, instead of paper. */
+.screen > .screen-card {
+  background: rgba(24, 16, 11, 0.78);
+  background-image: none;
+  border: 1px solid rgba(201, 150, 47, 0.35);
+  border-radius: 14px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(244, 212, 138, 0.08);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.screen .panel-header h2,
+.screen .screen-card > h2 {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 24px;
+  color: #f1dfb8;
+}
+
+/* Section labels: small spaced capitals, like the title's tagline. */
+.screen .screen-card h3 {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(241, 223, 184, 0.62);
+}
+
+.screen .muted {
+  color: var(--muted);
+}
+
+/* Controls on the dark panel. */
+.screen .secondary,
+.screen .close {
+  background: rgba(255, 244, 220, 0.05);
+  border-color: rgba(201, 150, 47, 0.3);
+  color: var(--ink);
+  box-shadow: none;
+}
+
+.screen .secondary:hover,
+.screen .close:hover {
+  background: rgba(201, 150, 47, 0.12);
+  border-color: rgba(201, 150, 47, 0.55);
+}
+
+.screen input,
+.screen .name-row input,
+.screen .code-input,
+.screen .name-input {
+  background: rgba(255, 244, 220, 0.05);
+  border-color: rgba(201, 150, 47, 0.3);
+  color: var(--ink);
+}
+
+.screen input::placeholder {
+  color: rgba(241, 223, 184, 0.35);
+}
+
+.screen input:focus {
+  outline: none;
+  border-color: #d9a944;
+  box-shadow: 0 0 0 3px rgba(217, 169, 68, 0.2);
+}
+
+.screen .segmented button {
+  background: rgba(255, 244, 220, 0.04);
+  border-color: rgba(201, 150, 47, 0.25);
+  color: var(--ink);
+}
+
+.screen .segmented button.selected {
+  background: rgba(217, 169, 68, 0.18);
+  border-color: #d9a944;
+  box-shadow: inset 0 0 0 1px #d9a944;
+}
+
+.screen .seat-kind,
+.screen .seat-difficulty {
+  background: rgba(255, 244, 220, 0.06);
+}
+
+.screen .seat-kind button.selected,
+.screen .seat-difficulty button.selected {
+  background: rgba(217, 169, 68, 0.22);
+  color: #f6ead6;
+  box-shadow: inset 0 0 0 1px rgba(217, 169, 68, 0.6);
+}
+
+/* Lists of games and seats. */
+.screen .online-game,
+.screen .lobby-seat {
+  background: rgba(255, 244, 220, 0.04);
+  border-color: rgba(201, 150, 47, 0.25);
+  color: var(--ink);
+}
+
+.screen .online-games li.yours .online-game,
+.screen .lobby-seat.selected {
+  background: rgba(217, 169, 68, 0.14);
+  border-color: #d9a944;
+}
+
+.screen .game-kind.online {
+  color: #7fbde8;
+}
+
+.screen .game-row.online .online-game {
+  border-left-color: #7fbde8;
+}
+
+.screen .game-row.local .online-game {
+  border-left-color: rgba(201, 150, 47, 0.45);
+}
+
+.screen .lobby-code {
+  border-color: rgba(201, 150, 47, 0.45);
+  font-family: var(--display);
+  color: #f1dfb8;
+}
+
+.screen .app-notice {
+  background: rgba(217, 169, 68, 0.1);
+  border-color: rgba(217, 169, 68, 0.45);
+}
+
+.screen .link-button {
+  color: #e9c87a;
+}
