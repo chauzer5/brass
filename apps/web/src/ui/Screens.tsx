@@ -35,36 +35,50 @@ export function MainMenu({
   const [page, setPage] = useState<'menu' | 'settings' | 'rulebook'>('menu');
   if (page === 'settings') return <Settings onClose={() => setPage('menu')} />;
   if (page === 'rulebook' && __RULEBOOK__) return <Rulebook pages={__RULEBOOK__} onClose={() => setPage('menu')} />;
+  // The main list, numbered like the tiles' levels; Rulebook and Settings sit quietly at the foot.
+  const items: { label: string; hint: string; run: () => void }[] = [
+    ...(onResume ? [{ label: 'Resume current game', hint: 'Back to your current game', run: onResume }] : []),
+    { label: 'New game', hint: 'On this device, or online with friends', run: onNew },
+    { label: 'Join game', hint: "A friend's online game, by its code", run: onJoin },
+    { label: 'Games list', hint: 'Every game on this device', run: onList },
+    { label: 'Learn to play', hint: 'A guided game against Bot Richard', run: onTutorial },
+  ];
   return (
-    <div className="screen">
-      <div className="screen-card main-menu">
-        <img src="/icon.svg" alt="" className="menu-logo" />
-        <h1 className="menu-title">Brass: Birmingham</h1>
-        {onResume && (
-          <button className="confirm" onClick={onResume}>
-            Resume current game
-          </button>
-        )}
-        <button className={onResume ? 'secondary' : 'confirm'} onClick={onNew}>
-          New game
-        </button>
-        <button className="secondary" onClick={onJoin}>
-          Join game
-        </button>
-        <button className="secondary" onClick={onList}>
-          Games list
-        </button>
-        <button className="secondary" onClick={onTutorial}>
-          Learn to play
-        </button>
-        {__RULEBOOK__ && (
-          <button className="secondary" onClick={() => setPage('rulebook')}>
-            Rulebook
-          </button>
-        )}
-        <button className="secondary" onClick={() => setPage('settings')}>
-          Settings
-        </button>
+    <div className="title-screen">
+      <div className="title-art" aria-hidden />
+      <div className="title-inner">
+        <header className="title-hero">
+          <img src="/icon.svg" alt="" className="title-logo" />
+          <h1 className="title-word">Brass</h1>
+          <p className="title-sub">
+            <span>Birmingham</span>
+          </p>
+          <p className="title-tag">Industry · Canals · Railways</p>
+        </header>
+        <nav className="title-menu" aria-label="Main menu">
+          {items.map((item, i) => (
+            <button
+              key={item.label}
+              className={`title-item ${i === 0 ? 'lead' : ''}`}
+              style={{ animationDelay: `${120 + i * 70}ms` }}
+              onClick={item.run}
+              aria-label={item.label}
+              aria-describedby={`title-hint-${i}`}
+            >
+              <span className="title-num" aria-hidden>
+                {['I', 'II', 'III', 'IV', 'V', 'VI'][i]}
+              </span>
+              <span className="title-label">{item.label}</span>
+              <span className="title-hint" id={`title-hint-${i}`}>
+                {item.hint}
+              </span>
+            </button>
+          ))}
+        </nav>
+        <footer className="title-foot">
+          {__RULEBOOK__ && <button onClick={() => setPage('rulebook')}>Rulebook</button>}
+          <button onClick={() => setPage('settings')}>Settings</button>
+        </footer>
       </div>
     </div>
   );
