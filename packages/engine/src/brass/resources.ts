@@ -33,6 +33,19 @@ export function spend(p: PlayerState, amount: number): void {
   p.spent += amount;
 }
 
+/**
+ * Pays for everything an action costs at once (the tile or link, and any coal or iron bought from the
+ * markets), so a shortfall is reported as the whole bill rather than whichever part ran out last.
+ */
+export function pay(p: PlayerState, parts: readonly (readonly [what: string, amount: number])[]): void {
+  const due = parts.filter(([, amount]) => amount > 0);
+  const total = due.reduce((sum, [, amount]) => sum + amount, 0);
+  if (p.money < total && due.length > 1) {
+    fail(`Not enough money: ${due.map(([what, amount]) => `£${amount} ${what}`).join(' + ')} = £${total}, and you have £${p.money}`);
+  }
+  spend(p, total);
+}
+
 export function advanceIncome(p: PlayerState, spaces: number): void {
   // Income level can't go above 30 (rulebook p.8): the track ends at level 30.
   p.incomeSpace = Math.min(MAX_PROGRESS_SPACE, p.incomeSpace + spaces);

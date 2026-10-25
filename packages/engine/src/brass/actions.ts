@@ -22,9 +22,9 @@ import {
   fail,
   flip,
   locationName,
+  pay,
   player,
   sellToMarket,
-  spend,
   tileDef,
   type BeerSource,
   type CubeSource,
@@ -180,9 +180,13 @@ function build(state: BrassState, p: PlayerState, a: Extract<BrassAction, { type
   }
 
   takeFromMat(p, a.industry);
-  spend(p, def.cost);
-  spend(p, consumeCoal(state, [a.location], def.coal, a.coal));
-  spend(p, consumeIron(state, def.iron, a.iron));
+  const coalCost = consumeCoal(state, [a.location], def.coal, a.coal);
+  const ironCost = consumeIron(state, def.iron, a.iron);
+  pay(p, [
+    ['for the tile', def.cost],
+    ['for coal', coalCost],
+    ['for iron', ironCost],
+  ]);
 
   const cubes =
     a.industry === 'coal' || a.industry === 'iron'
@@ -214,7 +218,8 @@ function networkAction(state: BrassState, p: PlayerState, a: Extract<BrassAction
   if (p.linksInSupply < n) fail('You have no Link tiles left');
   if (a.coal && a.coal.length !== (state.era === 'rail' ? n : 0)) fail('Choose one coal source per rail link');
 
-  spend(p, state.era === 'canal' ? CANAL_LINK_COST : n === 1 ? RAIL_LINK_COST : DOUBLE_RAIL_LINK_COST);
+  const linkCost = state.era === 'canal' ? CANAL_LINK_COST : n === 1 ? RAIL_LINK_COST : DOUBLE_RAIL_LINK_COST;
+  let coalCost = 0;
 
   a.links.forEach((id, i) => {
     const link = LINK_BY_ID[id] ?? fail('Unknown link');
@@ -229,9 +234,13 @@ function networkAction(state: BrassState, p: PlayerState, a: Extract<BrassAction
     p.linksInSupply -= 1;
     // Each rail link is connected to coal after it is placed (rulebook p.11).
     if (state.era === 'rail') {
-      spend(p, consumeCoal(state, link.ends, 1, a.coal && [a.coal[i]!]));
+      coalCost += consumeCoal(state, link.ends, 1, a.coal && [a.coal[i]!]);
     }
   });
+  pay(p, [
+    [n === 1 ? 'for the link' : 'for the links', linkCost],
+    ['for coal', coalCost],
+  ]);
 
   if (n === 2) {
     // The beer must come from a Brewery, not a Merchant (rulebook p.11).
@@ -246,10 +255,12 @@ function develop(state: BrassState, p: PlayerState, a: Extract<BrassAction, { ty
   discard(state, p, a.card);
   if (a.industries.length < 1 || a.industries.length > 2) fail('Develop removes 1 or 2 tiles');
   if (a.iron && a.iron.length !== a.industries.length) fail('Choose one iron source per tile');
+  let ironCost = 0;
   a.industries.forEach((industry, i) => {
     developOne(p, industry);
-    spend(p, consumeIron(state, 1, a.iron && [a.iron[i]!]));
+    ironCost += consumeIron(state, 1, a.iron && [a.iron[i]!]);
   });
+  pay(p, [['for iron', ironCost]]);
 }
 
 /** The first industry Gloucester's bonus can develop, for the automatic choice. */
