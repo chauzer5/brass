@@ -380,9 +380,11 @@ export function Table({
   // Develop, once its card is chosen, is played by tapping industries on the mat.
   const developing = draft.kind === 'develop' && draft.card !== null;
   // A sale with Gloucester's beer earns a free Develop, chosen on the board too.
+  // (Keyed on the whole action, develop choices included: baseKey leaves them out.)
+  const bonusKey = JSON.stringify(base);
   const bonus = useMemo(
     () => (player !== null && !draft.pendingSale ? gloucesterBonus(state, player, base, needs, draft.picks) : null),
-    [state, player, baseKey, needs, draft.picks, draft.pendingSale], // eslint-disable-line react-hooks/exhaustive-deps
+    [state, player, bonusKey, needs, draft.picks, draft.pendingSale], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const bonusOptions = useMemo(() => new Set(bonus?.options ?? []), [bonus]);
   const setBonus = (sale: number, develop: brass.Industry | null) =>
