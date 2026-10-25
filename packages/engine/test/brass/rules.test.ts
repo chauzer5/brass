@@ -441,6 +441,22 @@ describe('sell (rulebook p.10)', () => {
     expect(s.tiles['worcester#0']!.flipped && s.tiles['worcester#1']!.flipped).toBe(true);
   });
 
+  it("gives Gloucester's free Develop once per barrel: twice when both are used", () => {
+    const { s, c } = twoBarrels([true, true]);
+    const left = (ind: 'coal' | 'iron') => s.players[0]!.mat[ind].reduce((a, b) => a + b, 0);
+    const before = { coal: left('coal'), iron: left('iron') };
+    run(s, 0, {
+      type: 'sell',
+      card: c,
+      sales: [
+        { location: 'worcester', slot: 0, merchant: 1, develop: 'coal' },
+        { location: 'worcester', slot: 1, merchant: 2, develop: 'iron' },
+      ],
+    });
+    expect(left('coal')).toBe(before.coal - 1);
+    expect(left('iron')).toBe(before.iron - 1);
+  });
+
   it('cannot sell without beer', () => {
     const { s, action } = sellable();
     s.links['kidderminster~coalbrookdale'] = 1;

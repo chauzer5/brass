@@ -12,7 +12,7 @@ import { PlayerMat } from './ui/PlayerMat.tsx';
 import { Rulebook } from './ui/Rulebook.tsx';
 import { DiscardSheet, EraSummary, FirstPlayer, GameLogSheet, Handoff, Settings, MatSheet, MainMenu, PlayerStrip } from './ui/Screens.tsx';
 import { StepPanel, pickCard, tapMatRow, tapMerchant, tapSlot } from './ui/TurnPanel.tsx';
-import { choosable, chosenSource, gloucesterBonus, sourceNeeds } from './game/sources.ts';
+import { choosable, chosenSource, gloucesterBonus, sourceNeeds, tapBonus } from './game/sources.ts';
 import { gameLog, recapSince, type RecapItem } from './game/recap.ts';
 import { runBot } from './bot/runBot.ts';
 import { Coach, useCoach } from './tutorial/Coach.tsx';
@@ -385,10 +385,10 @@ export function Table({
     [state, player, baseKey, needs, draft.picks, draft.pendingSale], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const bonusOptions = useMemo(() => new Set(bonus?.options ?? []), [bonus]);
-  const setBonus = (develop: brass.Industry | null) =>
-    setDraft((d) => (bonus ? { ...d, sales: d.sales.map((s, k) => (k === bonus.sale ? { ...s, develop } : s)) } : d));
+  const setBonus = (sale: number, develop: brass.Industry | null) =>
+    setDraft((d) => ({ ...d, sales: d.sales.map((s, k) => (k === sale ? { ...s, develop } : s)) }));
   // When a bonus comes up, show the board to choose it on.
-  const bonusSale = bonus?.sale ?? null;
+  const bonusSale = bonus?.sales[0] ?? null;
   useEffect(() => {
     if (bonusSale !== null && bonusOptions.size > 0) setTrayTab('mat');
   }, [bonusSale]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -544,11 +544,14 @@ export function Table({
               <PlayerMat
                 player={p!}
                 era={state.era}
-                picks={bonus.chosen ? [bonus.chosen] : []}
-                selectable={bonusOptions}
-                // Tapping the chosen industry again takes the bonus back.
-                onRow={(ind) => setBonus(ind === bonus.chosen ? null : ind)}
-                onUnpick={() => setBonus(null)}
+                picks={bonus.chosen.filter((c) => c !== null)}
+                selectable={new Set([...bonusOptions, ...bonus.chosen.filter((c) => c !== null)])}
+                // Tapping a chosen industry again takes that bonus back.
+                onRow={(ind) => {
+                  const { sale, develop } = tapBonus(bonus, ind);
+                  setBonus(sale, develop);
+                }}
+                onUnpick={(i) => setBonus(bonus.sales.filter((_, k) => bonus.chosen[k] !== null)[i]!, null)}
               />
             ) : developing ? (
               <PlayerMat

@@ -250,17 +250,25 @@ function SourcePicker({
   );
 }
 
-/** Gloucester's beer bonus: develop one tile for free. Only shown when a sale there uses its beer. */
-/** Gloucester's bonus is chosen on the player board (like Develop); this only says so. */
+/** Gloucester's bonus (a free Develop per barrel of its beer used) is chosen on the player board, like Develop; this only says so. */
 function GloucesterBonus({ full, player, action, needs, draft }: { full: brass.BrassState; player: number; action: brass.BrassAction; needs: Need[]; draft: Draft }) {
   const bonus = gloucesterBonus(full, player, action, needs, draft.picks);
   if (!bonus) return null;
-  if (bonus.options.length === 0) return <p className="hint">Gloucester's bonus: nothing can be developed right now.</p>;
+  const two = bonus.sales.length > 1;
+  const label = two ? "Gloucester's bonuses (one per barrel)" : "Gloucester's bonus";
+  if (bonus.options.length === 0) return <p className="hint">{label}: nothing can be developed right now.</p>;
+  const chosen = bonus.chosen.filter((c) => c !== null).map((c) => INDUSTRY_NAME[c]);
+  const text =
+    chosen.length === 0
+      ? `tap your board for ${two ? 'two free Develops' : 'a free Develop'}.`
+      : chosen.length < bonus.sales.length
+        ? `a free Develop of ${chosen[0]}; tap your board for the other.`
+        : two
+          ? `free Develops of ${chosen.join(' and ')}. Tap your board to change them.`
+          : `a free Develop of ${chosen[0]}. Tap your board to change it.`;
   return (
     <p className="hint">
-      {bonus.chosen
-        ? `Gloucester's bonus: a free Develop of ${INDUSTRY_NAME[bonus.chosen]}. Tap your board to change it.`
-        : "Gloucester's bonus: tap your board for a free Develop."}
+      {label}: {text}
     </p>
   );
 }

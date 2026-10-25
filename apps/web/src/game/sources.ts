@@ -138,19 +138,21 @@ export function gloucesterOptions(state: brass.BrassState, player: number, a: Ex
   );
 }
 
-/** A Gloucester bonus the sale being put together earns: which sale, what it could develop, and what's chosen. */
+/**
+ * Gloucester's bonuses the sale being put together earns: one free Develop per
+ * sale that uses one of its barrels (selling to both its Merchants with both
+ * barrels earns two). Unchosen, each is the engine's default: the first
+ * industry that can be developed at that point.
+ */
 export interface GloucesterBonus {
-  sale: number;
+  /** The sales that earn a bonus, in the order they're resolved. */
+  sales: number[];
+  /** What each develops (null: nothing). */
+  chosen: (brass.Industry | null)[];
+  /** Industries any of the bonuses could develop. */
   options: brass.Industry[];
-  /** null: no tile developed. */
-  chosen: brass.Industry | null;
 }
 
-/**
- * The first sale in `action` that uses Gloucester's own beer (so earns its
- * free Develop), with the industries it could develop. Unchosen, it's the
- * engine's default: the first that can be developed.
- */
 export function gloucesterBonus(
   state: brass.BrassState,
   player: number,
@@ -159,13 +161,34 @@ export function gloucesterBonus(
   picks: Picks,
 ): GloucesterBonus | null {
   if (action?.type !== 'sell') return null;
-  const sale = action.sales.findIndex(
-    (s, k) =>
-      state.merchants[s.merchant]!.location === 'gloucester' &&
-      needs.some((n) => n.sale === k && chosenSource(n, picks) === 'merchant'),
+  const sales = action.sales.flatMap((s, k) =>
+    state.merchants[s.merchant]!.location === 'gloucester' && needs.some((n) => n.sale === k && chosenSource(n, picks) === 'merchant') ? [k] : [],
   );
-  if (sale < 0) return null;
-  const options = gloucesterOptions(state, player, action, sale);
-  const current = action.sales[sale]!.develop;
-  return { sale, options, chosen: current === undefined ? (options[0] ?? null) : current };
+  if (sales.length === 0) return null;
+  // Resolve them in order: each one's options depend on what the ones before it took.
+  let resolved = action;
+  const chosen: (brass.Industry | null)[] = [];
+  const options = new Set<brass.Industry>();
+  for (const sale of sales) {
+    const later = { ...resolved, sales: resolved.sales.map((s, i) => (sales.includes(i) && i > sale ? { ...s, develop: null } : s)) };
+    const here = gloucesterOptions(state, player, later, sale);
+    here.forEach((i) => options.add(i));
+    const current = action.sales[sale]!.develop;
+    const pick = current === undefined ? (here[0] ?? null) : current;
+    chosen.push(pick);
+    resolved = { ...resolved, sales: resolved.sales.map((s, i) => (i === sale ? { ...s, develop: pick } : s)) };
+  }
+  return { sales, chosen, options: brass.INDUSTRIES.filter((i) => options.has(i)) };
+}
+
+/**
+ * Tapping an industry on the board while choosing Gloucester's bonuses: tapping
+ * one that's chosen takes it back; another fills the first bonus left empty, or
+ * else replaces the last one. Returns the sale to change and its new develop.
+ */
+export function tapBonus(bonus: GloucesterBonus, industry: brass.Industry): { sale: number; develop: brass.Industry | null } {
+  const taken = bonus.chosen.lastIndexOf(industry);
+  if (taken >= 0) return { sale: bonus.sales[taken]!, develop: null };
+  const empty = bonus.chosen.indexOf(null);
+  return { sale: bonus.sales[empty >= 0 ? empty : bonus.sales.length - 1]!, develop: industry };
 }
