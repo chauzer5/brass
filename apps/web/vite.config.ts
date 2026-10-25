@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import { existsSync, readdirSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 
 /**
  * The rulebook's pages, as images in public/rulebook/ (page-1.jpg, …): drawn
@@ -46,6 +47,18 @@ const invitePage = `<!doctype html>
 </html>
 `;
 
+/** Which build this is, for Settings: the commit it was built from (Vercel says; otherwise git), and when. */
+function commit(): string | null {
+  const sha = process.env.VERCEL_GIT_COMMIT_SHA;
+  if (sha) return sha.slice(0, 7);
+  try {
+    return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim() || null;
+  } catch {
+    return null;
+  }
+}
+const version = { commit: commit(), builtAt: Date.now() };
+
 export default defineConfig({
   plugins: [
     react(),
@@ -80,7 +93,7 @@ export default defineConfig({
       },
     }),
   ],
-  define: { __RULEBOOK__: JSON.stringify(rulebookPages > 0 ? rulebookPages : null) },
+  define: { __RULEBOOK__: JSON.stringify(rulebookPages > 0 ? rulebookPages : null), __VERSION__: JSON.stringify(version) },
   server: { host: true },
   worker: { format: 'es' },
 });

@@ -430,13 +430,9 @@ button {
   dominant-baseline: central;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .sale-cube,
-  .sale-coin {
-    animation: none;
-    opacity: 0;
-  }
-}
+/* Reduced motion (Settings → Animations, or the device's setting): see settings.ts. */
+:root[data-motion='reduced'] .sale-cube,
+:root[data-motion='reduced'] .sale-coin { animation: none; opacity: 0; }
 
 /* ---- Town name ribbons ---- */
 
@@ -530,10 +526,9 @@ button {
   50% { stroke-opacity: 0.35; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .slot.lit,
-  .link-lit { animation: none; }
-}
+/* Reduced motion (Settings → Animations, or the device's setting): see settings.ts. */
+:root[data-motion='reduced'] .slot.lit,
+:root[data-motion='reduced'] .link-lit { animation: none; }
 
 .hit {
   fill: transparent;
@@ -1529,9 +1524,8 @@ button {
   padding: 2px 12px 8px;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .tray-mat { transition: none; }
-}
+/* Reduced motion (Settings → Animations, or the device's setting): see settings.ts. */
+:root[data-motion='reduced'] .tray-mat { transition: none; }
 
 .tray-info {
   min-width: 0;
@@ -1562,9 +1556,8 @@ button {
   transition: height 0.2s ease;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .hand-row { transition: none; }
-}
+/* Reduced motion (Settings → Animations, or the device's setting): see settings.ts. */
+:root[data-motion='reduced'] .hand-row { transition: none; }
 
 .hand-row-inner {
   position: relative;
@@ -2605,9 +2598,8 @@ button {
   cursor: pointer;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .wheel-spin { transition-duration: 0s !important; }
-}
+/* Reduced motion (Settings → Animations, or the device's setting): see settings.ts. */
+:root[data-motion='reduced'] .wheel-spin { transition-duration: 0s !important; }
 
 /* ---- The tutorial's coach ---- */
 
@@ -2733,9 +2725,8 @@ button {
   from { opacity: 0; transform: translateY(-6px); }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .coach-target { animation: none; }
-}
+/* Reduced motion (Settings → Animations, or the device's setting): see settings.ts. */
+:root[data-motion='reduced'] .coach-target { animation: none; }
 
 /* Pointing at a panel drawn on the map: SVG has no outlines, so its frame lights up instead. */
 g.coach-target {
@@ -2818,18 +2809,10 @@ g.coach-target > rect:first-of-type {
   100% { transform: scale(1, 1); opacity: 1; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .goods-fly {
-    animation: none;
-    opacity: 0;
-  }
-  .tile-turn {
-    animation: none;
-  }
-  .tile-turn.out {
-    display: none;
-  }
-}
+/* Reduced motion (Settings → Animations, or the device's setting): see settings.ts. */
+:root[data-motion='reduced'] .goods-fly { animation: none; opacity: 0; }
+:root[data-motion='reduced'] .tile-turn { animation: none; }
+:root[data-motion='reduced'] .tile-turn.out { display: none; }
 
 /* ---- End of round, end of era ---- */
 
@@ -2915,12 +2898,11 @@ g.coach-target > rect:first-of-type {
   100% { opacity: 0; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .turn-order-row { transition: none; }
-  .money-pop,
-  .score-pop { animation: none; opacity: 0; }
-  .leaving { animation: none; }
-}
+/* Reduced motion (Settings → Animations, or the device's setting): see settings.ts. */
+:root[data-motion='reduced'] .turn-order-row { transition: none; }
+:root[data-motion='reduced'] .money-pop,
+:root[data-motion='reduced'] .score-pop { animation: none; opacity: 0; }
+:root[data-motion='reduced'] .leaving { animation: none; }
 
 .main-menu {
   gap: 12px;
@@ -3966,14 +3948,11 @@ button.lobby-seat:disabled {
   background-image: var(--paper-grain), linear-gradient(180deg, color-mix(in srgb, var(--surface) 92%, #fff) 0%, var(--surface) 40%);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .screen > .screen-card,
-  .overlay > .screen-card,
-  .game-menu,
-  .player-chip.active {
-    animation: none;
-  }
-}
+/* Reduced motion (Settings → Animations, or the device's setting): see settings.ts. */
+:root[data-motion='reduced'] .screen > .screen-card,
+:root[data-motion='reduced'] .overlay > .screen-card,
+:root[data-motion='reduced'] .game-menu,
+:root[data-motion='reduced'] .player-chip.active { animation: none; }
 
 /* ================================================================== */
 /* ---- The title screen (main menu) ----                             */
@@ -4237,14 +4216,11 @@ button.lobby-seat:disabled {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .title-art,
-  .title-hero,
-  .title-item,
-  .title-foot {
-    animation: none;
-  }
-}
+/* Reduced motion (Settings → Animations, or the device's setting): see settings.ts. */
+:root[data-motion='reduced'] .title-art,
+:root[data-motion='reduced'] .title-hero,
+:root[data-motion='reduced'] .title-item,
+:root[data-motion='reduced'] .title-foot { animation: none; }
 
 /* ================================================================== */
 /* ---- Menu pages, to match the title screen (more quietly) ----     */
@@ -4418,4 +4394,15 @@ button.lobby-seat:disabled {
 
 .screen .link-button {
   color: #e9c87a;
+}
+
+/* ---- Settings: the About section ---- */
+.settings .about {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+.settings .about p {
+  margin: 0;
 }

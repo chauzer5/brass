@@ -7,7 +7,9 @@ import { PlayerMat } from './PlayerMat.tsx';
 import { Rulebook } from './Rulebook.tsx';
 import type { LogEntry, RecapItem } from '../game/recap.ts';
 import { joinNames, tieBreaks } from '../game/ties.ts';
-import { useTheme, type ThemeSetting } from '../settings.ts';
+import { applyUpdate, checkForUpdates } from './UpdatePrompt.tsx';
+import { disablePush, enablePush, inIosBrowser, pushState, savedName, saveName, type PushState } from '../online/client.ts';
+import { reducedMotion, useBotSpeed, useMotion, useTheme, type BotSpeed, type MotionSetting, type ThemeSetting } from '../settings.ts';
 
 /** Bots are named after the players on the front of the Brass rulebook. */
 const BOT_NAMES = ['Bot Richard', 'Bot George', 'Bot Eleanor'];
@@ -196,12 +198,40 @@ const THEME_OPTIONS: { value: ThemeSetting; label: string }[] = [
   { value: 'dark', label: 'Dark' },
 ];
 
+const MOTION_OPTIONS: { value: MotionSetting; label: string }[] = [
+  { value: 'system', label: 'Match device' },
+  { value: 'full', label: 'Full' },
+  { value: 'reduced', label: 'Reduced' },
+];
+
+const BOT_SPEED_OPTIONS: { value: BotSpeed; label: string }[] = [
+  { value: 'normal', label: 'Normal' },
+  { value: 'fast', label: 'Fast' },
+  { value: 'instant', label: 'Instant' },
+];
+
+/** A row of mutually exclusive choices. */
+function Choice<T extends string>({ label, options, value, onChange }: { label: string; options: { value: T; label: string }[]; value: T; onChange: (v: T) => void }) {
+  return (
+    <div className="segmented" role="radiogroup" aria-label={label}>
+      {options.map((o) => (
+        <button key={o.value} role="radio" aria-checked={value === o.value} className={value === o.value ? 'selected' : ''} onClick={() => onChange(o.value)}>
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function Settings({ onClose, inGame = false }: { onClose: () => void; inGame?: boolean }) {
   const { theme, setTheme } = useTheme();
+  const [motion, setMotion] = useMotion();
+  const [botSpeed, setBotSpeed] = useBotSpeed();
+  const [name, setName] = useState(savedName);
   return (
     // In a game it sits over the table; from the main menu it's a page of its own.
     <div className={inGame ? 'overlay' : 'screen'} onClick={inGame ? onClose : undefined}>
-      <div className="screen-card" onClick={(e) => e.stopPropagation()}>
+      <div className="screen-card settings" onClick={(e) => e.stopPropagation()}>
         <div className="panel-header">
           <button className="close" onClick={onClose} aria-label={inGame ? 'Back to the game' : 'Back to menu'}>
             ‹
@@ -209,24 +239,120 @@ export function Settings({ onClose, inGame = false }: { onClose: () => void; inG
           <h2>Settings</h2>
         </div>
         <h3>Appearance</h3>
-        <div className="segmented" role="radiogroup" aria-label="Appearance">
-          {THEME_OPTIONS.map((o) => (
-            <button
-              key={o.value}
-              role="radio"
-              aria-checked={theme === o.value}
-              className={theme === o.value ? 'selected' : ''}
-              onClick={() => setTheme(o.value)}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
+        <Choice label="Appearance" options={THEME_OPTIONS} value={theme} onChange={setTheme} />
         <p className="muted">"Match device" follows your device's light or dark setting.</p>
+
+        <h3>Animations</h3>
+        <Choice label="Animations" options={MOTION_OPTIONS} value={motion} onChange={setMotion} />
+        <p className="muted">Reduced skips cards dealing, goods flying to market and the like, for a quicker game.</p>
+
+        <h3>Bot speed</h3>
+        <Choice label="Bot speed" options={BOT_SPEED_OPTIONS} value={botSpeed} onChange={setBotSpeed} />
+        <p className="muted">How long bots pause before each move in games on this device.</p>
+
+        <h3>Your name</h3>
+        <div className="name-row">
+          <span className="dot owner-0" aria-hidden />
+          <input
+            value={name}
+            maxLength={24}
+            aria-label="Your name"
+            placeholder="Your name"
+            onChange={(e) => {
+              setName(e.target.value);
+              saveName(e.target.value);
+            }}
+          />
+        </div>
+        <p className="muted">Used when you start or join an online game. Games you're already in keep the name you joined with.</p>
+
+        <h3>Notifications</h3>
+        <NotificationSetting />
+
+        <About />
         <button className="confirm" onClick={onClose}>
           Done
         </button>
       </div>
+    </div>
+  );
+}
+
+/** Turn notifications for online games on or off on this device. */
+function NotificationSetting() {
+  const [state, setState] = useState<PushState>(pushState);
+  const [busy, setBusy] = useState(false);
+  const run = async (f: () => Promise<PushState>) => {
+    setBusy(true);
+    setState(await f().catch(() => pushState()));
+    setBusy(false);
+  };
+  if (state === 'unsupported') {
+    return (
+      <p className="muted">
+        {inIosBrowser
+          ? "To be notified when it's your turn online, add Brass to your Home Screen (Share → Add to Home Screen) and play from there."
+          : "This browser can't show notifications."}
+      </p>
+    );
+  }
+  if (state === 'denied') return <p className="muted">Notifications are blocked for Brass in your device's settings. Allow them there to turn them on.</p>;
+  const on = state === 'granted';
+  return (
+    <>
+      <Choice
+        label="Notifications"
+        options={[
+          { value: 'on', label: 'On' },
+          { value: 'off', label: 'Off' },
+        ]}
+        value={on ? 'on' : 'off'}
+        onChange={(v) => {
+          if (busy || (v === 'on') === on) return;
+          void run(v === 'on' ? enablePush : disablePush);
+        }}
+      />
+      <p className="muted">A notification when it's your turn in an online game.</p>
+    </>
+  );
+}
+
+/** Which version this is, and a way to look for a newer one. */
+function About() {
+  const [check, setCheck] = useState<'idle' | 'checking' | Awaited<ReturnType<typeof checkForUpdates>>>('idle');
+  const built = new Date(__VERSION__.builtAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  const status = {
+    idle: null,
+    checking: 'Checking…',
+    latest: "You're on the latest version.",
+    downloading: 'A new version is downloading; a Reload button will appear when it’s ready.',
+    ready: null,
+    offline: "Couldn't check: no connection.",
+    unsupported: 'Updates arrive when the page is reloaded.',
+  }[check];
+  return (
+    <div className="about">
+      <h3>About</h3>
+      <p className="muted">
+        Version {__VERSION__.commit ?? 'dev'} · {built}
+      </p>
+      {check === 'ready' ? (
+        <button className="secondary" onClick={() => void applyUpdate()}>
+          Reload to update
+        </button>
+      ) : (
+        <button
+          className="secondary"
+          disabled={check === 'checking'}
+          onClick={async () => {
+            setCheck('checking');
+            setCheck(await checkForUpdates());
+          }}
+        >
+          Check for updates
+        </button>
+      )}
+      {status && <p className="muted">{status}</p>}
     </div>
   );
 }
@@ -631,7 +757,7 @@ export function FirstPlayer({ names, order, onDone }: { names: readonly string[]
   const [angle, setAngle] = useState(0);
   const [landed, setLanded] = useState(false);
   useEffect(() => {
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reduced = reducedMotion();
     // Land somewhere inside the first player's slice, after a few full turns. (Only where it stops is random-looking:
     // the result was decided when the game was set up.)
     const inside = (Math.random() - 0.5) * slice * 0.6;

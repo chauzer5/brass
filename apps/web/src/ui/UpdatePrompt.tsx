@@ -34,7 +34,7 @@ function watchForUpdates(registration: ServiceWorkerRegistration) {
  * stored offline, or a waiting version the plugin lost track of): so this tells whichever version is
  * waiting to take over directly, reloads as soon as it does, and reloads anyway after a moment.
  */
-async function applyUpdate(viaPlugin: () => Promise<void>) {
+export async function applyUpdate(viaPlugin?: () => Promise<void>) {
   let reloaded = false;
   const reload = () => {
     if (reloaded) return;
@@ -49,7 +49,23 @@ async function applyUpdate(viaPlugin: () => Promise<void>) {
   } catch {
     // The fallback reload still happens.
   }
-  void viaPlugin().catch(() => {});
+  void viaPlugin?.().catch(() => {});
+}
+
+/**
+ * Looks for a new version now (Settings). 'ready': one is downloaded and waiting for a reload;
+ * 'downloading': one was found and the reload prompt will show once it's in.
+ */
+export async function checkForUpdates(): Promise<'ready' | 'downloading' | 'latest' | 'offline' | 'unsupported'> {
+  const reg = await navigator.serviceWorker?.getRegistration().catch(() => undefined);
+  if (!reg) return 'unsupported';
+  try {
+    await reg.update();
+  } catch {
+    return 'offline';
+  }
+  if (reg.waiting) return 'ready';
+  return reg.installing ? 'downloading' : 'latest';
 }
 
 /**

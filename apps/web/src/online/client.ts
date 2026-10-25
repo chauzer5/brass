@@ -37,14 +37,44 @@ export const joinGame = (code: string, body: JoinGameRequest) => request<SeatTic
 // ---- Notifications ----
 
 /** Whether this browser can get notifications (an iPhone only can from the home-screen app). */
+/**
+ * Opened in Safari on an iPhone or iPad, not the home-screen app. Links there always open in the browser,
+ * and the browser keeps its games apart from the app's.
+ */
+export const inIosBrowser =
+  (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.userAgent.includes('Macintosh') && navigator.maxTouchPoints > 1)) &&
+  !(navigator as { standalone?: boolean }).standalone &&
+  !matchMedia('(display-mode: standalone)').matches;
+
 export const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 
-export type PushState = 'unsupported' | 'default' | 'granted' | 'denied';
-export const pushState = (): PushState => (pushSupported() ? Notification.permission : 'unsupported');
+/** 'off': allowed by the phone, but turned off in Settings. */
+export type PushState = 'unsupported' | 'default' | 'granted' | 'denied' | 'off';
+export const pushState = (): PushState => {
+  if (!pushSupported()) return 'unsupported';
+  return Notification.permission === 'granted' && pushTurnedOff() ? 'off' : Notification.permission;
+};
+
+const PUSH_OFF_KEY = 'brass:push-off';
+function pushTurnedOff(): boolean {
+  try {
+    return localStorage.getItem(PUSH_OFF_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+function setPushTurnedOff(off: boolean) {
+  try {
+    if (off) localStorage.setItem(PUSH_OFF_KEY, '1');
+    else localStorage.removeItem(PUSH_OFF_KEY);
+  } catch {
+    // Just not remembered.
+  }
+}
 
 /** This phone's push subscription, made if needed (only once notifications are allowed). */
 async function subscription(): Promise<PushSubscription | null> {
-  if (!pushSupported() || Notification.permission !== 'granted') return null;
+  if (!pushSupported() || Notification.permission !== 'granted' || pushTurnedOff()) return null;
   const reg = await navigator.serviceWorker.ready;
   const existing = await reg.pushManager.getSubscription();
   if (existing) return existing;
@@ -69,9 +99,25 @@ export async function registerPush(ticket: SeatTicket): Promise<void> {
 /** Asks to allow notifications (from a tap), then signs up for every game this phone is in. */
 export async function enablePush(): Promise<PushState> {
   if (!pushSupported()) return 'unsupported';
+  setPushTurnedOff(false);
   const result = await Notification.requestPermission();
   if (result === 'granted') await Promise.all(savedTickets().map(registerPush));
   return result;
+}
+
+/**
+ * Stops notifications on this phone (Settings): drops its push subscription, so the games' servers
+ * find it gone the next time they send, and doesn't make a new one until they're turned back on.
+ */
+export async function disablePush(): Promise<PushState> {
+  setPushTurnedOff(true);
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration();
+    await (await reg?.pushManager.getSubscription())?.unsubscribe();
+  } catch (e) {
+    console.warn('Notifications not turned off cleanly:', e);
+  }
+  return pushState();
 }
 
 // ---- The games this phone is in ----

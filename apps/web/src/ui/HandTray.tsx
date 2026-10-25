@@ -2,6 +2,7 @@ import { brass } from '@brass/engine';
 import { useLayoutEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react';
 import type { CSSProperties } from 'react';
 import { IndustryIcon } from './icons.tsx';
+import { reducedMotion } from '../settings.ts';
 
 const CARD_WIDTH = 70;
 const CARD_GAP = 6;
@@ -191,7 +192,7 @@ export function HandTray({
     const row = innerCards.current;
     if (!arriving || !row || width === 0 || dealt.current === arriving.key) return;
     dealt.current = arriving.key;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (reducedMotion()) return;
     const deck = document.querySelector('[data-pile="deck"]')?.getBoundingClientRect();
     const area = document.querySelector('.board-area')?.getBoundingClientRect();
     const fromX = deck && area ? Math.min(Math.max(deck.left + deck.width / 2, area.left), area.right) : 0;
@@ -242,7 +243,7 @@ export function HandTray({
     const el = trayRef.current;
     if (!el || shownTab.current === tab) return;
     shownTab.current = tab;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (reducedMotion()) return;
     const from = trayHeight.current;
     const to = el.offsetHeight;
     const runs: Animation[] = [];

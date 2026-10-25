@@ -21,12 +21,13 @@ import { JoinGame, OnlineGame } from './online/OnlineScreens.tsx';
 import { lobbyInfo, markDone, savedTickets, type SavedTicket } from './online/client.ts';
 import { GamesList, NewGameFlow } from './ui/Games.tsx';
 import { normalizeCode } from '@brass/protocol';
+import { botPauseMs } from './settings.ts';
 
 /** Looking over a finished game: the whole map. */
 const WHOLE_MAP = { box: { x0: 0, y0: 0, x1: 1000, y1: 1000 }, key: 'whole-map' };
 
-/** Pause before each bot action, so people can see what's happening. */
-const BOT_PAUSE_MS = 900;
+/** Pause before each of the tutorial's bot actions, so people can see what's happening (a game's own uses the Bot speed setting). */
+const TUTORIAL_BOT_PAUSE_MS = 900;
 /** The tutorial's fast-forward. */
 const FAST_BOT_PAUSE_MS = 120;
 
@@ -477,7 +478,7 @@ export function Table({
     // The bot thinks during the pause; its move lands once both are done.
     let timer = 0;
     const pause = new Promise<void>((resolve) => {
-      timer = window.setTimeout(resolve, coach?.autoplay ? FAST_BOT_PAUSE_MS : BOT_PAUSE_MS);
+      timer = window.setTimeout(resolve, coach ? (coach.autoplay ? FAST_BOT_PAUSE_MS : TUTORIAL_BOT_PAUSE_MS) : botPauseMs());
     });
     Promise.all([runBot(input, difficulty), pause])
       .then(([action]) => {

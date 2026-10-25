@@ -7,6 +7,7 @@ import { DIFFICULTY_LABEL } from '../ui/Screens.tsx';
 import {
   createGame,
   enablePush,
+  inIosBrowser,
   forgetTicket,
   pushState,
   registerPush,
@@ -469,7 +470,8 @@ export function OnlineGame({ ticket, onBack, onNewGame }: { ticket: SavedTicket;
 export function PushPrompt() {
   const [state, setState] = useState<PushState>(pushState);
   const [busy, setBusy] = useState(false);
-  if (state === 'granted') return null;
+  // (Turned off in Settings: not asked again here.)
+  if (state === 'granted' || state === 'off') return null;
   if (state === 'unsupported') {
     return inIosBrowser ? (
       <p className="notice app-notice">
@@ -671,14 +673,6 @@ function Lobby({
   );
 }
 
-/**
- * Opened in Safari on an iPhone or iPad, not the home-screen app. Links there always open in the browser,
- * and the browser keeps its games apart from the app's.
- */
-const inIosBrowser =
-  (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.userAgent.includes('Macintosh') && navigator.maxTouchPoints > 1)) &&
-  !(navigator as { standalone?: boolean }).standalone &&
-  !matchMedia('(display-mode: standalone)').matches;
 
 const errorText = (e: unknown) =>
   e instanceof TypeError ? "Can't reach the game server. Check your connection." : e instanceof Error ? e.message : String(e);
