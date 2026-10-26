@@ -89,7 +89,8 @@ export function MainMenu({
 /** Setting up a game: how many players, and who (or which bot) plays each seat. */
 export function MatchSetup({ onStart, header }: { onStart: (names: string[], seats: Seat[]) => void; header: ReactNode }) {
   const [count, setCount] = useState(2);
-  const [names, setNames] = useState(['Player 1', 'Player 2', 'Player 3', 'Player 4']);
+  // The first seat is yours: your name from Settings, if you've given one.
+  const [names, setNames] = useState(() => [savedName() || 'Player 1', 'Player 2', 'Player 3', 'Player 4']);
   const [seats, setSeats] = useState<Seat[]>([HUMAN, HUMAN, HUMAN, HUMAN]);
   // Each bot seat keeps the name it was given, the first one not taken by another bot.
   const [botNames, setBotNames] = useState<(string | null)[]>([null, null, null, null]);
@@ -264,7 +265,7 @@ export function Settings({ onClose, inGame = false }: { onClose: () => void; inG
             }}
           />
         </div>
-        <p className="muted">Used when you start or join an online game. Games you're already in keep the name you joined with.</p>
+        <p className="muted">Filled in for you when you start a game or join one online. Games you're already in keep the name they had.</p>
 
         <h3>Notifications</h3>
         <NotificationSetting />
