@@ -120,9 +120,10 @@ export interface BotSettings {
 }
 
 /*
- * Tested head to head (2 players): Hard beats Normal (shown as Medium) by about 15 VP a game and the
- * previous Hard by about 20 (33 of 40 games). Its edge comes from looking a turn further for its best
- * plans, searching 20 distinct first moves, valuing money only while there are actions to spend it, and
+ * Tested head to head (2 players, 40 games a step): Hard beats Normal (shown as Medium) by 15+ VP a game.
+ * Each move once rather than once per card made the old Hard's 20-move search really 20 moves (+21 VP
+ * over it), and searching 40 with a lookahead over 8 plans added 7.5 more (+4 in 4-player games).
+ * Its edge comes from looking a turn further for its best plans, searching many distinct first moves, valuing money only while there are actions to spend it, and
  * weighing what its moves give the leading opponent. Normal and Easy look at fewer moves (Easy often
  * plays a decent move instead of the best, never an idle pass). All three value cash in hand when
  * nearly broke (liquidity), so none sits passing with no money rather than borrowing.
