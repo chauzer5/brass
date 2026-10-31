@@ -41,6 +41,10 @@ export interface GameSnapshot {
   turnDeadline: number | null;
   /** The server's clock when this was sent, to count down against. */
   now: number;
+  /** Once someone has asked for a rematch: this phone's seat in the new game. */
+  rematch: SeatTicket | null;
+  /** Who asked for the rematch. */
+  rematchBy: number | null;
 }
 
 /** The turn-time choices offered when making a game, in seconds (null: no limit). */
@@ -107,13 +111,22 @@ export type ClientMessage =
    */
   | { t: 'act'; at: number; player: number; action: brass.BrassAction }
   /** Whether the app is on screen: notifications are only sent to players who aren't looking. */
-  | { t: 'visible'; visible: boolean };
+  | { t: 'visible'; visible: boolean }
+  /** Once the game is over: the same players again, in a new game (made once; asking again just resends it). */
+  | { t: 'rematch' }
+  /** One of REACTIONS, shown to everyone for a moment. */
+  | { t: 'react'; reaction: string };
 
 export type ServerMessage =
   | { t: 'state'; game: GameSnapshot }
   | { t: 'error'; message: string }
   /** Something everyone should know (e.g. a turn that ran out and was passed). */
-  | { t: 'notice'; message: string };
+  | { t: 'notice'; message: string }
+  /** A player's reaction (one of REACTIONS). */
+  | { t: 'reaction'; seat: number; reaction: string };
+
+/** What players can send each other mid-game: a few emoji and stock phrases (no free text). */
+export const REACTIONS = ['👍', '😂', '😮', '😬', '🔥', '🍺', 'Nice move!', 'Ouch!', 'Your turn!', 'Good game!'] as const;
 
 /** Game codes: 5 letters and digits that can't be confused (no 0/O, 1/I/L). */
 export const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';

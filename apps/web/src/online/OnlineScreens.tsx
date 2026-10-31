@@ -1,5 +1,5 @@
 import { brass } from '@brass/engine';
-import { CODE_LENGTH, TURN_LIMITS, normalizeCode, type GameSnapshot, type LobbyInfo, type PublicSeat, type SeatSetup } from '@brass/protocol';
+import { CODE_LENGTH, REACTIONS, TURN_LIMITS, normalizeCode, type GameSnapshot, type LobbyInfo, type PublicSeat, type SeatSetup } from '@brass/protocol';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Table } from '../App.tsx';
 import { setLastGame, type Game, type Seat } from '../game/useGame.ts';
@@ -24,6 +24,7 @@ import {
   savedName,
   savedTickets,
   useOnlineGame,
+  type Reaction,
   type SavedTicket,
 } from './client.ts';
 
@@ -295,8 +296,26 @@ export function JoinGame({ initialCode, onBack, onJoined }: { initialCode: strin
 
 // ---- A game ----
 
-export function OnlineGame({ ticket, onBack, onNewGame }: { ticket: SavedTicket; onBack: () => void; onNewGame: () => void }) {
-  const { snapshot, match, connection, error, clearError, notice, clearNotice, play, playBot, start } = useOnlineGame(ticket);
+export function OnlineGame({
+  ticket,
+  onBack,
+  onNewGame,
+  onOpen,
+}: {
+  ticket: SavedTicket;
+  onBack: () => void;
+  onNewGame: () => void;
+  /** Opens another online game (the rematch). */
+  onOpen: (ticket: SavedTicket) => void;
+}) {
+  const { snapshot, match, connection, error, clearError, notice, clearNotice, play, playBot, start, rematch, reactions, react } =
+    useOnlineGame(ticket);
+  // Asked for a rematch here: go to it as soon as the server says where it is.
+  const [wantsRematch, setWantsRematch] = useState(false);
+  const rematchTicket = snapshot?.rematch ?? null;
+  useEffect(() => {
+    if (wantsRematch && rematchTicket) onOpen(saveTicket(rematchTicket));
+  }, [wantsRematch, rematchTicket]); // eslint-disable-line react-hooks/exhaustive-deps
   const [introSeen, setIntroSeen] = useState(!!ticket.introSeen);
   const [confirmLeave, setConfirmLeave] = useState(false);
   // Notifications for this game, if they're on (it's safe to sign up again each time). And it's the game
@@ -408,10 +427,29 @@ export function OnlineGame({ ticket, onBack, onNewGame }: { ticket: SavedTicket;
         status={
           <span className="online-status">
             {!cancelled && <TurnClock snapshot={snapshot} />}
+            {!cancelled && <ReactionPicker onReact={react} disabled={connection !== 'open'} />}
             <ConnectionStatus connection={connection} seats={snapshot.seats} you={snapshot.you} />
           </span>
         }
         extraMenu={cancelled ? [] : [[finished ? 'Remove game' : 'Leave game', () => setConfirmLeave(true)]]}
+        rematch={
+          cancelled
+            ? undefined
+            : {
+                label: wantsRematch ? 'Setting up…' : rematchTicket ? 'Join the rematch' : 'Rematch',
+                disabled: wantsRematch || connection !== 'open',
+                note:
+                  snapshot.rematchBy !== null && snapshot.rematchBy !== snapshot.you
+                    ? `${seatName(snapshot.seats[snapshot.rematchBy]!, snapshot.rematchBy)} wants a rematch.`
+                    : null,
+                onClick: () => {
+                  setWantsRematch(true);
+                  if (!rematchTicket) rematch();
+                },
+              }
+        }
+        overlay={<Reactions reactions={reactions} seats={snapshot.seats} />}
+        summaryExtra={cancelled ? null : <ReactionRow onReact={react} disabled={connection !== 'open'} />}
       />
       {(error || notice) && !cancelled && (
         <div className={`online-toast ${error ? 'error' : ''}`} role="alert" onClick={error ? clearError : clearNotice}>
@@ -494,6 +532,83 @@ export function PushPrompt() {
       >
         Turn on
       </button>
+    </div>
+  );
+}
+
+/** The reactions button in the top bar, and the row of reactions it opens. */
+function ReactionPicker({ onReact, disabled }: { onReact: (reaction: string) => void; disabled: boolean }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        className={`reaction-button ${open ? 'open' : ''}`}
+        aria-label="Send a reaction"
+        aria-expanded={open}
+        disabled={disabled}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
+          <path d="M3 4.5h14v9H8.5L5 16.5v-3H3z" strokeLinejoin="round" />
+          <circle cx="7.5" cy="9" r="0.9" fill="currentColor" stroke="none" />
+          <circle cx="10" cy="9" r="0.9" fill="currentColor" stroke="none" />
+          <circle cx="12.5" cy="9" r="0.9" fill="currentColor" stroke="none" />
+        </svg>
+      </button>
+      {open && (
+        <>
+          <div className="reaction-scrim" onClick={() => setOpen(false)} />
+          <div className="reaction-palette" role="menu" aria-label="Reactions">
+            {REACTIONS.map((r) => (
+              <button
+                key={r}
+                role="menuitem"
+                className={/\p{Extended_Pictographic}/u.test(r) ? 'emoji' : 'phrase'}
+                onClick={() => {
+                  onReact(r);
+                  setOpen(false);
+                }}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+/** The reactions as a row (on the final scores, where the top bar's button is covered). */
+function ReactionRow({ onReact, disabled }: { onReact: (reaction: string) => void; disabled: boolean }) {
+  return (
+    <div className="reaction-row" role="group" aria-label="Send a reaction">
+      {REACTIONS.map((r) => (
+        <button key={r} className={/\p{Extended_Pictographic}/u.test(r) ? 'emoji' : 'phrase'} disabled={disabled} onClick={() => onReact(r)}>
+          {r}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Reactions as bubbles under the sender's chip in the player strip (or along the top, if it can't be found). */
+function Reactions({ reactions, seats }: { reactions: Reaction[]; seats: PublicSeat[] }) {
+  return (
+    <div className="reactions" aria-live="polite">
+      {reactions.map((r) => {
+        const chip = document.querySelector<HTMLElement>(`.player-strip [data-player="${r.seat}"]`)?.getBoundingClientRect();
+        const style = chip
+          ? { top: chip.bottom + 6, left: Math.min(Math.max(chip.left + chip.width / 2, 70), window.innerWidth - 70) }
+          : { top: 120, left: window.innerWidth / 2 };
+        const emoji = /\p{Extended_Pictographic}/u.test(r.reaction);
+        return (
+          <div key={r.id} className={`reaction-bubble owner-${r.seat} ${emoji ? 'emoji' : ''}`} style={style}>
+            <span className="reaction-who">{seatName(seats[r.seat]!, r.seat)}</span>
+            <span className="reaction-what">{r.reaction}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -620,22 +735,31 @@ function Lobby({
           <button className="close" onClick={onBack} aria-label="Back">
             ‹
           </button>
-          <h2>Waiting for players</h2>
+          <h2>{waiting > 0 ? 'Waiting for players' : 'Everyone’s in'}</h2>
         </div>
-        <p className="muted">Send your friends this code, or the link.</p>
-        <div className="lobby-code" aria-label={`Game code ${code.split('').join(' ')}`}>
-          {code}
-        </div>
-        <div className="online-actions">
-          <button className="secondary" onClick={copy}>
-            {copied ? 'Copied!' : 'Copy link'}
-          </button>
-          {'share' in navigator && (
-            <button className="secondary" onClick={share}>
-              Share…
-            </button>
-          )}
-        </div>
+        {waiting > 0 ? (
+          <>
+            <p className="muted">Send your friends this code, or the link.</p>
+            <div className="lobby-code" aria-label={`Game code ${code.split('').join(' ')}`}>
+              {code}
+            </div>
+            <div className="online-actions">
+              <button className="secondary" onClick={copy}>
+                {copied ? 'Copied!' : 'Copy link'}
+              </button>
+              {'share' in navigator && (
+                <button className="secondary" onClick={share}>
+                  Share…
+                </button>
+              )}
+            </div>
+          </>
+        ) : (
+          // (A rematch starts with everyone seated: the green dots show who's here yet.)
+          <p className="muted">
+            Game {code}. {you === host ? 'Start when you’re ready.' : `${seatName(seats[host]!, host)} will start it.`}
+          </p>
+        )}
         <h3>Players</h3>
         <div className="name-list">
           {seats.map((s, i) => (
@@ -672,7 +796,6 @@ function Lobby({
     </div>
   );
 }
-
 
 const errorText = (e: unknown) =>
   e instanceof TypeError ? "Can't reach the game server. Check your connection." : e instanceof Error ? e.message : String(e);

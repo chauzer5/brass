@@ -4406,3 +4406,316 @@ button.lobby-seat:disabled {
 .settings .about p {
   margin: 0;
 }
+
+/* ---- Reactions (online) ---- */
+/* A button in the top bar opens a row of emoji and stock phrases; whatever anyone sends pops up under */
+/* their chip in the player strip for a few seconds. */
+.reaction-button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.reaction-button.open {
+  color: var(--highlight);
+}
+.reaction-button:disabled {
+  opacity: 0.4;
+}
+
+.reaction-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
+.reaction-palette {
+  position: fixed;
+  z-index: 41;
+  top: calc(env(safe-area-inset-top) + 60px);
+  right: 12px;
+  left: 12px;
+  max-width: 360px;
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  animation: reaction-palette-in 0.15s ease-out;
+}
+.reaction-palette button {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--ink);
+  cursor: pointer;
+}
+.reaction-palette button.emoji {
+  width: 44px;
+  height: 44px;
+  font-size: 24px;
+  line-height: 1;
+  padding: 0;
+}
+.reaction-palette button.phrase {
+  height: 36px;
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+@keyframes reaction-palette-in {
+  from { opacity: 0; transform: translateY(-6px); }
+}
+
+.reactions {
+  position: fixed;
+  inset: 0;
+  z-index: 35;
+  pointer-events: none;
+}
+.reaction-bubble {
+  position: absolute;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 6px 12px 7px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 2px solid var(--owner);
+  box-shadow: var(--shadow);
+  white-space: nowrap;
+  animation: reaction-pop 3.5s ease-out forwards;
+}
+/* The point, up at the sender's chip. */
+.reaction-bubble::before {
+  content: '';
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  background: var(--surface);
+  border-left: 2px solid var(--owner);
+  border-top: 2px solid var(--owner);
+  transform: rotate(45deg);
+}
+.reaction-who {
+  font-size: 11px;
+  color: var(--muted);
+}
+.reaction-what {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.reaction-bubble.emoji .reaction-what {
+  font-size: 28px;
+  line-height: 1.1;
+}
+@keyframes reaction-pop {
+  0% { opacity: 0; transform: translateX(-50%) translateY(-6px) scale(0.6); }
+  8% { opacity: 1; transform: translateX(-50%) scale(1.08); }
+  14% { transform: translateX(-50%) scale(1); }
+  85% { opacity: 1; transform: translateX(-50%); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-4px); }
+}
+:root[data-motion='reduced'] .reaction-bubble { animation: reaction-fade 3.5s linear forwards; }
+@keyframes reaction-fade {
+  0%, 90% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* The final scores' rematch button: full width, above the other two. */
+.era-summary .rematch {
+  width: 100%;
+}
+
+/* The same reactions as a row on the final scores. */
+.reaction-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+.reaction-row button {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--ink);
+  cursor: pointer;
+}
+.reaction-row button.emoji {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  font-size: 20px;
+  line-height: 1;
+}
+.reaction-row button.phrase {
+  height: 32px;
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ---- The game breakdown (after the final scores) ---- */
+.breakdown-overlay {
+  z-index: 12;
+}
+.breakdown {
+  max-width: 560px;
+}
+.breakdown section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.breakdown-open {
+  width: 100%;
+}
+
+.chart {
+  position: relative;
+  width: 100%;
+}
+.chart svg {
+  display: block;
+  overflow: visible;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.chart-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.chart-grid.zero {
+  stroke: var(--muted);
+  stroke-dasharray: 3 3;
+}
+.chart-era {
+  stroke: var(--muted);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+  opacity: 0.7;
+}
+.chart-tick {
+  font-size: 11px;
+  fill: var(--muted);
+}
+.chart-line {
+  fill: none;
+  stroke: var(--owner);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.chart-end,
+.chart-dot {
+  fill: var(--owner);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+.chart-label {
+  font-size: 12px;
+  font-weight: 600;
+  fill: var(--ink);
+}
+.chart-crosshair {
+  stroke: var(--muted);
+  stroke-width: 1;
+}
+.chart-tooltip {
+  position: absolute;
+  top: 4px;
+  min-width: 130px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  font-size: 12px;
+  pointer-events: none;
+  z-index: 2;
+}
+.chart-tooltip-title {
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.chart-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.chart-tooltip-name {
+  flex: 1;
+  color: var(--muted);
+}
+.chart-tooltip-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.breakdown-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.breakdown-table th,
+.breakdown-table td {
+  padding: 5px 4px;
+  border-bottom: 1px solid var(--line);
+}
+.breakdown-table thead th {
+  font-size: 12px;
+  font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
+}
+.breakdown-table thead th .dot {
+  margin-right: 4px;
+}
+.breakdown-name {
+  display: inline-block;
+  max-width: 64px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+.breakdown-table tbody th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--ink);
+}
+.breakdown-table td {
+  text-align: right;
+}
+.breakdown-table tr.sub-head th {
+  padding-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+  border-bottom: 0;
+}
+.breakdown-table tr.sub th {
+  padding-left: 14px;
+  color: var(--muted);
+}
+.breakdown-table tr.total th,
+.breakdown-table tr.total td {
+  font-weight: 700;
+  border-bottom: 0;
+}

@@ -5,6 +5,7 @@ import {
   CODE_ALPHABET,
   TURN_LIMITS,
   CODE_LENGTH,
+  REACTIONS,
   normalizeCode,
   type ClientMessage,
   type CreateGameRequest,
@@ -59,7 +60,20 @@ interface StoredGame {
   turnLimit?: number;
   /** When the current player's turn began (ms). */
   turnStartedAt?: number;
+  /** The rematch, once someone asked: its code, each seat's token there, and who asked. */
+  rematch?: { code: string; tokens: (string | null)[]; by: number };
 }
+
+/** A rematch as handed to its new room: the same seats (with fresh tokens), turn limit and players' phones. */
+interface RematchSetup {
+  playerCount: brass.PlayerCount;
+  seats: StoredSeat[];
+  host: number;
+  turnLimit?: number;
+}
+
+/** The fewest milliseconds between one phone's reactions. */
+const REACTION_GAP_MS = 1500;
 
 const MAX_NAME = 24;
 const cleanName = (name: unknown) => (typeof name === 'string' ? name.trim().slice(0, MAX_NAME) : '');
@@ -216,6 +230,47 @@ export class GameRoom extends DurableObject<Env> {
     await this.save(game);
     await this.scheduleTimeout(game);
     return { code, seat: first, token };
+  }
+
+  /** A rematch: everyone already seated, waiting in the lobby for whoever asked to start it. */
+  async createRematch(code: string, setup: RematchSetup): Promise<'ok' | 'taken'> {
+    if (await this.load()) return 'taken';
+    const game: StoredGame = {
+      code,
+      playerCount: setup.playerCount,
+      status: 'lobby',
+      seed: randomSeed(),
+      log: [],
+      seats: setup.seats,
+      createdAt: Date.now(),
+      host: setup.host,
+      ...(setup.turnLimit && { turnLimit: setup.turnLimit }),
+    };
+    await this.save(game);
+    return 'ok';
+  }
+
+  /** Makes this game's rematch (once), and tells everyone. */
+  private async rematch(game: StoredGame, by: number) {
+    if (!game.rematch) {
+      const tokens = game.seats.map((s) => (s.kind === 'human' && s.token ? crypto.randomUUID() : null));
+      const seats: StoredSeat[] = game.seats.map((s, i) =>
+        s.kind === 'bot' ? s : { kind: 'human', name: s.name, token: tokens[i]!, ...(s.push && { push: s.push }) },
+      );
+      const setup: RematchSetup = { playerCount: game.playerCount, seats, host: by, ...(game.turnLimit && { turnLimit: game.turnLimit }) };
+      for (let attempt = 0; attempt < 5 && !game.rematch; attempt++) {
+        const code = newCode();
+        if ((await this.env.GAMES.get(this.env.GAMES.idFromName(code)).createRematch(code, setup)) === 'ok') game.rematch = { code, tokens, by };
+      }
+      if (!game.rematch) return;
+      await this.save(game);
+      const who = this.nameOf(game, by);
+      for (const ws of this.ctx.getWebSockets()) {
+        if (Number(this.ctx.getTags(ws)[0]) !== by) this.send(ws, { t: 'notice', message: `${who} wants a rematch!` });
+      }
+      this.notify(game, this.humans(game, by), () => ({ title: 'Rematch?', body: `${who} wants a rematch of game ${game.code}.` }));
+    }
+    this.broadcast(game);
   }
 
   async info(): Promise<LobbyInfo | null> {
@@ -433,7 +488,24 @@ export class GameRoom extends DurableObject<Env> {
     }
 
     if (msg.t === 'visible') {
-      ws.serializeAttachment({ visible: !!msg.visible });
+      ws.serializeAttachment({ ...((ws.deserializeAttachment() ?? {}) as object), visible: !!msg.visible });
+      return;
+    }
+
+    if (msg.t === 'rematch') {
+      if (game.status !== 'playing' || !brass.brassGame.outcome(this.matchOf(game).state)) {
+        return this.send(ws, { t: 'error', message: 'A rematch can only be asked for once the game is over' });
+      }
+      return this.rematch(game, you);
+    }
+
+    if (msg.t === 'react') {
+      if (!(REACTIONS as readonly string[]).includes(msg.reaction) || game.status === 'cancelled') return;
+      // A little spacing, so nobody can flood everyone's screens.
+      const attachment = (ws.deserializeAttachment() ?? {}) as { visible?: boolean; reactedAt?: number };
+      if (Date.now() - (attachment.reactedAt ?? 0) < REACTION_GAP_MS) return;
+      ws.serializeAttachment({ ...attachment, reactedAt: Date.now() });
+      for (const other of this.ctx.getWebSockets()) this.send(other, { t: 'reaction', seat: you, reaction: msg.reaction });
       return;
     }
 
@@ -505,6 +577,8 @@ export class GameRoom extends DurableObject<Env> {
       turnLimit: game.turnLimit ?? null,
       turnDeadline: this.deadline(game),
       now: Date.now(),
+      rematch: game.rematch?.tokens[you] ? { code: game.rematch.code, seat: you, token: game.rematch.tokens[you] } : null,
+      rematchBy: game.rematch?.by ?? null,
     };
     return { t: 'state', game: snapshot };
   }

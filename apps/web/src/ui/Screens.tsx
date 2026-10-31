@@ -391,6 +391,7 @@ export function PlayerStrip({
           <button
             key={id}
             className={`player-chip owner-${id} ${id === active ? 'active' : ''}`}
+            data-player={id}
             aria-label={`${names[id]}: £${p.money}, income ${income}, ${p.vp} VP. Show board`}
             onClick={() => onSelect(id)}
           >
@@ -514,6 +515,9 @@ export function EraSummary({
   outcome,
   onContinue,
   onNewGame,
+  rematch,
+  extra,
+  onBreakdown,
 }: {
   view: brass.BrassView;
   names: readonly string[];
@@ -522,6 +526,12 @@ export function EraSummary({
   /** End of the Canal Era: carry on into the Rail Era. Game over: look at the final board. */
   onContinue: () => void;
   onNewGame: () => void;
+  /** Game over: the same players again. */
+  rematch?: { label: string; onClick: () => void; disabled?: boolean; note?: string | null } | undefined;
+  /** Shown under the scores (online: reactions). */
+  extra?: ReactNode;
+  /** Game over: opens the charts and tables of how the game went. */
+  onBreakdown?: (() => void) | undefined;
 }) {
   const final = outcome !== null;
   const eras = view.eraScores;
@@ -615,15 +625,31 @@ export function EraSummary({
           </p>
         ))}
         {!final && <p className="muted era-note">{eraLabel('rail')}: only rail links from now on, and Canal-only tiles can no longer be built.</p>}
+        {final && onBreakdown && (
+          <button className="secondary breakdown-open" onClick={onBreakdown}>
+            Game breakdown: points, income and moves ›
+          </button>
+        )}
+        {final && extra}
         {final ? (
-          <div className="era-buttons">
-            <button className="secondary" onClick={onContinue}>
-              View the board
-            </button>
-            <button className="confirm" onClick={onNewGame}>
-              New game
-            </button>
-          </div>
+          <>
+            {rematch && (
+              <>
+                {rematch.note && <p className="muted era-note">{rematch.note}</p>}
+                <button className="confirm rematch" onClick={rematch.onClick} disabled={rematch.disabled}>
+                  {rematch.label}
+                </button>
+              </>
+            )}
+            <div className="era-buttons">
+              <button className="secondary" onClick={onContinue}>
+                View the board
+              </button>
+              <button className={rematch ? 'secondary' : 'confirm'} onClick={onNewGame}>
+                New game
+              </button>
+            </div>
+          </>
         ) : (
           <button className="confirm" onClick={onContinue} autoFocus>
             Start the Rail Era

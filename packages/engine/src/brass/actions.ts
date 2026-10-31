@@ -34,6 +34,7 @@ import {
   currentPlayer,
   slotKey,
   type BrassState,
+  type EraPlayerScore,
   type CardId,
   type PlayerState,
   type SlotKey,
@@ -515,7 +516,7 @@ export function linkIconsAt(state: BrassState, location: LocationId): number {
 /** End of era scoring and maintenance (rulebook p.7). */
 function endEra(state: BrassState, rng: Rng): void {
   // Kept for the end-of-era summary.
-  const score = state.players.map((p) => ({ linkVP: 0, links: 0, tileVP: 0, tiles: 0, before: p.vp, after: p.vp }));
+  const score: EraPlayerScore[] = state.players.map((p) => ({ linkVP: 0, links: 0, tileVP: 0, tiles: 0, tileVPByIndustry: {}, before: p.vp, after: p.vp }));
 
   // 1. Score each Link tile, then remove it.
   for (const [id, owner] of Object.entries(state.links)) {
@@ -534,8 +535,10 @@ function endEra(state: BrassState, rng: Rng): void {
   for (const tile of Object.values(state.tiles)) {
     if (!tile?.flipped) continue;
     player(state, tile.owner).vp += tileDef(tile).vp;
-    score[tile.owner]!.tileVP += tileDef(tile).vp;
-    score[tile.owner]!.tiles += 1;
+    const sc = score[tile.owner]!;
+    sc.tileVP += tileDef(tile).vp;
+    sc.tiles += 1;
+    sc.tileVPByIndustry![tile.industry] = (sc.tileVPByIndustry![tile.industry] ?? 0) + tileDef(tile).vp;
   }
   for (const p of state.players) score[p.id]!.after = p.vp;
   state.eraScores.push({ era: state.era, players: score });

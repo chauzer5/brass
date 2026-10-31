@@ -98,6 +98,8 @@ export interface EraPlayerScore {
   /** VPs from flipped Industry tiles, and how many there were. */
   tileVP: number;
   tiles: number;
+  /** The tiles' VPs by industry (missing in games scored before it was kept). */
+  tileVPByIndustry?: Partial<Record<Industry, number>>;
   /** VPs before and after this era's scoring. */
   before: number;
   after: number;

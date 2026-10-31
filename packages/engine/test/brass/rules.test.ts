@@ -610,7 +610,11 @@ describe('full games', () => {
     const scores = match.state.eraScores;
     expect(scores.map((e) => e.era)).toEqual(['canal', 'rail']);
     for (const era of scores) {
-      for (const p of era.players) expect(p.after - p.before).toBe(p.linkVP + p.tileVP);
+      for (const p of era.players) {
+        expect(p.after - p.before).toBe(p.linkVP + p.tileVP);
+        // Split by industry for the end-of-game breakdown.
+        expect(Object.values(p.tileVPByIndustry!).reduce((a, b) => a + b, 0)).toBe(p.tileVP);
+      }
     }
     // The game ends with the rail era's scoring, so its totals are the final scores. (Between eras VPs can
     // also change through Merchant bonuses and income shortfalls, so the eras' totals needn't chain.)

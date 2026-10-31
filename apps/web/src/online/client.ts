@@ -201,6 +201,16 @@ export type Connection = 'connecting' | 'open' | 'offline';
 
 const configFor = (playerCount: brass.PlayerCount): brass.BrassConfig => ({ playerCount, components: brass.BIRMINGHAM_COMPONENTS });
 
+/** A reaction someone sent, on screen for a moment. */
+export interface Reaction {
+  id: number;
+  seat: number;
+  reaction: string;
+}
+/** How long a reaction stays up. */
+const REACTION_MS = 3500;
+let reactionId = 0;
+
 /** Waits before reconnecting: quickly at first, then less often. */
 const RETRY_MS = [500, 1000, 2000, 4000, 8000, 15000];
 
@@ -216,6 +226,8 @@ export function useOnlineGame(ticket: SeatTicket) {
   const [connection, setConnection] = useState<Connection>('connecting');
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Reactions on screen now (each goes after a few seconds).
+  const [reactions, setReactions] = useState<Reaction[]>([]);
   const ws = useRef<WebSocket | null>(null);
   const matchRef = useRef<BrassMatch | null>(null);
   matchRef.current = match;
@@ -244,6 +256,12 @@ export function useOnlineGame(ticket: SeatTicket) {
         }
         if (msg.t === 'notice') {
           setNotice(msg.message);
+          return;
+        }
+        if (msg.t === 'reaction') {
+          const reaction = { id: ++reactionId, seat: msg.seat, reaction: msg.reaction };
+          setReactions((rs) => [...rs.filter((r) => r.seat !== msg.seat), reaction]);
+          window.setTimeout(() => setReactions((rs) => rs.filter((r) => r !== reaction)), REACTION_MS);
           return;
         }
         const game = msg.game;
@@ -324,6 +342,22 @@ export function useOnlineGame(ticket: SeatTicket) {
   );
 
   const start = useCallback(() => send({ t: 'start' }), [send]);
+  const rematch = useCallback(() => send({ t: 'rematch' }), [send]);
+  const react = useCallback((reaction: string) => send({ t: 'react', reaction }), [send]);
 
-  return { snapshot, match, connection, error, clearError: () => setError(null), notice, clearNotice: () => setNotice(null), play, playBot, start };
+  return {
+    snapshot,
+    match,
+    connection,
+    error,
+    clearError: () => setError(null),
+    notice,
+    clearNotice: () => setNotice(null),
+    play,
+    playBot,
+    start,
+    rematch,
+    reactions,
+    react,
+  };
 }

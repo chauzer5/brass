@@ -20,6 +20,7 @@ import { useWide } from './ui/layout.ts';
 import { JoinGame, OnlineGame } from './online/OnlineScreens.tsx';
 import { lobbyInfo, markDone, savedTickets, type SavedTicket } from './online/client.ts';
 import { GamesList, NewGameFlow } from './ui/Games.tsx';
+import { GameBreakdown } from './ui/Breakdown.tsx';
 import { normalizeCode } from '@brass/protocol';
 import { botPauseMs } from './settings.ts';
 
@@ -103,6 +104,18 @@ export function App() {
           local.remove();
           setScreen({ kind: 'new' });
         }}
+        // The same players again (this one goes from the list, as with a new game).
+        rematch={
+          game.tutorial
+            ? undefined
+            : {
+                label: 'Rematch',
+                onClick: () => {
+                  local.remove();
+                  local.start([...game.names], [...game.seats]);
+                },
+              }
+        }
         onExitTutorial={menu}
         onKeepPlaying={local.keepPlaying}
         onIntroDone={local.introDone}
@@ -110,7 +123,9 @@ export function App() {
     );
   }
   if (screen.kind === 'online') {
-    return <OnlineGame key={screen.ticket.code} ticket={screen.ticket} onBack={menu} onNewGame={() => setScreen({ kind: 'new' })} />;
+    return (
+      <OnlineGame key={screen.ticket.code} ticket={screen.ticket} onBack={menu} onNewGame={() => setScreen({ kind: 'new' })} onOpen={openOnline} />
+    );
   }
   if (screen.kind === 'join') return <JoinGame initialCode={screen.code} onBack={menu} onJoined={openOnline} />;
   if (screen.kind === 'new') {
@@ -165,6 +180,9 @@ export function Table({
   runsBots = true,
   status,
   extraMenu = [],
+  rematch,
+  overlay,
+  summaryExtra,
 }: {
   game: Game;
   play: (player: number, action: brass.BrassAction) => string | null;
@@ -182,6 +200,12 @@ export function Table({
   status?: ReactNode;
   /** More entries for the ☰ menu (online: leaving the game). */
   extraMenu?: readonly (readonly [string, () => void])[];
+  /** Offered with the final scores: the same players again. */
+  rematch?: { label: string; onClick: () => void; disabled?: boolean; note?: string | null } | undefined;
+  /** Drawn over the table (online: reactions). */
+  overlay?: ReactNode;
+  /** Shown with the final scores (online: reactions). */
+  summaryExtra?: ReactNode;
 }) {
   const { match, names, seats } = game;
   const state = match.state;
@@ -192,6 +216,8 @@ export function Table({
   // dismissed to look at the board). Eras that ended before this game was opened aren't shown again.
   const [seenEras, setSeenEras] = useState(state.eraScores.length);
   const [resultsHidden, setResultsHidden] = useState(false);
+  // The game's breakdown, opened from the final scores.
+  const [breakdownOpen, setBreakdownOpen] = useState(false);
   // Eras whose scoring has played out on the board (it plays before the summary opens).
   const [erasPlayed, setErasPlayed] = useState(state.eraScores.length);
   const scoringToPlay = state.eraScores.length > erasPlayed;
@@ -759,8 +785,13 @@ export function Table({
             if (outcome) setResultsHidden(true);
           }}
           onNewGame={onNewGame}
+          rematch={rematch}
+          extra={summaryExtra}
+          onBreakdown={() => setBreakdownOpen(true)}
         />
       )}
+      {summaryOpen && outcome && breakdownOpen && <GameBreakdown match={match} names={names} onClose={() => setBreakdownOpen(false)} />}
+      {overlay}
       {outcome && !summaryOpen && !scoringToPlay && (
         <button className="results-button confirm" onClick={() => setResultsHidden(false)}>
           Final scores
