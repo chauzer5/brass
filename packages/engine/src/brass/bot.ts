@@ -109,25 +109,33 @@ export interface BotSettings {
    * known), then the bot's next turn is searched too (its `breadth` best first actions), so a move that
    * sets up the next turn (a build to sell, a link to a Merchant) is seen for what it leads to.
    */
-  lookahead?: { plans: number; breadth: number };
+  lookahead?: {
+    plans: number;
+    breadth: number;
+    /** Stops looking further once this long has gone on it (ms), best plans first: a slow phone looks less far. */
+    budgetMs?: number;
+  };
   weights?: Partial<Weights>;
 }
 
 /*
- * Tested head to head (2 players, 20 games each): Hard wins about 75% against
- * Normal (shown as Medium), Easy about 25%. All three value cash in hand when
- * nearly broke (liquidity), so none sits passing with no money rather than
- * borrowing, and value money beyond what they could still spend (about £15 a
- * round left) at a quarter, so none borrows money it has no time left to
- * spend. Hard gets its edge from weighing what its moves give the leading
- * opponent; Easy looks at fewer
- * moves and often plays a decent move instead of the best (never an idle
- * pass). Easy passes on about 2% of its actions, Normal on none.
+ * Tested head to head (2 players): Hard beats Normal (shown as Medium) by about 15 VP a game and the
+ * previous Hard by about 20 (33 of 40 games). Its edge comes from looking a turn further for its best
+ * plans, searching 20 distinct first moves, valuing money only while there are actions to spend it, and
+ * weighing what its moves give the leading opponent. Normal and Easy look at fewer moves (Easy often
+ * plays a decent move instead of the best, never an idle pass). All three value cash in hand when
+ * nearly broke (liquidity), so none sits passing with no money rather than borrowing.
  */
 const SETTINGS: Record<BotDifficulty, BotSettings> = {
   easy: { noise: 5, breadth: 2, slip: 0.5, slack: 8, weights: { liquidity: 0.3, spendPerRound: 15 } },
   normal: { noise: 0.6, breadth: 10, weights: { liquidity: 0.3, spendPerRound: 15 } },
-  hard: { noise: 0.2, breadth: 20, rivalry: 0.5, weights: { spendPerRound: 15, liquidity: 0.15 } },
+  hard: {
+    noise: 0.2,
+    breadth: 20,
+    rivalry: 0.5,
+    lookahead: { plans: 6, breadth: 4, budgetMs: 1500 },
+    weights: { liquidity: 0.15, spendPerAction: 10, flipHorizon: 4 },
+  },
 };
 
 // ---- A stand-in game from what the bot can see ----
@@ -329,15 +337,34 @@ function tryAfter(state: BrassState, me: PlayerId, action: BrassAction, rng: Rng
   }
 }
 
-/** Candidate moves worth trying: one Scout stands for all of them (which cards go doesn't change the position's value). */
+/**
+ * The moves worth telling apart: the same move made with different cards is one move (the evaluation
+ * doesn't tell ordinary cards apart), made with an ordinary card rather than a Wild one if it can be;
+ * and one Scout stands for all of them (which cards go doesn't change the position's value either).
+ */
+function distinctMoves(state: BrassState, actions: readonly BrassAction[]): BrassAction[] {
+  const isWild = (id: CardId) => {
+    const kind = state.cards[id]?.kind;
+    return kind === 'wildLocation' || kind === 'wildIndustry';
+  };
+  const chosen = new Map<string, BrassAction>();
+  for (const a of actions) {
+    if (a.type === 'removeTile') {
+      chosen.set(JSON.stringify(a), a);
+      continue;
+    }
+    const { card: _card, cards: _cards, ...rest } = a as BrassAction & { card?: CardId; cards?: CardId[] };
+    const key = a.type === 'scout' ? 'scout' : JSON.stringify(rest);
+    const kept = chosen.get(key);
+    const wild = (x: BrassAction) => ('card' in x ? isWild(x.card) : 'cards' in x ? x.cards.some(isWild) : false);
+    if (!kept || (wild(kept) && !wild(a))) chosen.set(key, a);
+  }
+  return [...chosen.values()];
+}
+
+/** Candidate moves worth trying from a position. */
 function candidates(state: BrassState, me: PlayerId): BrassAction[] {
-  let scouted = false;
-  return candidateActions(state, me).filter((a) => {
-    if (a.type !== 'scout') return true;
-    if (scouted) return false;
-    scouted = true;
-    return true;
-  });
+  return distinctMoves(state, candidateActions(state, me));
 }
 
 /** A position's worth to `me`: its own value, less (by `rivalry`) the best opponent's. */
@@ -412,7 +439,7 @@ export function brassBot(difficulty: BotDifficulty | BotSettings = 'normal'): Bo
     const sim = createRng(rng.int(2 ** 31));
     const score = scorer(player, weights, rivalry);
     // One step: how good is the position right after each action?
-    const first = legalActions.map((action) => {
+    const first = distinctMoves(state, legalActions).map((action) => {
       const s = after(state, player, action, sim);
       return { action, state: s, score: score(s) - (MILD_PENALTY[action.type] ?? 0) };
     });
@@ -437,7 +464,9 @@ export function brassBot(difficulty: BotDifficulty | BotSettings = 'normal'): Bo
     searched.sort((a, b) => b.score - a.score);
     // A turn further for the best plans: what the position after this turn lets the bot do next turn.
     if (lookahead) {
+      const started = performance.now();
       for (const f of searched.slice(0, lookahead.plans)) {
+        if (lookahead.budgetMs !== undefined && performance.now() - started > lookahead.budgetMs) break;
         const end = f.follow ? (tryAfter(f.state, player, f.follow, sim) ?? f.state) : f.state;
         const next = skipToMyTurn(end, player, sim);
         if (next) f.score += bestTurn(next, player, sim, score, lookahead.breadth) - score(end);
