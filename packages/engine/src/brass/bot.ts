@@ -8,7 +8,7 @@ import { LOCATION_BY_ID, MERCHANTS } from './data/map.ts';
 import { brassGame, candidateActions, type BrassView } from './game.ts';
 import { LINK_BY_ID, network } from './graph.ts';
 import { RuleError } from './resources.ts';
-import { cloneState, currentPlayer, parseSlotKey, type BrassState, type Card, type CardId, type SlotKey } from './state.ts';
+import { actionsThisTurn, cloneState, currentPlayer, parseSlotKey, type BrassState, type Card, type CardId, type SlotKey } from './state.ts';
 import { INDUSTRIES, type Industry } from './types.ts';
 
 /*
@@ -59,6 +59,16 @@ export interface Weights {
    * but a Loan or a Pass is possible, so being broke costs far more than the pounds themselves.
    */
   liquidity: number;
+  /**
+   * Money is only worth something while there are actions left to spend it: about this much per action
+   * still to come (0: no limit). Beyond that it counts a tenth. Replaces `spendPerRound` when set.
+   */
+  spendPerAction: number;
+  /**
+   * An unflipped tile's chance to flip shrinks as the era's actions run out: full with this many of the
+   * bot's own actions left in the era, scaled down below it (0: always full).
+   */
+  flipHorizon: number;
 }
 
 export const DEFAULT_WEIGHTS: Weights = {
@@ -77,6 +87,8 @@ export const DEFAULT_WEIGHTS: Weights = {
   wild: 0.6,
   spendPerRound: 0,
   liquidity: 0,
+  spendPerAction: 0,
+  flipHorizon: 0,
 };
 
 export interface BotSettings {
@@ -92,6 +104,12 @@ export interface BotSettings {
    * only for itself; 1 weighs the strongest opponent's gain as its own loss.
    */
   rivalry?: number;
+  /**
+   * Look a turn further for the best few plans: the others are assumed to pass (their moves can't be
+   * known), then the bot's next turn is searched too (its `breadth` best first actions), so a move that
+   * sets up the next turn (a build to sell, a link to a Merchant) is seen for what it leads to.
+   */
+  lookahead?: { plans: number; breadth: number };
   weights?: Partial<Weights>;
 }
 
@@ -140,6 +158,16 @@ function determinize(view: BrassView): BrassState {
 }
 
 // ---- Evaluation ----
+
+/** The actions `me` still has in this era, counting what's left of the current turn (none once they've played this round). */
+function actionsLeftInEra(state: BrassState, me: PlayerId): number {
+  if (state.phase.kind === 'gameOver') return 0;
+  const later = (ROUNDS_PER_ERA[state.playerCount] - state.round) * 2;
+  const position = state.turnOrder.indexOf(me);
+  const now =
+    position > state.turnIndex ? actionsThisTurn(state) : position === state.turnIndex && state.phase.kind === 'actions' ? actionsThisTurn(state) - state.actionsTaken : 0;
+  return later + now;
+}
 
 /** Rounds left in the game, counting the current one: how long income keeps paying. */
 function roundsLeft(state: BrassState): number {
@@ -198,8 +226,16 @@ export function evaluate(state: BrassState, me: PlayerId, w: Weights = DEFAULT_W
   // charged now.
   const income = incomeLevel(p.incomeSpace);
   v += income * Math.max(0, rounds - 1) * moneyWeight * (income < 0 ? w.negativeIncome : 1);
-  const cap = w.spendPerRound > 0 ? w.spendPerRound * rounds : Infinity;
-  v += (Math.min(p.money, cap) + Math.max(0, p.money - cap) * 0.25) * moneyWeight;
+  const eraActions = actionsLeftInEra(state, me);
+  if (w.spendPerAction > 0) {
+    // Actions still to come in the game: this era's, and the whole Rail Era's after the Canal Era.
+    const actions = eraActions + (state.era === 'canal' ? ROUNDS_PER_ERA[state.playerCount] * 2 : 0);
+    const cap = w.spendPerAction * actions;
+    v += (Math.min(p.money, cap) + Math.max(0, p.money - cap) * 0.1) * moneyWeight;
+  } else {
+    const cap = w.spendPerRound > 0 ? w.spendPerRound * rounds : Infinity;
+    v += (Math.min(p.money, cap) + Math.max(0, p.money - cap) * 0.25) * moneyWeight;
+  }
   if (rounds > 2) v += Math.min(p.money, 20) * w.liquidity;
   if (income < 0 && p.money + income < 0) v -= (-(p.money + income)) * 0.8 + 2;
 
@@ -238,7 +274,15 @@ export function evaluate(state: BrassState, me: PlayerId, w: Weights = DEFAULT_W
       flip = tile.cubes <= 1 ? w.flipCubes : w.flipCubes * 0.64;
     }
     if (late) flip *= 0.5;
-    v += (def.vp * scorings + def.income * Math.max(0, rounds - 2) * moneyWeight) * flip;
+    if (w.flipHorizon > 0) {
+      // Flipping in time for this era's scoring gets less likely as its actions run out; a Canal Era
+      // tile that stays on the board can still flip in the Rail Era, for that scoring and its income.
+      const now = flip * Math.max(0.15, Math.min(1, eraActions / w.flipHorizon));
+      const eventually = scorings === 2 ? Math.max(flip, now) : now;
+      v += def.vp * (now + (scorings === 2 ? eventually : 0)) + def.income * Math.max(0, rounds - 2) * moneyWeight * eventually;
+    } else {
+      v += (def.vp * scorings + def.income * Math.max(0, rounds - 2) * moneyWeight) * flip;
+    }
     v += tile.cubes * (tile.industry === 'brewery' ? (mySellables > 0 ? 0.5 : 0.05) : 0.12);
   }
 
@@ -324,13 +368,42 @@ function bestFollowUp(state: BrassState, me: PlayerId, rng: Rng, score: Score): 
   return best === -Infinity ? { score: score(state), action: null } : { score: best, action: bestAction };
 }
 
+/**
+ * The others' turns, played as passes (the bot can't know their moves), until it's `me` to act again.
+ * Null when that doesn't come (the game ends, or someone must cover a shortfall).
+ */
+function skipToMyTurn(state: BrassState, me: PlayerId, rng: Rng): BrassState | null {
+  let s = cloneState(state);
+  for (let i = 0; i < 16; i++) {
+    const current = currentPlayer(s);
+    if (current === null || s.phase.kind !== 'actions') return null;
+    if (current === me) return s;
+    const card = s.players[current]!.hand[0];
+    if (!card) return null;
+    s = brassGame.apply(s, current, { type: 'pass', card }, rng);
+  }
+  return null;
+}
+
+/** The best whole turn from here: its `breadth` best first actions, each with its best follow-up. */
+function bestTurn(state: BrassState, me: PlayerId, rng: Rng, score: Score, breadth: number): number {
+  const first: { state: BrassState; score: number }[] = [];
+  for (const a of candidates(state, me)) {
+    const s = tryAfter(state, me, a, rng);
+    if (s) first.push({ state: s, score: score(s) - (MILD_PENALTY[a.type] ?? 0) });
+  }
+  if (first.length === 0) return score(state);
+  first.sort((a, b) => b.score - a.score);
+  return Math.max(...first.slice(0, breadth).map((f) => bestFollowUp(f.state, me, rng, score).score));
+}
+
 /** Scouting draws Wild cards; passing does nothing. Both are fine, but shouldn't win ties against doing something. */
 const MILD_PENALTY: Partial<Record<BrassAction['type'], number>> = { pass: 1.5, scout: 0.4 };
 
 /** The Brass bot at a given difficulty (or with custom settings, for tuning). */
 export function brassBot(difficulty: BotDifficulty | BotSettings = 'normal'): Bot<BrassView, BrassAction> {
   const settings = typeof difficulty === 'string' ? SETTINGS[difficulty] : difficulty;
-  const { noise, breadth, slip = 0, slack = 1, rivalry = 0 } = settings;
+  const { noise, breadth, slip = 0, slack = 1, rivalry = 0, lookahead } = settings;
   const weights = { ...DEFAULT_WEIGHTS, ...settings.weights };
   return ({ player, view, legalActions }: BotInput<BrassView, BrassAction>, rng: Rng): BrassAction => {
     if (legalActions.length === 0) throw new Error('The bot was asked to act with no legal actions');
@@ -362,6 +435,15 @@ export function brassBot(difficulty: BotDifficulty | BotSettings = 'normal'): Bo
       if (firstMove) searched.push(search(firstMove));
     }
     searched.sort((a, b) => b.score - a.score);
+    // A turn further for the best plans: what the position after this turn lets the bot do next turn.
+    if (lookahead) {
+      for (const f of searched.slice(0, lookahead.plans)) {
+        const end = f.follow ? (tryAfter(f.state, player, f.follow, sim) ?? f.state) : f.state;
+        const next = skipToMyTurn(end, player, sim);
+        if (next) f.score += bestTurn(next, player, sim, score, lookahead.breadth) - score(end);
+      }
+      searched.sort((a, b) => b.score - a.score);
+    }
     // Now and then (easier bots), a decent move instead of the best one: a mistake, never an idle pass.
     if (slip > 0 && rng.next() < slip) {
       const decent = searched.slice(0, slack).filter((f) => f.action.type !== 'pass');
