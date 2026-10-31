@@ -109,12 +109,13 @@ export interface BotSettings {
    * known), then the bot's next turn is searched too (its `breadth` best first actions), so a move that
    * sets up the next turn (a build to sell, a link to a Merchant) is seen for what it leads to.
    */
-  lookahead?: {
-    plans: number;
-    breadth: number;
-    /** Stops looking further once this long has gone on it (ms), best plans first: a slow phone looks less far. */
-    budgetMs?: number;
-  };
+  lookahead?: { plans: number; breadth: number };
+  /**
+   * Roughly how long a move may take (ms): past half of it no more first moves get their follow-ups
+   * searched (beyond the best 5), and past all of it the lookahead stops (best plans first). A slow
+   * phone searches less rather than keeping everyone waiting.
+   */
+  budgetMs?: number;
   weights?: Partial<Weights>;
 }
 
@@ -131,9 +132,10 @@ const SETTINGS: Record<BotDifficulty, BotSettings> = {
   normal: { noise: 0.6, breadth: 10, weights: { liquidity: 0.3, spendPerRound: 15 } },
   hard: {
     noise: 0.2,
-    breadth: 20,
     rivalry: 0.5,
-    lookahead: { plans: 6, breadth: 4, budgetMs: 1500 },
+    breadth: 40,
+    lookahead: { plans: 8, breadth: 6 },
+    budgetMs: 1500,
     weights: { liquidity: 0.15, spendPerAction: 10, flipHorizon: 4 },
   },
 };
@@ -430,11 +432,13 @@ const MILD_PENALTY: Partial<Record<BrassAction['type'], number>> = { pass: 1.5, 
 /** The Brass bot at a given difficulty (or with custom settings, for tuning). */
 export function brassBot(difficulty: BotDifficulty | BotSettings = 'normal'): Bot<BrassView, BrassAction> {
   const settings = typeof difficulty === 'string' ? SETTINGS[difficulty] : difficulty;
-  const { noise, breadth, slip = 0, slack = 1, rivalry = 0, lookahead } = settings;
+  const { noise, breadth, slip = 0, slack = 1, rivalry = 0, lookahead, budgetMs = Infinity } = settings;
   const weights = { ...DEFAULT_WEIGHTS, ...settings.weights };
   return ({ player, view, legalActions }: BotInput<BrassView, BrassAction>, rng: Rng): BrassAction => {
     if (legalActions.length === 0) throw new Error('The bot was asked to act with no legal actions');
     if (legalActions.length === 1) return legalActions[0]!;
+    const started = performance.now();
+    const elapsed = () => performance.now() - started;
     const state = determinize(view);
     const sim = createRng(rng.int(2 ** 31));
     const score = scorer(player, weights, rivalry);
@@ -449,7 +453,11 @@ export function brassBot(difficulty: BotDifficulty | BotSettings = 'normal'): Bo
       const follow = bestFollowUp(f.state, player, sim, score);
       return { ...f, follow: follow.action, score: follow.score - (MILD_PENALTY[f.action.type] ?? 0) + (rng.next() * 2 - 1) * noise };
     };
-    const searched = first.slice(0, breadth).map(search);
+    const searched: ReturnType<typeof search>[] = [];
+    for (const f of first.slice(0, breadth)) {
+      if (searched.length >= 5 && elapsed() > budgetMs / 2) break;
+      searched.push(search(f));
+    }
     // A good move found only as the second action (after a pass, say) is searched as a first action too, so
     // a short list of first moves doesn't make "pass, then the good move" look like the best plan.
     const seen = new Set(searched.map((f) => JSON.stringify(f.action)));
@@ -464,9 +472,8 @@ export function brassBot(difficulty: BotDifficulty | BotSettings = 'normal'): Bo
     searched.sort((a, b) => b.score - a.score);
     // A turn further for the best plans: what the position after this turn lets the bot do next turn.
     if (lookahead) {
-      const started = performance.now();
       for (const f of searched.slice(0, lookahead.plans)) {
-        if (lookahead.budgetMs !== undefined && performance.now() - started > lookahead.budgetMs) break;
+        if (elapsed() > budgetMs) break;
         const end = f.follow ? (tryAfter(f.state, player, f.follow, sim) ?? f.state) : f.state;
         const next = skipToMyTurn(end, player, sim);
         if (next) f.score += bestTurn(next, player, sim, score, lookahead.breadth) - score(end);
